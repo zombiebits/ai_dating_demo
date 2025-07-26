@@ -359,5 +359,19 @@
     "tags": ["travel", "creative", "sarcastic", "mountain"],
     "bio": "Rocks out while keeping you informed.",
     "photo": "assets/dave.jpg"
+  },
+  {
+    "id": "lauren",
+    "name": "Lauren the Daring Equestrian",
+    "tags": ["sports", "adventurous", "playful", "forest"],
+    "bio": "Loves ponies and will be your ride or die.",
+    "photo": "assets/lauren.jpg"
+  },
+  {
+    "id": "derek",
+    "name": "Derek the Camping Web Designer",
+    "tags": ["travel", "chill", "stoic", "forest"],
+    "bio": "On the road or in boat, always connected.",
+    "photo": "assets/derek.jpg"
   }
 ]
