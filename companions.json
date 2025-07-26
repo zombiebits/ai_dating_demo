@@ -361,11 +361,11 @@
     "photo": "assets/dave.jpg"
   },
   {
-    "id": "lauren",
-    "name": "Lauren the Daring Equestrian",
+    "id": "lexi",
+    "name": "Lexi the Daring Equestrian",
     "tags": ["sports", "adventurous", "playful", "forest"],
     "bio": "Loves ponies and will be your ride or die.",
-    "photo": "assets/lauren.jpg"
+    "photo": "assets/lexi.jpg"
   },
   {
     "id": "derek",
