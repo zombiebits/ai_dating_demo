@@ -51,7 +51,7 @@ def profile_upsert(auth_uid: str, username: str) -> dict:
                 pass                                           # name collision; ignore
     else:                                                      # first visit
         try:
-            user = (
+            up = (
                 tbl.upsert(
                     {
                         "auth_uid": auth_uid,
@@ -61,8 +61,16 @@ def profile_upsert(auth_uid: str, username: str) -> dict:
                     on_conflict="auth_uid",
                 )
                 .execute()
-                .data[0]
+                .data
             )
+            # PostgREST may return an empty list when RLS is on – fallback to SELECT
+            user = (
+                up[0]
+                if up
+                else tbl.select("*").eq("auth_uid", auth_uid).execute().data[0]
+            )
+
+
         except APIError as e:
             msg = str(e)
             if "users_username_idx" in msg or "duplicate key" in msg:
