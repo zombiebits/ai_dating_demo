@@ -11,14 +11,12 @@ st.set_page_config(page_title="BONDIGO", page_icon="🩷", layout="centered")
 st.markdown(
     """
 <style>
-    /* BIGGER sidebar radios */
-    [data-testid="stSidebar"] div[role="radiogroup"] label{
-        font-size:1.3rem !important; line-height:1.6rem !important;
-        padding:10px 0 10px 6px;
-    }
-    /* bigger name + bio */
-    .match-name{font-size:1.25rem;font-weight:700;}
-    .match-bio {font-size:1.05rem;line-height:1.55;}
+[data-testid="stSidebar"] div[role="radiogroup"] label{
+    font-size:1.3rem !important; line-height:1.6rem !important;
+    padding:10px 0 10px 6px;
+}
+.match-name{font-size:1.25rem;font-weight:700;}
+.match-bio {font-size:1.05rem;line-height:1.55;}
 </style>
 """,
     unsafe_allow_html=True,
@@ -28,7 +26,7 @@ st.markdown(
 MAX_TOKENS_PER_USER = 10_000
 PLACEHOLDER         = "assets/placeholder.png"
 LOGO                = "assets/bondigo_banner.png"
-TAGLINE             = "Talk the Lingo, Master the Bond, Dominate the Game."
+TAGLINE             = "Talk the Lingo. Master the Bond. Dominate the Game."
 RARITY_COLOR        = {"Common":"#BBBBBB", "Rare":"#57C7FF", "Legendary":"#FFAA33"}
 
 # ---------- show banner ----------
@@ -51,8 +49,8 @@ COMPANION_MAP = {c["id"]: c for c in COMPANIONS}
 # ---------- session defaults ----------
 for k, v in {
     "matches": [], "likes": [], "histories": {}, "chat_id": None,
-    "collection": set(),          # NEW – owned companion IDs
-    "spent": 0, "nav": "Find matches", "switch_to_chat": False
+    "collection": set(), "spent": 0,
+    "nav": "Find matches", "switch_to_chat": False
 }.items():
     st.session_state.setdefault(k, v)
 
@@ -62,14 +60,11 @@ def ensure_history(cid):
         c = COMPANION_MAP[cid]
         st.session_state["histories"][cid] = [{
             "role":"system",
-            "content":(
-                f"You are {c['name']}. {c['bio']} "
-                "Speak in first person, friendly & flirty but PG‑13."
-            )
+            "content":f"You are {c['name']}. {c['bio']} Speak in first person, friendly & flirty but PG‑13."
         }]
 
 def like(c):
-    st.session_state["collection"].add(c["id"])     # mint on like
+    st.session_state["collection"].add(c["id"])      # mint
     if c["id"] not in st.session_state["likes"]:
         st.session_state["likes"].append(c["id"])
     st.session_state["chat_id"] = c["id"]
@@ -89,11 +84,8 @@ if st.session_state.pop("switch_to_chat", False):
 
 # ---------- NAV ----------
 options = ["Find matches", "Chat", "My Collection"]
-page = st.sidebar.radio(
-    "Navigation", options,
-    key="nav",
-    index=options.index(st.session_state.get("nav", options[0]))
-)
+page = st.sidebar.radio("Navigation", options, key="nav",
+                        index=options.index(st.session_state["nav"]))
 
 # ======== FIND MATCHES ========
 if page == "Find matches":
@@ -116,17 +108,15 @@ if page == "Find matches":
             find_matches([hobby, trait, vibe, scene]) or random.sample(COMPANIONS, 5)
         )
 
-    # render match cards
     for c in st.session_state["matches"]:
         col_img, col_info, col_like, col_chat = st.columns([1, 3, 1, 2])
         with col_img:
             show_image(c.get("photo", PLACEHOLDER), width=100)
         with col_info:
-            badge = c.get("rarity", "Common")
+            badge = c.get("rarity","Common")
             st.markdown(
                 f"<span style='background:{RARITY_COLOR[badge]};"
-                f"padding:2px 6px;border-radius:4px;"
-                f"font-size:0.75rem;color:#000;'>{badge}</span>",
+                f"padding:2px 6px;border-radius:4px;font-size:0.75rem;color:#000;'>{badge}</span>",
                 unsafe_allow_html=True
             )
             st.markdown(f"<div class='match-name'>{c['name']}</div>", unsafe_allow_html=True)
@@ -142,9 +132,11 @@ if page == "Find matches":
 
 # ======== CHAT ========
 elif page == "Chat":
+    # redirect if user has no likes yet
     if not st.session_state["likes"]:
-        st.info("Like at least one companion first!")
-        st.stop()
+        st.session_state["nav"] = "Find matches"
+        st.warning("Mint a companion first on *Find matches*!")
+        st.rerun()
 
     names = [COMPANION_MAP[c]["name"] for c in st.session_state["likes"]]
     idx   = st.session_state["likes"].index(
@@ -192,17 +184,16 @@ elif page == "My Collection":
         st.info("Mint some companions first! (💖 on Find matches)")
         st.stop()
 
-    owned = [COMPANION_MAP[c] for c in st.session_state["collection"]]
-    for c in owned:
+    for cid in st.session_state["collection"]:
+        c = COMPANION_MAP[cid]
         col_img, col_info = st.columns([1, 3])
         with col_img:
             show_image(c.get("photo", PLACEHOLDER), width=90)
         with col_info:
-            badge = c.get("rarity", "Common")
+            badge = c.get("rarity","Common")
             st.markdown(
                 f"<span style='background:{RARITY_COLOR[badge]};"
-                f"padding:2px 6px;border-radius:4px;"
-                f"font-size:0.75rem;color:#000;'>{badge}</span> "
+                f"padding:2px 6px;border-radius:4px;font-size:0.75rem;color:#000;'>{badge}</span> "
                 f"**{c['name']}**",
                 unsafe_allow_html=True
             )
