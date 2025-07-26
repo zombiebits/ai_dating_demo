@@ -88,12 +88,12 @@ def owned_set(uid: str):
 st.set_page_config("BONDIGO", page_icon="🩷", layout="centered")
 
 # 1️⃣  Catch magic‑link redirect (?access_token & refresh_token)
-q = st.experimental_get_query_params()
+q =st.query_params 
 if "access_token" in q and "uid" not in st.session_state:
     session = sb.auth.set_session(q["access_token"][0], q["refresh_token"][0])
     st.session_state.uid = session.user.id
     # clean the URL (replace query‑params with '/')
-    st.experimental_set_query_params()
+    st.query_params.clear()
 
 # 2️⃣  If not logged‑in show email box
 if "uid" not in st.session_state:
