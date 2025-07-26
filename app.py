@@ -30,13 +30,24 @@ CID2COMP    = {c["id"]: c for c in COMPANIONS}
 
 # ──────────────────── DB helpers ─────────────────────────────
 def profile_upsert(auth_uid: str, username: str) -> dict:
-    """Ensure a wallet row exists and perform 24 h airdrop if needed."""
-    rows = SB.table("users").select("*").eq("auth_uid", auth_uid).execute().data
-    user = rows[0] if rows else SB.table("users").insert({
-        "auth_uid": auth_uid,
-        "username": username,
-        "tokens": 1000
-    }).execute().data[0]
+    """Ensure wallet row exists and award 24 h airdrop."""
+    tbl = SB.table("users")
+
+    # row for *this* auth user?
+    rows = tbl.select("*").eq("auth_uid", auth_uid).execute().data
+    if rows:
+        user = rows[0]
+    else:
+        # someone else already grabbed that username?
+        clash = tbl.select("id").eq("username", username).execute().data
+        if clash:
+            raise ValueError("username_taken")          # ← new guard
+
+        user = tbl.insert({
+            "auth_uid": auth_uid,
+            "username": username,
+            "tokens": 1000,
+        }).execute().data[0]
 
     last = user["last_airdrop"] or user["created_at"]
     last = datetime.fromisoformat(last.replace("Z", "+00:00"))
@@ -85,48 +96,49 @@ if "user" not in st.session_state:
 
     st.title("🔐  Sign in / Sign up to **BONDIGO**")
 
-    mode    = st.radio("Choose", ["Sign in", "Sign up"], horizontal=True)
-    uname   = st.text_input("Username", max_chars=20)
-    pwd     = st.text_input("Password", type="password")
-    pressed = st.button("Go ➜")
+    mode  = st.radio("Choose", ["Sign in", "Sign up"], horizontal=True)
+    uname = st.text_input("Username", max_chars=20)
+    pwd   = st.text_input("Password", type="password")
 
-    if pressed:
+    if st.button("Go ➜"):
         if not uname or not pwd:
-            st.warning("Fill both fields."); st.stop()
+            st.warning("Fill both fields.")
+            st.stop()
 
+        # Supabase Auth still needs an e‑mail → convert username to a dummy one
         pseudo_email = f"{uname.lower()}@bondigo.local"
 
-        # ① If signing‑up, make sure the username is still available
-        if mode == "Sign up":
-            taken = SB.table("users").select("id").eq("username", uname).execute().data
-            if taken:
-                st.error("Sorry, that username is already taken."); st.stop()
-
-        # ② Auth: create or sign‑in
+        # ① Create the Auth account if we’re in “Sign up”
         try:
             if mode == "Sign up":
                 SB.auth.sign_up({"email": pseudo_email, "password": pwd})
 
+            # ② Always sign‑in afterwards
             sess = SB.auth.sign_in_with_password(
                 {"email": pseudo_email, "password": pwd})
-
         except Exception as e:
-            st.error(f"Auth error: {e}"); st.stop()
+            st.error(f"Auth error: {e}")
+            st.stop()
 
-        # ③ Create / fetch wallet row
+        # ③ Create / fetch wallet row (and handle username clashes safely)
         try:
             st.session_state.user = profile_upsert(sess.user.id, uname)
-        except Exception:
-            st.error("That username was just registered, pick another one.")
+        except ValueError as ve:
+            # profile_upsert raises ValueError("username_taken") on clash
+            if str(ve) == "username_taken":
+                st.error("Sorry, that username is already taken.")
+            else:
+                st.error("Unexpected error, please try again.")
             SB.auth.sign_out()
             st.stop()
 
-        # ④ Bootstrap the rest of the local session
-        st.session_state.col     = collection_set(st.session_state.user["id"])
-        st.session_state.hist    = {}
-        st.session_state.spent   = 0
+        # ④ Initialise the rest of the session state
+        st.session_state.col   = collection_set(st.session_state.user["id"])
+        st.session_state.hist  = {}
+        st.session_state.spent = 0
         st.session_state.matches = []
-        st.rerun()
+        st.experimental_rerun()
+
     st.stop()
 
 # ──────────────────── quick aliases ───────────────────────────
