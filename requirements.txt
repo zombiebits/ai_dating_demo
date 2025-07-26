@@ -1,5 +1,6 @@
-streamlit>=1.35
-openai>=1.30
+streamlit>=1.47.1
+supabase==1.2.0
 python-dotenv
-supabase==1.2.0       
-pyjwt>=2.10
+openai>=1.30
+pyjwt
+postgrest
