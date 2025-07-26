@@ -4,35 +4,44 @@ import streamlit as st
 from openai import OpenAI, OpenAIError, RateLimitError
 from dotenv import load_dotenv
 
+# ---------- page / meta ----------
+st.set_page_config(page_title="BotCrush", page_icon="🩷", layout="centered")
+
 # ---------- tweak appearance ----------
 st.markdown(
     """
 <style>
     /* BIGGER sidebar radios */
     [data-testid="stSidebar"] div[role="radiogroup"] label {
-        font-size: 1.3rem !important;   /* ← raise from 1.1 rem  */
+        font-size: 1.3rem !important;
         line-height: 1.6rem !important;
-        padding: 10px 0 10px 6px;       /* taller click‑zone      */
+        padding: 10px 0 10px 6px;
     }
-    /* bigger name text in cards */
+    /* bigger name + bio in match cards */
     .match-name {font-size: 1.25rem; font-weight: 700;}
-    /* bigger bio */
     .match-bio  {font-size: 1.05rem; line-height: 1.55;}
-    </style>
-    """,
+</style>
+""",
     unsafe_allow_html=True,
 )
 
 # ---------- constants ----------
 MAX_TOKENS_PER_USER = 10_000
-PLACEHOLDER = "assets/placeholder.png"
+PLACEHOLDER         = "assets/placeholder.png"
+LOGO                = "assets/botcrush_banner.png"    # <-- your new banner
+
+# ---------- show banner ----------
+if Path(LOGO).is_file():
+    st.image(LOGO, width=380)
+else:  # fallback if you forget the file
+    st.markdown("## 🩷 BotCrush")
 
 # ---------- setup ----------
 load_dotenv(encoding="utf-8-sig")
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-COMPANIONS = json.load(open("companions.json", encoding="utf-8-sig"))
-COMPANION_MAP = {c["id"]: c for c in COMPANIONS}
+COMPANIONS     = json.load(open("companions.json", encoding="utf-8-sig"))
+COMPANION_MAP  = {c["id"]: c for c in COMPANIONS}
 
 # ---------- session defaults ----------
 for k, v in {
@@ -47,7 +56,8 @@ def ensure_history(cid):
         c = COMPANION_MAP[cid]
         st.session_state["histories"][cid] = [{
             "role": "system",
-            "content": f"You are {c['name']}. {c['bio']} Speak in first person, friendly & flirty but PG‑13."
+            "content": f"You are {c['name']}. {c['bio']} "
+                       "Speak in first person, friendly & flirty but PG‑13."
         }]
 
 def like(c):
@@ -64,22 +74,19 @@ def show_image(path_str, width):
     p = Path(path_str)
     st.image(str(p if p.is_file() else PLACEHOLDER), width=width)
 
-# ---------- nav switch ----------
+# ---------- nav auto‑switch ----------
 if st.session_state.pop("switch_to_chat", False):
     st.session_state["nav"] = "Chat"
 
-# ---------- UI ----------
-st.title("🤖💕  AI Matchmaker (Demo)")
-
+# ---------- NAV ----------
 options = ["Find matches", "Chat"]
 page = st.sidebar.radio(
-    "Navigation",
-    options,
+    "Navigation", options,
     key="nav",
     index=options.index(st.session_state.get("nav", options[0]))
 )
 
-# ======== FIND ========
+# ======== FIND MATCHES ========
 if page == "Find matches":
     st.header("Tell us about you")
 
@@ -100,6 +107,7 @@ if page == "Find matches":
             find_matches([hobby, trait, vibe, scene]) or random.sample(COMPANIONS, 5)
         )
 
+    # render cards
     for c in st.session_state["matches"]:
         col_img, col_info, col_like, col_chat = st.columns([1, 3, 1, 2])
         with col_img:
@@ -123,7 +131,8 @@ elif page == "Chat":
         st.stop()
 
     names = [COMPANION_MAP[c]["name"] for c in st.session_state["likes"]]
-    idx   = st.session_state["likes"].index(st.session_state.get("chat_id") or st.session_state["likes"][0])
+    idx   = st.session_state["likes"].index(
+            st.session_state.get("chat_id") or st.session_state["likes"][0])
     sel   = st.selectbox("Choose a conversation", names, index=idx)
     cid   = st.session_state["likes"][names.index(sel)]
     st.session_state["chat_id"] = cid
@@ -144,14 +153,13 @@ elif page == "Chat":
     if user_msg:
         msgs = st.session_state["histories"][cid]
         msgs.append({"role":"user","content":user_msg})
-
         with st.spinner("Thinking…"):
             try:
-                resp = client.chat.completions.create(
+                resp   = client.chat.completions.create(
                     model="gpt-4o-mini", messages=msgs, max_tokens=120
                 )
-                reply = resp.choices[0].message.content
-                usage = resp.usage
+                reply  = resp.choices[0].message.content
+                usage  = resp.usage
                 st.session_state["spent"] += usage.prompt_tokens + usage.completion_tokens
                 msgs.append({"role":"assistant","content":reply})
                 st.chat_message("assistant").write(reply)
