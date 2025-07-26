@@ -28,13 +28,18 @@ st.markdown(
 # ---------- constants ----------
 MAX_TOKENS_PER_USER = 10_000
 PLACEHOLDER         = "assets/placeholder.png"
-LOGO                = "assets/bondigo_banner.png"    # <-- your new banner
+LOGO                = "assets/bondigo_banner.png"    
+TAGLINE             = "Talk the Lingo. Master the Bond. Dominate the Game."
 
 # ---------- show banner ----------
 if Path(LOGO).is_file():
     st.image(LOGO, width=380)
-else:  # fallback if you forget the file
-    st.markdown("## 🩷 BONDIGO")
+    st.markdown(
+        f"<p style='text-align:center; margin-top:-2px; "
+        "font-size:1.15rem; font-weight:500; color:#FFC8D8;'>"
+        f"{TAGLINE}</p>",
+        unsafe_allow_html=True
+    )
 
 # ---------- setup ----------
 load_dotenv(encoding="utf-8-sig")
