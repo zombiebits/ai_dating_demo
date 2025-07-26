@@ -142,11 +142,11 @@
   },
 
   {
-    "id": "orbit2",
-    "name": "Orbit2 the Telescope Tech",
+    "id": "orion",
+    "name": "Orion the Telescope Tech",
     "tags": ["space", "analytical", "stoic", "space‑station"],
     "bio": "Adjusts cosmic lenses and your perspective.",
-    "photo": "assets/placeholder.png"
+    "photo": "assets/orion.png"
   },
   {
     "id": "miso",
