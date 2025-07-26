@@ -28,7 +28,7 @@ LOGO        = "assets/bondigo_banner.png"
 TAGLINE     = "Talk the Lingo · Master the Bond · Dominate the Game."
 CLR         = {"Common":"#bbb", "Rare":"#57C7FF", "Legendary":"#FFAA33"}
 
-COMPANIONS    = json.load(open("companions.json", encoding="utf‑8"))
+COMPANIONS = json.load(open("companions.json", encoding="utf-8-sig"))
 CID2COMPANION = {c["id"]: c for c in COMPANIONS}
 
 # ────────────────────── SUPABASE HELPERS ────────────────────────────
