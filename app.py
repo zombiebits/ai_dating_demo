@@ -12,14 +12,13 @@ st.markdown(
     """
 <style>
     /* BIGGER sidebar radios */
-    [data-testid="stSidebar"] div[role="radiogroup"] label {
-        font-size: 1.3rem !important;
-        line-height: 1.6rem !important;
-        padding: 10px 0 10px 6px;
+    [data-testid="stSidebar"] div[role="radiogroup"] label{
+        font-size:1.3rem !important; line-height:1.6rem !important;
+        padding:10px 0 10px 6px;
     }
-    /* bigger name + bio in match cards */
-    .match-name {font-size: 1.25rem; font-weight: 700;}
-    .match-bio  {font-size: 1.05rem; line-height: 1.55;}
+    /* bigger name + bio */
+    .match-name{font-size:1.25rem;font-weight:700;}
+    .match-bio {font-size:1.05rem;line-height:1.55;}
 </style>
 """,
     unsafe_allow_html=True,
@@ -28,29 +27,31 @@ st.markdown(
 # ---------- constants ----------
 MAX_TOKENS_PER_USER = 10_000
 PLACEHOLDER         = "assets/placeholder.png"
-LOGO                = "assets/bondigo_banner.png"    
-TAGLINE             = "Talk the Lingo. Master the Bond. Dominate the Game."
+LOGO                = "assets/bondigo_banner.png"
+TAGLINE             = "Talk the Lingo, Master the Bond, Dominate the Game."
+RARITY_COLOR        = {"Common":"#BBBBBB", "Rare":"#57C7FF", "Legendary":"#FFAA33"}
 
 # ---------- show banner ----------
 if Path(LOGO).is_file():
     st.image(LOGO, width=380)
     st.markdown(
-        f"<p style='text-align:center; margin-top:-2px; "
-        "font-size:1.15rem; font-weight:500; color:#FFC8D8;'>"
+        f"<p style='text-align:center;margin-top:-2px;"
+        "font-size:1.15rem;font-weight:500;color:#FFC8D8;'>"
         f"{TAGLINE}</p>",
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
 # ---------- setup ----------
 load_dotenv(encoding="utf-8-sig")
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-COMPANIONS     = json.load(open("companions.json", encoding="utf-8-sig"))
-COMPANION_MAP  = {c["id"]: c for c in COMPANIONS}
+COMPANIONS    = json.load(open("companions.json", encoding="utf-8-sig"))
+COMPANION_MAP = {c["id"]: c for c in COMPANIONS}
 
 # ---------- session defaults ----------
 for k, v in {
     "matches": [], "likes": [], "histories": {}, "chat_id": None,
+    "collection": set(),          # NEW – owned companion IDs
     "spent": 0, "nav": "Find matches", "switch_to_chat": False
 }.items():
     st.session_state.setdefault(k, v)
@@ -60,12 +61,15 @@ def ensure_history(cid):
     if cid not in st.session_state["histories"]:
         c = COMPANION_MAP[cid]
         st.session_state["histories"][cid] = [{
-            "role": "system",
-            "content": f"You are {c['name']}. {c['bio']} "
-                       "Speak in first person, friendly & flirty but PG‑13."
+            "role":"system",
+            "content":(
+                f"You are {c['name']}. {c['bio']} "
+                "Speak in first person, friendly & flirty but PG‑13."
+            )
         }]
 
 def like(c):
+    st.session_state["collection"].add(c["id"])     # mint on like
     if c["id"] not in st.session_state["likes"]:
         st.session_state["likes"].append(c["id"])
     st.session_state["chat_id"] = c["id"]
@@ -84,7 +88,7 @@ if st.session_state.pop("switch_to_chat", False):
     st.session_state["nav"] = "Chat"
 
 # ---------- NAV ----------
-options = ["Find matches", "Chat"]
+options = ["Find matches", "Chat", "My Collection"]
 page = st.sidebar.radio(
     "Navigation", options,
     key="nav",
@@ -95,15 +99,15 @@ page = st.sidebar.radio(
 if page == "Find matches":
     st.header("Tell us about you")
 
-    hobby  = st.selectbox("Pick a hobby",
+    hobby = st.selectbox("Pick a hobby",
         ["space","foodie","gaming","music","art","sports","reading","travel","gardening","coding"])
-    trait  = st.selectbox("Pick a trait",
+    trait = st.selectbox("Pick a trait",
         ["curious","adventurous","night‑owl","chill","analytical","energetic",
          "humorous","kind","bold","creative"])
-    vibe   = st.selectbox("Pick a vibe",
+    vibe  = st.selectbox("Pick a vibe",
         ["witty","caring","mysterious","romantic","sarcastic","intellectual",
          "playful","stoic","optimistic","pragmatic"])
-    scene  = st.selectbox("Pick a scene",
+    scene = st.selectbox("Pick a scene",
         ["beach","forest","cafe","space‑station","cyberpunk‑city","medieval‑castle",
          "mountain","underwater","neon‑disco","cozy‑library"])
 
@@ -112,12 +116,19 @@ if page == "Find matches":
             find_matches([hobby, trait, vibe, scene]) or random.sample(COMPANIONS, 5)
         )
 
-    # render cards
+    # render match cards
     for c in st.session_state["matches"]:
         col_img, col_info, col_like, col_chat = st.columns([1, 3, 1, 2])
         with col_img:
             show_image(c.get("photo", PLACEHOLDER), width=100)
         with col_info:
+            badge = c.get("rarity", "Common")
+            st.markdown(
+                f"<span style='background:{RARITY_COLOR[badge]};"
+                f"padding:2px 6px;border-radius:4px;"
+                f"font-size:0.75rem;color:#000;'>{badge}</span>",
+                unsafe_allow_html=True
+            )
             st.markdown(f"<div class='match-name'>{c['name']}</div>", unsafe_allow_html=True)
             st.markdown(f"<div class='match-bio'>{c['bio']}</div>", unsafe_allow_html=True)
         with col_like:
@@ -172,3 +183,27 @@ elif page == "Chat":
                 st.error("OpenAI rate‑limit hit—try again later.")
             except OpenAIError as e:
                 st.error(f"OpenAI error: {e}")
+
+# ======== COLLECTION ========
+elif page == "My Collection":
+    st.header("My Bondigo Collection")
+
+    if not st.session_state["collection"]:
+        st.info("Mint some companions first! (💖 on Find matches)")
+        st.stop()
+
+    owned = [COMPANION_MAP[c] for c in st.session_state["collection"]]
+    for c in owned:
+        col_img, col_info = st.columns([1, 3])
+        with col_img:
+            show_image(c.get("photo", PLACEHOLDER), width=90)
+        with col_info:
+            badge = c.get("rarity", "Common")
+            st.markdown(
+                f"<span style='background:{RARITY_COLOR[badge]};"
+                f"padding:2px 6px;border-radius:4px;"
+                f"font-size:0.75rem;color:#000;'>{badge}</span> "
+                f"**{c['name']}**",
+                unsafe_allow_html=True
+            )
+            st.caption(c["bio"])

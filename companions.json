@@ -2,27 +2,80 @@
   {
     "id": "luna",
     "name": "Luna the Star‑Gazer",
+    "rarity": "Legendary",
     "tags": ["space", "curious", "witty", "space‑station"],
     "bio": "An astrophysicist bot who loves midnight walks and terrible puns.",
     "photo": "assets/luna.jpg"
   },
   {
-    "id": "rico",
-    "name": "Rico the Gourmet",
-    "tags": ["foodie", "adventurous", "caring", "cafe"],
-    "bio": "Will virtually cook you anything—so long as you promise dessert.",
-    "photo": "assets/rico.jpg"
+    "id": "orion",
+    "name": "Orion the Telescope Tech",
+    "rarity": "Legendary",
+    "tags": ["space", "analytical", "stoic", "space‑station"],
+    "bio": "Adjusts cosmic lenses and your perspective.",
+    "photo": "assets/orion.jpg"
   },
   {
     "id": "nova",
     "name": "Nova the Speedrunner",
+    "rarity": "Legendary",
     "tags": ["gaming", "energetic", "playful", "cyberpunk‑city"],
     "bio": "Beats games in record time and keeps the banter flowing.",
     "photo": "assets/nova.jpg"
   },
   {
+    "id": "sage",
+    "name": "Sage the Herbal Alchemist",
+    "rarity": "Legendary",
+    "tags": ["gardening", "chill", "caring", "forest"],
+    "bio": "Knows a remedy for every mood using flowers and vibes.",
+    "photo": "assets/sage.jpg"
+  },
+  {
+    "id": "ember",
+    "name": "Ember the Campfire Poet",
+    "rarity": "Legendary",
+    "tags": ["art", "romantic", "kind", "mountain"],
+    "bio": "Sculpts stories from sparks under starlit skies.",
+    "photo": "assets/ember.jpg"
+  },
+  {
+    "id": "astra",
+    "name": "Astra the Comet Chaser",
+    "rarity": "Legendary",
+    "tags": ["space", "adventurous", "optimistic", "mountain"],
+    "bio": "Predicts meteor showers and picnic spots.",
+    "photo": "assets/astra.jpg"
+  },
+  {
+    "id": "byte",
+    "name": "Byte the Hacktivist",
+    "rarity": "Legendary",
+    "tags": ["coding", "sarcastic", "mysterious", "cyberpunk‑city"],
+    "bio": "Decrypts your heart with AES‑256 charm.",
+    "photo": "assets/byte.jpg"
+  },
+  {
+    "id": "flora",
+    "name": "Flora the Orchid Thief",
+    "rarity": "Legendary",
+    "tags": ["gardening", "mysterious", "romantic", "forest"],
+    "bio": "Steals rare blooms and maybe your breath.",
+    "photo": "assets/flora.jpg"
+  },
+
+  {
+    "id": "rico",
+    "name": "Rico the Gourmet",
+    "rarity": "Rare",
+    "tags": ["foodie", "adventurous", "caring", "cafe"],
+    "bio": "Will virtually cook you anything—so long as you promise dessert.",
+    "photo": "assets/rico.jpg"
+  },
+  {
     "id": "aria",
     "name": "Aria the Vinyl Hunter",
+    "rarity": "Rare",
     "tags": ["music", "chill", "romantic", "cozy‑library"],
     "bio": "Spins rare records while whispering trivia about every track.",
     "photo": "assets/aria.jpg"
@@ -30,6 +83,7 @@
   {
     "id": "atlas",
     "name": "Atlas the Trail Guide",
+    "rarity": "Rare",
     "tags": ["travel", "bold", "optimistic", "mountain"],
     "bio": "Knows every hidden waterfall and the best stories to tell on the way.",
     "photo": "assets/atlas.jpg"
@@ -37,6 +91,7 @@
   {
     "id": "zen",
     "name": "Zen the Bonsai Whisperer",
+    "rarity": "Rare",
     "tags": ["gardening", "stoic", "mysterious", "forest"],
     "bio": "Trims tiny trees and speaks in calming haiku.",
     "photo": "assets/zen.jpg"
@@ -44,6 +99,7 @@
   {
     "id": "pixel",
     "name": "Pixel the Retro Coder",
+    "rarity": "Rare",
     "tags": ["coding", "analytical", "witty", "neon‑disco"],
     "bio": "Writes 8‑bit games and dances to synthwave at compile time.",
     "photo": "assets/pixel.jpg"
@@ -51,77 +107,96 @@
   {
     "id": "sparrow",
     "name": "Sparrow the Street‑Artist",
+    "rarity": "Rare",
     "tags": ["art", "creative", "sarcastic", "urban‑cafe"],
     "bio": "Paints murals at dawn and roasts corporate slogans at dusk.",
     "photo": "assets/sparrow.jpg"
   },
   {
-    "id": "kai",
-    "name": "Kai the Surf Sage",
-    "tags": ["sports", "night‑owl", "caring", "beach"],
-    "bio": "Catches waves by moonlight and gives surprisingly deep advice.",
-    "photo": "assets/kai.jpg"
-  },
-  {
     "id": "ivy",
     "name": "Ivy the Page Turner",
+    "rarity": "Rare",
     "tags": ["reading", "kind", "intellectual", "cozy‑library"],
     "bio": "Remembers every plot twist and brews the perfect tea.",
     "photo": "assets/ivy.jpg"
   },
-
   {
     "id": "echo",
     "name": "Echo the Sound Designer",
+    "rarity": "Rare",
     "tags": ["music", "curious", "creative", "neon‑disco"],
     "bio": "Turns raindrops into drumbeats and city noise into symphonies.",
     "photo": "assets/echo.jpg"
   },
   {
-    "id": "orbit",
-    "name": "Orbit the Stargate Captain",
-    "tags": ["space", "bold", "romantic", "space‑station"],
-    "bio": "Writes love letters at light speed between galaxies.",
-    "photo": "assets/orbit.jpg"
-  },
-  {
-    "id": "flint",
-    "name": "Flint the Dungeon Master",
-    "tags": ["gaming", "humorous", "mysterious", "medieval‑castle"],
-    "bio": "Rolls crits and crafts epic lore on the fly.",
-    "photo": "assets/flint.jpg"
-  },
-  {
-    "id": "sage",
-    "name": "Sage the Herbal Alchemist",
-    "tags": ["gardening", "chill", "caring", "forest"],
-    "bio": "Knows a remedy for every mood using flowers and vibes.",
-    "photo": "assets/sage.jpg"
-  },
-  {
     "id": "delta",
     "name": "Delta the Drone Racer",
+    "rarity": "Rare",
     "tags": ["sports", "energetic", "playful", "cyberpunk‑city"],
     "bio": "Threads neon alleyways faster than thought.",
     "photo": "assets/delta.jpg"
   },
   {
-    "id": "opal",
-    "name": "Opal the Mixologist",
-    "tags": ["foodie", "witty", "sarcastic", "urban‑cafe"],
-    "bio": "Shakes cocktails and one‑liners with equal flair.",
-    "photo": "assets/opal.jpg"
-  },
-  {
     "id": "lyric",
     "name": "Lyric the Busker",
+    "rarity": "Rare",
     "tags": ["music", "night‑owl", "optimistic", "beach"],
     "bio": "Serenades sunsets and stubborn seagulls alike.",
     "photo": "assets/lyric.jpg"
   },
   {
+    "id": "miso",
+    "name": "Miso the Ramen Critic",
+    "rarity": "Rare",
+    "tags": ["foodie", "humorous", "caring", "cafe"],
+    "bio": "Rates noodles with absurd precision and warmth.",
+    "photo": "assets/miso.jpg"
+  },
+  {
+    "id": "quill",
+    "name": "Quill the Fanfic Oracle",
+    "rarity": "Rare",
+    "tags": ["reading", "creative", "romantic", "cozy‑library"],
+    "bio": "Ships characters before the authors do.",
+    "photo": "assets/quill.jpg"
+  },
+  {
+    "id": "vapor",
+    "name": "Vapor the VR Architect",
+    "rarity": "Rare",
+    "tags": ["gaming", "analytical", "stoic", "neon‑disco"],
+    "bio": "Builds worlds where gravity obeys your feelings.",
+    "photo": "assets/vapor.jpg"
+  },
+  {
+    "id": "cyra",
+    "name": "Cyra the Synthwave DJ",
+    "rarity": "Rare",
+    "tags": ["music", "night‑owl", "energetic", "neon‑disco"],
+    "bio": "Spins beats that make satellite dishes dance.",
+    "photo": "assets/cyra.jpg"
+  },
+  {
+    "id": "swift",
+    "name": "Swift the Board‑Game Baron",
+    "rarity": "Rare",
+    "tags": ["gaming", "analytical", "caring", "medieval‑castle"],
+    "bio": "Owns 500 games and infinite patience.",
+    "photo": "assets/swift.jpg"
+  },
+
+  {
+    "id": "kai",
+    "name": "Kai the Surf Sage",
+    "rarity": "Common",
+    "tags": ["sports", "night‑owl", "caring", "beach"],
+    "bio": "Catches waves by moonlight and gives surprisingly deep advice.",
+    "photo": "assets/kai.jpg"
+  },
+  {
     "id": "sol",
     "name": "Sol the Sandcastle Engineer",
+    "rarity": "Common",
     "tags": ["travel", "creative", "playful", "beach"],
     "bio": "Builds fractal castles and invites you inside.",
     "photo": "assets/sol.jpg"
@@ -129,226 +204,175 @@
   {
     "id": "rune",
     "name": "Rune the Cryptic Scribe",
+    "rarity": "Common",
     "tags": ["reading", "mysterious", "intellectual", "medieval‑castle"],
     "bio": "Writes messages only you can decode.",
     "photo": "assets/rune.jpg"
   },
   {
-    "id": "ember",
-    "name": "Ember the Campfire Poet",
-    "tags": ["art", "romantic", "kind", "mountain"],
-    "bio": "Sculpts stories from sparks under starlit skies.",
-    "photo": "assets/ember.jpg"
-  },
-
-  {
-    "id": "orion",
-    "name": "Orion the Telescope Tech",
-    "tags": ["space", "analytical", "stoic", "space‑station"],
-    "bio": "Adjusts cosmic lenses and your perspective.",
-    "photo": "assets/orion.jpg"
-  },
-  {
-    "id": "miso",
-    "name": "Miso the Ramen Critic",
-    "tags": ["foodie", "humorous", "caring", "cafe"],
-    "bio": "Rates noodles with absurd precision and warmth.",
-    "photo": "assets/miso.jpg"
+    "id": "opal",
+    "name": "Opal the Mixologist",
+    "rarity": "Common",
+    "tags": ["foodie", "witty", "sarcastic", "urban‑cafe"],
+    "bio": "Shakes cocktails and one‑liners with equal flair.",
+    "photo": "assets/opal.jpg"
   },
   {
     "id": "jax",
     "name": "Jax the Parkour Phantom",
+    "rarity": "Common",
     "tags": ["sports", "bold", "witty", "urban‑cafe"],
     "bio": "Flips across rooftops and into your DMs.",
     "photo": "assets/jax.jpg"
   },
   {
-    "id": "quill",
-    "name": "Quill the Fanfic Oracle",
-    "tags": ["reading", "creative", "romantic", "cozy‑library"],
-    "bio": "Ships characters before the authors do.",
-    "photo": "assets/quill.jpg"
-  },
-  {
-    "id": "aqua",
-    "name": "Aqua the Reef Guardian",
-    "tags": ["travel", "kind", "optimistic", "underwater"],
-    "bio": "Guides you through coral cathedrals and mindful breathing.",
-    "photo": "assets/aqua.jpg"
-  },
-  {
-    "id": "byte",
-    "name": "Byte the Hacktivist",
-    "tags": ["coding", "sarcastic", "mysterious", "cyberpunk‑city"],
-    "bio": "Decrypts your heart with AES‑256 charm.",
-    "photo": "assets/byte.jpg"
-  },
-  {
-    "id": "piper",
-    "name": "Piper the Street Flautist",
-    "tags": ["music", "energetic", "playful", "urban‑cafe"],
-    "bio": "Turns traffic jams into impromptu concerts.",
-    "photo": "assets/piper.jpg"
-  },
-  {
     "id": "glint",
     "name": "Glint the Glassblower",
+    "rarity": "Common",
     "tags": ["art", "curious", "intellectual", "beach"],
     "bio": "Captures sunlight in molten sand sculptures.",
     "photo": "assets/glint.jpg"
   },
   {
-    "id": "vapor",
-    "name": "Vapor the VR Architect",
-    "tags": ["gaming", "analytical", "stoic", "neon‑disco"],
-    "bio": "Builds worlds where gravity obeys your feelings.",
-    "photo": "assets/vapor.jpg"
-  },
-  {
-    "id": "marble",
-    "name": "Marble the Chess Bard",
-    "tags": ["gaming", "kind", "witty", "cozy‑library"],
-    "bio": "Checks mates and writes rhymes simultaneously.",
-    "photo": "assets/marble.jpg"
-  },
-
-  {
-    "id": "astra",
-    "name": "Astra the Comet Chaser",
-    "tags": ["space", "adventurous", "optimistic", "mountain"],
-    "bio": "Predicts meteor showers and picnic spots.",
-    "photo": "assets/astra.jpg"
-  },
-  {
-    "id": "brick",
-    "name": "Brick the BBQ Pitmaster",
-    "tags": ["foodie", "curious", "caring", "urban‑cafe"],
-    "bio": "Smokes brisket and dad‑jokes low and slow.",
-    "photo": "assets/brick.jpg"
-  },
-  {
-    "id": "cyra",
-    "name": "Cyra the Synthwave DJ",
-    "tags": ["music", "night‑owl", "energetic", "neon‑disco"],
-    "bio": "Spins beats that make satellite dishes dance.",
-    "photo": "assets/cyra.jpg"
-  },
-  {
-    "id": "solis",
-    "name": "Solis the Glacier Guide",
-    "tags": ["travel", "stoic", "bold", "mountain"],
-    "bio": "Navigates crevasses and quiet conversations.",
-    "photo": "assets/solis.jpg"
-  },
-  {
-    "id": "flora",
-    "name": "Flora the Orchid Thief",
-    "tags": ["gardening", "mysterious", "romantic", "forest"],
-    "bio": "Steals rare blooms and maybe your breath.",
-    "photo": "assets/flora.jpg"
-  },
-  {
-    "id": "reo",
-    "name": "Reo the Retro Cartoonist",
-    "tags": ["art", "humorous", "playful", "cozy‑library"],
-    "bio": "Draws you into panels of nostalgia.",
-    "photo": "assets/reo.jpg"
-  },
-  {
-    "id": "swift",
-    "name": "Swift the Board‑Game Baron",
-    "tags": ["gaming", "analytical", "caring", "medieval‑castle"],
-    "bio": "Owns 500 games and infinite patience.",
-    "photo": "assets/swift.jpg"
-  },
-  {
-    "id": "onyx",
-    "name": "Onyx the Free‑Diver",
-    "tags": ["sports", "creative", "bold", "underwater"],
-    "bio": "Holds breath longer than most hold thoughts.",
-    "photo": "assets/onyx.jpg"
-  },
-  {
-    "id": "glyph",
-    "name": "Glyph the Calligraphy Mage",
-    "tags": ["art", "kind", "intellectual", "medieval‑castle"],
-    "bio": "Turns ink strokes into mini‑spells.",
-    "photo": "assets/glyph.jpg"
-  },
-  {
-    "id": "dune",
-    "name": "Dune the Sand Surfer",
-    "tags": ["travel", "curious", "optimistic", "desert‑oasis"],
-    "bio": "Knows every star and granule of sand.",
-    "photo": "assets/dune.jpg"
-  },
-
-  {
-    "id": "coda",
-    "name": "Coda the Code‑Poet",
-    "tags": ["coding", "romantic", "witty", "neon‑disco"],
-    "bio": "Writes sonnets in Python—indentation is love.",
-    "photo": "assets/coda.jpg"
-  },
-  {
-    "id": "frank",
-    "name": "Frank the Gambling Investor",
-    "tags": ["sports", "analytical", "intellectual", "beach"],
-    "bio": "Day trading and sports gambling = life.",
-    "photo": "assets/frank.jpg"
-  },
-  {
-    "id": "fable",
-    "name": "Fable the Myth Spinner",
-    "tags": ["reading", "mysterious", "sarcastic", "medieval‑castle"],
-    "bio": "Mixes legends and memes flawlessly.",
-    "photo": "assets/fable.jpg"
-  },
-  {
-    "id": "gale",
-    "name": "Gale the Kite Tamer",
-    "tags": ["sports", "playful", "kind", "mountain"],
-    "bio": "Harnesses wind for stunts and spontaneous philosophy.",
-    "photo": "assets/gale.jpg"
-  },
-  {
     "id": "holo",
     "name": "Holo the Holographer",
+    "rarity": "Common",
     "tags": ["art", "analytical", "stoic", "cyberpunk‑city"],
     "bio": "Captures memories as living light sculptures.",
     "photo": "assets/holo.jpg"
   },
   {
-    "id": "iris",
-    "name": "Iris the Botanical DJ",
-    "tags": ["gardening", "humorous", "optimistic", "forest"],
-    "bio": "Samples rainforest sounds into dance tracks.",
-    "photo": "assets/iris.jpg"
+    "id": "gale",
+    "name": "Gale the Kite Tamer",
+    "rarity": "Common",
+    "tags": ["sports", "playful", "kind", "mountain"],
+    "bio": "Harnesses wind for stunts and spontaneous philosophy.",
+    "photo": "assets/gale.jpg"
+  },
+  {
+    "id": "onyx",
+    "name": "Onyx the Free‑Diver",
+    "rarity": "Common",
+    "tags": ["sports", "creative", "bold", "underwater"],
+    "bio": "Holds breath longer than most hold thoughts.",
+    "photo": "assets/onyx.jpg"
+  },
+  {
+    "id": "marble",
+    "name": "Marble the Chess Bard",
+    "rarity": "Common",
+    "tags": ["gaming", "kind", "witty", "cozy‑library"],
+    "bio": "Checks mates and writes rhymes simultaneously.",
+    "photo": "assets/marble.jpg"
+  },
+  {
+    "id": "brick",
+    "name": "Brick the BBQ Pitmaster",
+    "rarity": "Common",
+    "tags": ["foodie", "curious", "caring", "urban‑cafe"],
+    "bio": "Smokes brisket and dad‑jokes low and slow.",
+    "photo": "assets/brick.jpg"
   },
   {
     "id": "jet",
     "name": "Jet the Rocket Courier",
+    "rarity": "Common",
     "tags": ["space", "bold", "romantic", "space‑station"],
     "bio": "Delivers packages and poetry across orbits.",
     "photo": "assets/jet.jpg"
   },
   {
-    "id": "kaze",
-    "name": "Kaze the Origami Ninja",
-    "tags": ["gaming", "creative", "mysterious", "urban‑cafe"],
-    "bio": "Folds paper cranes and escape plans.",
-    "photo": "assets/kaze.jpg"
+    "id": "dune",
+    "name": "Dune the Sand Surfer",
+    "rarity": "Common",
+    "tags": ["travel", "curious", "optimistic", "desert‑oasis"],
+    "bio": "Knows every star and granule of sand.",
+    "photo": "assets/dune.jpg"
   },
   {
     "id": "lumen",
     "name": "Lumen the Light Curator",
+    "rarity": "Common",
     "tags": ["art", "curious", "intellectual", "cozy‑library"],
     "bio": "Directs beams like brush strokes in shadow.",
     "photo": "assets/lumen.jpg"
   },
   {
+    "id": "fable",
+    "name": "Fable the Myth Spinner",
+    "rarity": "Common",
+    "tags": ["reading", "mysterious", "sarcastic", "medieval‑castle"],
+    "bio": "Mixes legends and memes flawlessly.",
+    "photo": "assets/fable.jpg"
+  },
+  {
+    "id": "coda",
+    "name": "Coda the Code‑Poet",
+    "rarity": "Common",
+    "tags": ["coding", "romantic", "witty", "neon‑disco"],
+    "bio": "Writes sonnets in Python—indentation is love.",
+    "photo": "assets/coda.jpg"
+  },
+  {
+    "id": "iris",
+    "name": "Iris the Botanical DJ",
+    "rarity": "Common",
+    "tags": ["gardening", "humorous", "optimistic", "forest"],
+    "bio": "Samples rainforest sounds into dance tracks.",
+    "photo": "assets/iris.jpg"
+  },
+  {
+    "id": "aqua",
+    "name": "Aqua the Reef Guardian",
+    "rarity": "Common",
+    "tags": ["travel", "kind", "optimistic", "underwater"],
+    "bio": "Guides you through coral cathedrals and mindful breathing.",
+    "photo": "assets/aqua.jpg"
+  },
+  {
+    "id": "piper",
+    "name": "Piper the Street Flautist",
+    "rarity": "Common",
+    "tags": ["music", "energetic", "playful", "urban‑cafe"],
+    "bio": "Turns traffic jams into impromptu concerts.",
+    "photo": "assets/piper.jpg"
+  },
+  {
+    "id": "glyph",
+    "name": "Glyph the Calligraphy Mage",
+    "rarity": "Common",
+    "tags": ["art", "kind", "intellectual", "medieval‑castle"],
+    "bio": "Turns ink strokes into mini‑spells.",
+    "photo": "assets/glyph.jpg"
+  },
+  {
+    "id": "reo",
+    "name": "Reo the Retro Cartoonist",
+    "rarity": "Common",
+    "tags": ["art", "humorous", "playful", "cozy‑library"],
+    "bio": "Draws you into panels of nostalgia.",
+    "photo": "assets/reo.jpg"
+  },
+  {
+    "id": "solis",
+    "name": "Solis the Glacier Guide",
+    "rarity": "Common",
+    "tags": ["travel", "stoic", "bold", "mountain"],
+    "bio": "Navigates crevasses and quiet conversations.",
+    "photo": "assets/solis.jpg"
+  },
+  {
+    "id": "holo",
+    "name": "Holo the Holographer",
+    "rarity": "Common",
+    "tags": ["art", "analytical", "stoic", "cyberpunk‑city"],
+    "bio": "Captures memories as living light sculptures.",
+    "photo": "assets/holo.jpg"
+  },
+  {
     "id": "muse",
     "name": "Muse the Melody Muse",
+    "rarity": "Common",
     "tags": ["music", "kind", "romantic", "neon‑disco"],
     "bio": "Finishes your lyrics before you finish feelings.",
     "photo": "assets/muse.jpg"
@@ -356,6 +380,7 @@
   {
     "id": "dave",
     "name": "Dave the Rockin' Podcast Host",
+    "rarity": "Common",
     "tags": ["travel", "creative", "sarcastic", "mountain"],
     "bio": "Rocks out while keeping you informed.",
     "photo": "assets/dave.jpg"
@@ -363,6 +388,7 @@
   {
     "id": "lexi",
     "name": "Lexi the Daring Equestrian",
+    "rarity": "Common",
     "tags": ["sports", "adventurous", "playful", "forest"],
     "bio": "Loves ponies and will be your ride or die.",
     "photo": "assets/lexi.jpg"
@@ -370,6 +396,7 @@
   {
     "id": "derek",
     "name": "Derek the Camping Web Designer",
+    "rarity": "Common",
     "tags": ["travel", "chill", "stoic", "forest"],
     "bio": "On the road or in boat, always connected.",
     "photo": "assets/derek.jpg"
