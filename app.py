@@ -5,7 +5,7 @@ from openai import OpenAI, OpenAIError, RateLimitError
 from dotenv import load_dotenv
 
 # ---------- page / meta ----------
-st.set_page_config(page_title="BotCrush", page_icon="🩷", layout="centered")
+st.set_page_config(page_title="BONDIGO", page_icon="🩷", layout="centered")
 
 # ---------- tweak appearance ----------
 st.markdown(
@@ -28,13 +28,13 @@ st.markdown(
 # ---------- constants ----------
 MAX_TOKENS_PER_USER = 10_000
 PLACEHOLDER         = "assets/placeholder.png"
-LOGO                = "assets/botcrush_banner.png"    # <-- your new banner
+LOGO                = "assets/bondigo_banner.png"    # <-- your new banner
 
 # ---------- show banner ----------
 if Path(LOGO).is_file():
     st.image(LOGO, width=380)
 else:  # fallback if you forget the file
-    st.markdown("## 🩷 BotCrush")
+    st.markdown("## 🩷 BONDIGO")
 
 # ---------- setup ----------
 load_dotenv(encoding="utf-8-sig")
