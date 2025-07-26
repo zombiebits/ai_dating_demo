@@ -8,7 +8,8 @@ from pathlib import Path
 import streamlit as st
 from openai import OpenAI, OpenAIError, RateLimitError
 from dotenv import load_dotenv
-from supabase import create_client               # v1.2.0 client
+from supabase import create_client
+from postgrest.exceptions import APIError           # ← inspect PostgREST errors
 
 # ─────────────────────────── ENV  ────────────────────────────
 load_dotenv()
@@ -29,36 +30,26 @@ COMPANIONS  = json.load(open("companions.json", encoding="utf-8-sig"))
 CID2COMP    = {c["id"]: c for c in COMPANIONS}
 
 # ──────────────────── DB helpers ─────────────────────────────
-from postgrest.exceptions import APIError
-
 def profile_upsert(auth_uid: str, username: str) -> dict:
     """
-    Ensure a wallet row exists (id == auth_uid).  
-    If username is already taken by *another* auth user we raise ValueError("username_taken").
-    Also performs the 24 h airdrop.
+    Ensure a wallet row exists (id == auth_uid).
+    If the username is already taken by a different auth user
+    we raise ValueError("username_taken").
     """
     tbl = SB.table("users")
 
-    # 1️⃣ existing row for this auth user?
+    # row for *this* auth user?
     rows = tbl.select("*").eq("auth_uid", auth_uid).execute().data
     if rows:
         user = rows[0]
-
-        # update username if the owner changed it
+        # keep username in sync (optional)
         if user["username"] != username:
             try:
-                user = (
-                    tbl.update({"username": username})
-                       .eq("auth_uid", auth_uid)
-                       .execute()
-                       .data[0]
-                )
-            except APIError as e:
-                # someone else grabbed that username meanwhile – just ignore
-                pass
-
-    # 2️⃣ first time: try to create the row
-    else:
+                user = tbl.update({"username": username}) \
+                          .eq("auth_uid", auth_uid).execute().data[0]
+            except APIError:
+                pass                                           # name collision; ignore
+    else:                                                      # first visit
         try:
             user = (
                 tbl.upsert(
@@ -67,32 +58,32 @@ def profile_upsert(auth_uid: str, username: str) -> dict:
                         "username": username,
                         "tokens": 1000,
                     },
-                    on_conflict="auth_uid",          # treat auth_uid as PK
+                    on_conflict="auth_uid",
                 )
                 .execute()
                 .data[0]
             )
         except APIError as e:
-            # If the *username* column is what triggered the error
-            if "users_username_idx" in str(e) or "duplicate key" in str(e):
+            msg = str(e)
+            if "users_username_idx" in msg or "duplicate key" in msg:
                 raise ValueError("username_taken")
+            if "violates row level security policy" in msg.lower():
+                raise RuntimeError(
+                    "RLS‑insert blocked. Check that the users policy has a "
+                    "'WITH CHECK (auth_uid = auth.uid())' clause."
+                )
             raise
 
-    # 3️⃣ daily airdrop
+    # 24 h airdrop
     last = user["last_airdrop"] or user["created_at"]
     last = datetime.fromisoformat(last.replace("Z", "+00:00"))
     if datetime.now(timezone.utc) - last >= timedelta(hours=24):
-        user = (
-            tbl.update(
-                {
-                    "tokens": user["tokens"] + DAILY_AIRDROP,
-                    "last_airdrop": datetime.now(timezone.utc).isoformat(),
-                }
-            )
-            .eq("auth_uid", auth_uid)
-            .execute()
-            .data[0]
-        )
+        user = tbl.update(
+            {
+                "tokens": user["tokens"] + DAILY_AIRDROP,
+                "last_airdrop": datetime.now(timezone.utc).isoformat(),
+            }
+        ).eq("auth_uid", auth_uid).execute().data[0]
     return user
 
 
@@ -131,7 +122,7 @@ st.markdown("""
 # ──────────────────── LOGIN / SIGN‑UP ─────────────────────────
 if "user" not in st.session_state:
 
-    st.title("🔐  Sign in / Sign up to **BONDIGO**")
+    st.title("🔐 Sign in / Sign up to **BONDIGO**")
 
     mode  = st.radio("Choose", ["Sign in", "Sign up"], horizontal=True)
     uname = st.text_input("Username", max_chars=20)
@@ -139,40 +130,33 @@ if "user" not in st.session_state:
 
     if st.button("Go ➜"):
         if not uname or not pwd:
-            st.warning("Fill both fields.")
-            st.stop()
+            st.warning("Fill both fields."); st.stop()
 
-        # Supabase Auth still needs an e‑mail → convert username to a dummy one
         pseudo_email = f"{uname.lower()}@bondigo.local"
 
-        # ① Create the Auth account if we’re in “Sign up”
+        # ① Auth
         try:
             if mode == "Sign up":
                 SB.auth.sign_up({"email": pseudo_email, "password": pwd})
 
-            # ② Always sign‑in afterwards
             sess = SB.auth.sign_in_with_password(
                 {"email": pseudo_email, "password": pwd})
         except Exception as e:
-            st.error(f"Auth error: {e}")
-            st.stop()
+            st.error(f"Auth error: {e}"); st.stop()
 
-        # ③ Create / fetch wallet row (and handle username clashes safely)
+        # ② Wallet row
         try:
             st.session_state.user = profile_upsert(sess.user.id, uname)
-        except ValueError as ve:
-            # profile_upsert raises ValueError("username_taken") on clash
-            if str(ve) == "username_taken":
-                st.error("Sorry, that username is already taken.")
-            else:
-                st.error("Unexpected error, please try again.")
-            SB.auth.sign_out()
-            st.stop()
+        except ValueError:
+            st.error("Sorry, that username is already taken.")
+            SB.auth.sign_out(); st.stop()
+        except RuntimeError as e:
+            st.error(str(e)); st.stop()
 
-        # ④ Initialise the rest of the session state
-        st.session_state.col   = collection_set(st.session_state.user["id"])
-        st.session_state.hist  = {}
-        st.session_state.spent = 0
+        # ③ Init session
+        st.session_state.col     = collection_set(st.session_state.user["id"])
+        st.session_state.hist    = {}
+        st.session_state.spent   = 0
         st.session_state.matches = []
         st.experimental_rerun()
 
@@ -189,7 +173,7 @@ if Path(LOGO).is_file():
                 f"color:#FFC8D8'>{TAGLINE}</p>", unsafe_allow_html=True)
 st.markdown(f"**Wallet:** `{user['tokens']} 💎`")
 
-# ──────────────────── NAV  ────────────────────────────────────
+# ──────────────────── NAVIGATION ──────────────────────────────
 tabs = ["Find matches", "Chat", "My Collection"]
 page = st.sidebar.radio("Navigation", tabs, key="nav",
                         index=tabs.index(st.session_state.get("nav", tabs[0])))
