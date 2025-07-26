@@ -29,33 +29,70 @@ COMPANIONS  = json.load(open("companions.json", encoding="utf-8-sig"))
 CID2COMP    = {c["id"]: c for c in COMPANIONS}
 
 # ──────────────────── DB helpers ─────────────────────────────
+from postgrest.exceptions import APIError
+
 def profile_upsert(auth_uid: str, username: str) -> dict:
-    """Ensure wallet row exists and award 24 h airdrop."""
+    """
+    Ensure a wallet row exists (id == auth_uid).  
+    If username is already taken by *another* auth user we raise ValueError("username_taken").
+    Also performs the 24 h airdrop.
+    """
     tbl = SB.table("users")
 
-    # row for *this* auth user?
+    # 1️⃣ existing row for this auth user?
     rows = tbl.select("*").eq("auth_uid", auth_uid).execute().data
     if rows:
         user = rows[0]
+
+        # update username if the owner changed it
+        if user["username"] != username:
+            try:
+                user = (
+                    tbl.update({"username": username})
+                       .eq("auth_uid", auth_uid)
+                       .execute()
+                       .data[0]
+                )
+            except APIError as e:
+                # someone else grabbed that username meanwhile – just ignore
+                pass
+
+    # 2️⃣ first time: try to create the row
     else:
-        # someone else already grabbed that username?
-        clash = tbl.select("id").eq("username", username).execute().data
-        if clash:
-            raise ValueError("username_taken")          # ← new guard
+        try:
+            user = (
+                tbl.upsert(
+                    {
+                        "auth_uid": auth_uid,
+                        "username": username,
+                        "tokens": 1000,
+                    },
+                    on_conflict="auth_uid",          # treat auth_uid as PK
+                )
+                .execute()
+                .data[0]
+            )
+        except APIError as e:
+            # If the *username* column is what triggered the error
+            if "users_username_idx" in str(e) or "duplicate key" in str(e):
+                raise ValueError("username_taken")
+            raise
 
-        user = tbl.insert({
-            "auth_uid": auth_uid,
-            "username": username,
-            "tokens": 1000,
-        }).execute().data[0]
-
+    # 3️⃣ daily airdrop
     last = user["last_airdrop"] or user["created_at"]
     last = datetime.fromisoformat(last.replace("Z", "+00:00"))
     if datetime.now(timezone.utc) - last >= timedelta(hours=24):
-        user = SB.table("users").update({
-            "tokens": user["tokens"] + DAILY_AIRDROP,
-            "last_airdrop": datetime.now(timezone.utc).isoformat()
-        }).eq("id", user["id"]).execute().data[0]
+        user = (
+            tbl.update(
+                {
+                    "tokens": user["tokens"] + DAILY_AIRDROP,
+                    "last_airdrop": datetime.now(timezone.utc).isoformat(),
+                }
+            )
+            .eq("auth_uid", auth_uid)
+            .execute()
+            .data[0]
+        )
     return user
 
 
