@@ -160,21 +160,21 @@
     "name": "Jax the Parkour Phantom",
     "tags": ["sports", "bold", "witty", "urban‑cafe"],
     "bio": "Flips across rooftops and into your DMs.",
-    "photo": "assets/placeholder.png"
+    "photo": "assets/jax.png"
   },
   {
     "id": "quill",
     "name": "Quill the Fanfic Oracle",
     "tags": ["reading", "creative", "romantic", "cozy‑library"],
     "bio": "Ships characters before the authors do.",
-    "photo": "assets/placeholder.png"
+    "photo": "assets/quill.png"
   },
   {
     "id": "aqua",
     "name": "Aqua the Reef Guardian",
     "tags": ["travel", "kind", "optimistic", "underwater"],
     "bio": "Guides you through coral cathedrals and mindful breathing.",
-    "photo": "assets/placeholder.png"
+    "photo": "assets/aqua.png"
   },
   {
     "id": "byte",
