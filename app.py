@@ -8,7 +8,7 @@ from pathlib import Path
 import streamlit as st
 from openai import OpenAI, OpenAIError, RateLimitError
 from dotenv import load_dotenv
-from supabase import create_client                     # v1.2.0 client
+from supabase import create_client               # v1.2.0 client
 
 # ─────────────────────────── ENV  ────────────────────────────
 load_dotenv()
@@ -16,17 +16,17 @@ SB = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
 OA = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
 # ─────────────────────────── CONSTANTS  ──────────────────────
-MAX_TOKENS     = 10_000
-DAILY_AIRDROP  = 150
-COST           = {"Common": 50, "Rare": 200, "Legendary": 700}
+MAX_TOKENS    = 10_000
+DAILY_AIRDROP = 150
+COST          = {"Common": 50, "Rare": 200, "Legendary": 700}
 
 PLACEHOLDER = "assets/placeholder.png"
 LOGO        = "assets/bondigo_banner.png"
 TAGLINE     = "Talk the Lingo · Master the Bond · Dominate the Game."
 CLR         = {"Common": "#bbb", "Rare": "#57C7FF", "Legendary": "#FFAA33"}
 
-COMPANIONS   = json.load(open("companions.json", encoding="utf-8-sig"))
-CID2COMP     = {c["id"]: c for c in COMPANIONS}
+COMPANIONS  = json.load(open("companions.json", encoding="utf-8-sig"))
+CID2COMP    = {c["id"]: c for c in COMPANIONS}
 
 # ──────────────────── DB helpers ─────────────────────────────
 def profile_upsert(auth_uid: str, username: str) -> dict:
@@ -48,9 +48,9 @@ def profile_upsert(auth_uid: str, username: str) -> dict:
     return user
 
 
-def collection_set(uid: str) -> set[str]:
+def collection_set(user_row_id: str) -> set[str]:
     rows = SB.table("collection").select("companion_id") \
-           .eq("user_id", uid).execute().data
+           .eq("user_id", user_row_id).execute().data
     return {r["companion_id"] for r in rows}
 
 
@@ -75,7 +75,7 @@ st.set_page_config("BONDIGO", "🩷", layout="centered")
 st.markdown("""
 <style>
 [data-testid="stSidebar"] div[role="radiogroup"] label{
-  font-size:1.25rem; line-height:1.5rem; padding:8px 0 8px 4px;}
+  font-size:1.25rem;line-height:1.5rem;padding:8px 0 8px 4px;}
 .match-name{font-size:1.2rem;font-weight:700;}
 .match-bio {font-size:1.0rem;line-height:1.5;}
 </style>""", unsafe_allow_html=True)
@@ -83,7 +83,7 @@ st.markdown("""
 # ──────────────────── LOGIN / SIGN‑UP ─────────────────────────
 if "user" not in st.session_state:
 
-    st.title("🔐 Sign in / Sign up to **BONDIGO**")
+    st.title("🔐  Sign in / Sign up to **BONDIGO**")
 
     mode    = st.radio("Choose", ["Sign in", "Sign up"], horizontal=True)
     uname   = st.text_input("Username", max_chars=20)
@@ -92,11 +92,17 @@ if "user" not in st.session_state:
 
     if pressed:
         if not uname or not pwd:
-            st.warning("Fill both fields.")
-            st.stop()
+            st.warning("Fill both fields."); st.stop()
 
-        pseudo_email = f"{uname.lower()}@bondigo.local"   # valid e‑mail for Auth
+        pseudo_email = f"{uname.lower()}@bondigo.local"
 
+        # ① If signing‑up, make sure the username is still available
+        if mode == "Sign up":
+            taken = SB.table("users").select("id").eq("username", uname).execute().data
+            if taken:
+                st.error("Sorry, that username is already taken."); st.stop()
+
+        # ② Auth: create or sign‑in
         try:
             if mode == "Sign up":
                 SB.auth.sign_up({"email": pseudo_email, "password": pwd})
@@ -105,14 +111,20 @@ if "user" not in st.session_state:
                 {"email": pseudo_email, "password": pwd})
 
         except Exception as e:
-            st.error(str(e))
+            st.error(f"Auth error: {e}"); st.stop()
+
+        # ③ Create / fetch wallet row
+        try:
+            st.session_state.user = profile_upsert(sess.user.id, uname)
+        except Exception:
+            st.error("That username was just registered, pick another one.")
+            SB.auth.sign_out()
             st.stop()
 
-        # initialise wallet & local state
-        st.session_state.user  = profile_upsert(sess.user.id, uname)
-        st.session_state.col   = collection_set(sess.user["id"])
-        st.session_state.hist  = {}
-        st.session_state.spent = 0
+        # ④ Bootstrap the rest of the local session
+        st.session_state.col     = collection_set(st.session_state.user["id"])
+        st.session_state.hist    = {}
+        st.session_state.spent   = 0
         st.session_state.matches = []
         st.rerun()
     st.stop()
@@ -177,13 +189,12 @@ if page == "Find matches":
 # ──────────────────── CHAT ────────────────────────────────────
 elif page == "Chat":
     if not colset:
-        st.info("Mint a companion first.")
-        st.stop()
+        st.info("Mint a companion first."); st.stop()
 
     names = [CID2COMP[c]["name"] for c in colset]
-    default_cid = next(iter(colset))
+    cur_cid = next(iter(colset))
     sel_name = st.selectbox("Choose companion", names,
-                            index=names.index(CID2COMP[default_cid]["name"]))
+                            index=names.index(CID2COMP[cur_cid]["name"]))
     cid = next(k for k, v in CID2COMP.items() if v["name"] == sel_name)
     st.session_state.chat_id = cid
 
@@ -204,8 +215,7 @@ elif page == "Chat":
           .write(m["content"])
 
     if st.session_state.spent >= MAX_TOKENS:
-        st.warning("Daily budget hit.")
-        st.stop()
+        st.warning("Daily budget hit."); st.stop()
 
     prompt = st.chat_input("Say something…")
     if prompt:
