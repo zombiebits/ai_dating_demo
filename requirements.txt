@@ -1,5 +1,5 @@
-streamlit>=1.33
-openai>=1.0
+streamlit>=1.35
+openai>=1.30
 python-dotenv
-supabase==1.2.0
-python-jose
+supabase-py>=2.3       
+PyJWT>=2.8.0
