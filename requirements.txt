@@ -2,4 +2,4 @@ streamlit>=1.33
 openai>=1.0
 python-dotenv
 supabase==1.2.0
-PyJWT>=2.8.0
+python-jose
