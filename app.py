@@ -82,6 +82,10 @@ def show_image(path_str, width):
 if st.session_state.pop("switch_to_chat", False):
     st.session_state["nav"] = "Chat"
 
+# ---------- redirect guard BEFORE sidebar widget ----------
+if st.session_state.get("nav") == "Chat" and not st.session_state["likes"]:
+    st.session_state["nav"] = "Find matches"   # flip back silently
+
 # ---------- NAV ----------
 options = ["Find matches", "Chat", "My Collection"]
 page = st.sidebar.radio("Navigation", options, key="nav",
@@ -132,12 +136,6 @@ if page == "Find matches":
 
 # ======== CHAT ========
 elif page == "Chat":
-    # redirect if user has no likes yet
-    if not st.session_state["likes"]:
-        st.session_state["nav"] = "Find matches"
-        st.warning("Mint a companion first on *Find matches*!")
-        st.rerun()
-
     names = [COMPANION_MAP[c]["name"] for c in st.session_state["likes"]]
     idx   = st.session_state["likes"].index(
             st.session_state.get("chat_id") or st.session_state["likes"][0])
