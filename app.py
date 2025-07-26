@@ -70,11 +70,8 @@ if st.session_state.pop("switch_to_chat", False):
 
 # ---------- UI ----------
 st.title("🤖💕  AI Matchmaker (Demo)")
-page = st.sidebar.radio(
-    "Navigation", ["Find matches", "Chat"],
-    key="nav",
-    index=0 if st.session_state["nav"] == "Find matches" else 1
-)
+page = st.sidebar.radio("Navigation", ["Find matches", "Chat"],
+                        key="nav", value=st.session_state["nav"])
 
 # ======== FIND ========
 if page == "Find matches":
