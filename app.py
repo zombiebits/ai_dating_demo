@@ -1,13 +1,12 @@
 ###############################################################################
 # BONDIGO – virtual companion demo with Supabase e‑mail magic‑link auth
 ###############################################################################
-import json, os, random
+import json, os, random, jwt                       # ← jwt is required by supabase‑py
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-import urllib.parse
 
 import streamlit as st
-import streamlit.components.v1 as components           # ← new
+import streamlit.components.v1 as components
 from openai import OpenAI, OpenAIError, RateLimitError
 from dotenv import load_dotenv
 from supabase import create_client
@@ -28,19 +27,15 @@ LOGO        = "assets/bondigo_banner.png"
 TAGLINE     = "Talk the Lingo · Master the Bond · Dominate the Game."
 CLR         = {"Common":"#bbb", "Rare":"#57C7FF", "Legendary":"#FFAA33"}
 
-COMPANIONS = json.load(open("companions.json", encoding="utf-8-sig"))
-CID2COMPANION = {c["id"]: c for c in COMPANIONS}
+COMPANIONS     = json.load(open("companions.json", encoding="utf-8-sig"))
+CID2COMPANION  = {c["id"]: c for c in COMPANIONS}
 
 # ────────────────────── SUPABASE HELPERS ────────────────────────────
 def sb_get_or_create_user(email: str) -> dict:
     """Create a profile row if missing + handle 24 h token airdrop."""
     rows = SUPABASE.table("users").select("*").eq("email", email).execute().data
-    if rows:
-        user = rows[0]
-    else:
-        user = SUPABASE.table("users").insert(
-            {"email": email, "tokens": 1000}
-        ).execute().data[0]
+    user = rows[0] if rows else SUPABASE.table("users").insert(
+        {"email": email, "tokens": 1000}).execute().data[0]
 
     last = user["last_airdrop"] or user["created_at"]
     last = datetime.fromisoformat(last.replace("Z", "+00:00"))
@@ -51,27 +46,25 @@ def sb_get_or_create_user(email: str) -> dict:
         ).eq("id", user["id"]).execute().data[0]
     return user
 
-def sb_collection(user_id:str) -> set[str]:
+def sb_collection(user_id: str) -> set[str]:
     rows = SUPABASE.table("collection").select("companion_id") \
            .eq("user_id", user_id).execute().data
     return {r["companion_id"] for r in rows}
 
-def sb_buy(user:dict, comp:dict):
+def sb_buy(user: dict, comp: dict):
     cid  = comp["id"]
-    cost = COST[comp.get("rarity","Common")]
+    cost = COST[comp.get("rarity", "Common")]
     if cost > user["tokens"]:
         return False, "Not enough 💎"
     owned = SUPABASE.table("collection").select("companion_id") \
-            .eq("user_id", user["id"]).eq("companion_id", cid).execute()
-    if owned.data:
+            .eq("user_id", user["id"]).eq("companion_id", cid).execute().data
+    if owned:
         return False, "Already owned"
 
-    # atomic-ish
-    SUPABASE.table("users").update({"tokens": user["tokens"]-cost}) \
+    SUPABASE.table("users").update({"tokens": user["tokens"] - cost}) \
              .eq("id", user["id"]).execute()
     SUPABASE.table("collection").insert(
-        {"user_id": user["id"], "companion_id": cid}
-    ).execute()
+        {"user_id": user["id"], "companion_id": cid}).execute()
     return True, sb_get_or_create_user(user["email"])
 
 # ────────────────────────── PAGE CONFIG ─────────────────────────────
@@ -89,35 +82,35 @@ st.markdown("""
 # ─────────────────────── LOGIN / AUTH BLOCK ─────────────────────────
 if "user" not in st.session_state:
 
-    # 0️⃣ – header
     st.title("📧 Login to **BONDIGO**")
 
-    # 1️⃣ – send magic link
+    # 1️⃣ send magic‑link
     email = st.text_input("Email")
     if st.button("Send magic link") and email:
-        SUPABASE.auth.sign_in_with_otp(
-            {"email": email},
-            options={"email_redirect_to": "https://ai-matchmaker-demo.streamlit.app/"},
-        )
+        SUPABASE.auth.sign_in_with_otp({        # ← pass ONE dict as per v2 API
+            "email": email,
+            "options": {
+                "emailRedirectTo": "https://ai-matchmaker-demo.streamlit.app"
+            }
+        })
         st.success("Check your mailbox!")
 
-    # 2️⃣ – tiny JS: if URL fragment contains tokens, move them to ?query
+    # 2️⃣ tiny JS – move #fragment → ?query then trigger rerun
     components.html("""
     <script>
     const h = window.location.hash;
     if (h.startsWith("#access_token=")){
-        const q = new URLSearchParams(h.slice(1));      // remove '#'
+        const q = new URLSearchParams(h.slice(1));  // strip '#'
         const url = new URL(window.location);
-        url.hash   = "";
-        url.search = q.toString();
+        url.hash = ""; url.search = q.toString();
         window.history.replaceState({}, "", url);
         window.parent.postMessage({type:"streamlit:rerun"}, "*");
     }
     </script>
     """, height=0)
 
-    # 3️⃣ – catch tokens now in query string
-    qp = st.query_params
+    # 3️⃣ catch tokens now in query string
+    qp = st.query_params                     # ← new API (no deprecation)
     if "access_token" in qp and "user" not in st.session_state:
         session = SUPABASE.auth.set_session(qp["access_token"], qp["refresh_token"])
         st.query_params.clear()              # clean URL
@@ -125,6 +118,7 @@ if "user" not in st.session_state:
         st.session_state.collection = sb_collection(st.session_state.user["id"])
         st.session_state.histories  = {}
         st.session_state.spent      = 0
+        st.session_state.matches    = []
         st.rerun()
     st.stop()
 
@@ -165,15 +159,14 @@ if page == "Find matches":
         ] or random.sample(COMPANIONS, 5)
 
     for c in st.session_state.get("matches", []):
-        b = c.get("rarity","Common"); clr = CLR[b]
+        b = c.get("rarity", "Common"); clr = CLR[b]
         with st.container():
             col1,col2,col3 = st.columns([1,3,2])
             col1.image(c.get("photo", PLACEHOLDER), width=90)
             col2.markdown(
                 f"<span style='background:{clr};padding:2px 6px;border-radius:4px;"
                 f"font-size:0.75rem'>{b}</span> **{c['name']}** • {COST[b]} 💎  \n"
-                f"<span class='match-bio'>{c['bio']}</span>",
-                unsafe_allow_html=True)
+                f"<span class='match-bio'>{c['bio']}</span>", unsafe_allow_html=True)
             if col3.button("💖 Mint", key=f"mint-{c['id']}"):
                 ok, res = sb_buy(user, c)
                 if ok:
@@ -194,10 +187,9 @@ elif page == "Chat":
     default_cid = next(iter(collection))
     sel_name = st.selectbox("Choose companion", names,
                             index=names.index(CID2COMPANION[default_cid]["name"]))
-    cid = next(k for k,v in CID2COMPANION.items() if v["name"]==sel_name)
+    cid = next(k for k,v in CID2COMPANION.items() if v["name"] == sel_name)
     st.session_state.chat_id = cid
 
-    # ensure history
     hist = st.session_state.histories.setdefault(cid, [{
         "role":"system",
         "content": f"You are {CID2COMPANION[cid]['name']}. "
@@ -214,7 +206,6 @@ elif page == "Chat":
     for m in hist[1:]:
         st.chat_message("assistant" if m["role"]=="assistant" else "user").write(m["content"])
 
-    # daily token limit
     if st.session_state.spent >= MAX_TOKENS_PER_USER:
         st.warning("Daily token budget hit.")
         st.stop()
@@ -231,7 +222,6 @@ elif page == "Chat":
             hist.append({"role":"assistant","content":reply})
             st.chat_message("assistant").write(reply)
 
-            # persist (optional)
             SUPABASE.table("messages").insert(
                 {"user_id": user["id"], "companion_id": cid,
                  "role":"user","content":prompt}).execute()
@@ -257,5 +247,4 @@ elif page == "My Collection":
         col2.markdown(
             f"<span style='background:{clr};padding:2px 6px;border-radius:4px;"
             f"font-size:0.75rem'>{c['rarity']}</span> **{c['name']}**  \n"
-            f"<span style='font-size:0.85rem'>{c['bio']}</span>",
-            unsafe_allow_html=True)
+            f"<span style='font-size:0.85rem'>{c['bio']}</span>", unsafe_allow_html=True)
