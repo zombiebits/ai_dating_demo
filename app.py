@@ -186,7 +186,7 @@ elif page == "Chat":
 
 # ======== COLLECTION ========
 elif page == "My Collection":
-    st.header("My Bondigo Collection")
+    st.header("My BONDIGO Collection")
 
     if not st.session_state["collection"]:
         st.info("Mint some companions first! (💖 on Find matches)")
