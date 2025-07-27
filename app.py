@@ -154,67 +154,69 @@ if "user" not in st.session_state:
 
     st.title("🔐 Sign in / Sign up to **BONDIGO**")
 
-    with st.form("login_form"):
-        mode  = st.radio("Choose", ["Sign in","Sign up"], horizontal=True)
-        uname = st.text_input("Username", max_chars=20)
-        pwd   = st.text_input("Password", type="password")
-        go    = st.form_submit_button("Go ➜")
+    # ←←← REPLACED: no st.form here, just one st.button
+    mode  = st.radio("Choose", ["Sign in","Sign up"], horizontal=True)
+    uname = st.text_input("Username", max_chars=20)
+    pwd   = st.text_input("Password", type="password")
+    go    = st.button("Go ➜")        # ← single-click "Go"
 
-    # only run once the form is submitted:
-    if go:
-        if not uname or not pwd:
-            st.warning("Fill both fields.")
+    if not go:                       # ← bail until they hit it
+        st.stop()
+
+    if not uname or not pwd:
+        st.warning("Fill both fields.")
+        st.stop()
+
+    # on sign‑up, block a taken username early:
+    if mode == "Sign up":
+        conflict = SRS.table("users")\
+                      .select("id")\
+                      .eq("username", uname)\
+                      .execute().data
+        if conflict:
+            st.error("That username’s taken.")
             st.stop()
 
-        # on sign‑up, block a taken username early:
+    email = f"{uname.lower()}@bondigo.local"
+    try:
         if mode == "Sign up":
-            conflict = SRS.table("users")\
-                          .select("id")\
-                          .eq("username", uname)\
-                          .execute().data
-            if conflict:
-                st.error("That username’s taken.")
-                st.stop()
+            SB.auth.sign_up({"email": email, "password": pwd})
+        sess = SB.auth.sign_in_with_password({
+            "email": email, "password": pwd
+        })
+    except Exception as e:
+        st.error(f"Auth error: {e}")
+        st.stop()
 
-        email = f"{uname.lower()}@bondigo.local"
-        try:
-            if mode == "Sign up":
-                SB.auth.sign_up({"email": email, "password": pwd})
-            sess = SB.auth.sign_in_with_password({
-                "email": email, "password": pwd
-            })
-        except Exception as e:
-            st.error(f"Auth error: {e}")
-            st.stop()
+    # grab the real JWT so RLS on SB still works:
+    token = None
+    if hasattr(sess, "session") and sess.session:
+        token = sess.session.access_token
+    elif hasattr(sess, "access_token"):
+        token = sess.access_token
 
-        # grab the real JWT so RLS on SB still works:
-        token = None
-        if hasattr(sess, "session") and sess.session:
-            token = sess.session.access_token
-        elif hasattr(sess, "access_token"):
-            token = sess.access_token
+    if not token:
+        st.error("Couldn’t find access token.")
+        st.stop()
 
-        if not token:
-            st.error("Couldn’t find access token.")
-            st.stop()
+    st.session_state.user_jwt = token
+    SB.postgrest.headers["Authorization"] = f"Bearer {token}"
 
-        st.session_state.user_jwt = token
-        SB.postgrest.headers["Authorization"] = f"Bearer {token}"
+    # upsert the user (1000 tokens + airdrop baseline)
+    try:
+        st.session_state.user = profile_upsert(sess.user.id, uname)
+    except ValueError:
+        st.error("Username conflict; try another.")
+        SB.auth.sign_out()
+        st.stop()
 
-        # upsert the user (1000 tokens + airdrop baseline)
-        try:
-            st.session_state.user = profile_upsert(sess.user.id, uname)
-        except ValueError:
-            st.error("Username conflict; try another.")
-            SB.auth.sign_out()
-            st.stop()
+    # init some other state
+    st.session_state.spent   = 0
+    st.session_state.matches = []
 
-        # init some other state
-        st.session_state.spent   = 0
-        st.session_state.matches = []
+    # now restart into the main app
+    raise RerunException(rerun_data=None)
 
-        # now restart into the main app
-        raise RerunException(rerun_data=None)
 
 # ─────────────────── ENSURE STATE KEYS ────────────────────────────
 # (if you navigate away/reload, re‑bootstrap these)
