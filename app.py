@@ -143,7 +143,7 @@ st.markdown("""
 # ─────────────────── LOGIN / SIGN‑UP ───────────────────────────────
 if "user" not in st.session_state:
 
-    # 1) Logo + tagline on the login screen:
+    # Logo + tagline on the login screen:
     if Path(LOGO).is_file():
         st.image(LOGO, width=380)
         st.markdown(
@@ -154,13 +154,12 @@ if "user" not in st.session_state:
 
     st.title("🔐 Sign in / Sign up to **BONDIGO**")
 
-    # ←←← REPLACED: no st.form here, just one st.button
     mode  = st.radio("Choose", ["Sign in","Sign up"], horizontal=True)
     uname = st.text_input("Username", max_chars=20)
     pwd   = st.text_input("Password", type="password")
-    go    = st.button("Go ➜")        # ← single-click "Go"
+    go    = st.button("Go ➜")
 
-    if not go:                       # ← bail until they hit it
+    if not go:
         st.stop()
 
     if not uname or not pwd:
@@ -219,7 +218,6 @@ if "user" not in st.session_state:
 
 
 # ─────────────────── ENSURE STATE KEYS ────────────────────────────
-# (if you navigate away/reload, re‑bootstrap these)
 if "spent"   not in st.session_state: st.session_state.spent   = 0
 if "matches" not in st.session_state: st.session_state.matches = []
 
@@ -236,7 +234,7 @@ if Path(LOGO).is_file():
       unsafe_allow_html=True
     )
 
-# 2) Show the username in the wallet banner:
+# Show the username in the wallet banner:
 st.markdown(f"**{user['username']}'s Wallet:** `{user['tokens']} 💎`")
 
 tabs = ["Find matches","Chat","My Collection"]
@@ -270,9 +268,10 @@ if page == "Find matches":
         rarity, clr = c.get("rarity","Common"), CLR[c.get("rarity","Common")]
         c1, c2, c3 = st.columns([1,3,2])
         c1.image(c.get("photo",PLACEHOLDER), width=90)
+        # badge with black text:
         c2.markdown(
-          f"<span style='background:{clr};padding:2px 6px; "
-          f"border-radius:4px;font-size:0.75rem'>{rarity}</span> "
+          f"<span style='background:{clr}; color:black; padding:2px 6px; "
+          f"border-radius:4px; font-size:0.75rem'>{rarity}</span> "
           f"**{c['name']}** • {COST[rarity]} 💎  \n"
           f"<span class='match-bio'>{c['bio']}</span>",
           unsafe_allow_html=True
@@ -296,8 +295,7 @@ elif page == "Chat":
     sel   = st.selectbox("Choose companion", names)
     cid   = next(k for k,v in CID2COMP.items() if v["name"] == sel)
 
-    # load the chat history from DB on first open
-    if cid not in st.session_state.matches:
+    if cid not in st.session_state.hist:
         rows = (
           SRS.table("messages")
              .select("role,content,created_at")
@@ -309,8 +307,7 @@ elif page == "Chat":
         )
         base = [{
           "role":"system",
-          "content": f"You are {CID2COMP[cid]['name']}. "
-                     f"{CID2COMP[cid]['bio']} Speak in first person, PG‑13."
+          "content": f"You are {CID2COMP[cid]['name']}. {CID2COMP[cid]['bio']} Speak in first person, PG‑13."
         }]
         st.session_state.hist = base + [{"role":r["role"],"content":r["content"]} for r in rows]
 
@@ -378,9 +375,11 @@ elif page == "My Collection":
         rar = c.get("rarity","Common"); clr = CLR[rar]
         col1, col2 = st.columns([1,5])
         col1.image(c.get("photo",PLACEHOLDER), width=80)
+        # badge with black text:
         col2.markdown(
-          f"<span style='background:{clr};padding:2px 6px;border-radius:4px;"
-          f"font-size:0.75rem'>{rar}</span> **{c['name']}**  \n"
+          f"<span style='background:{clr}; color:black; padding:2px 6px; "
+          f"border-radius:4px; font-size:0.75rem'>{rar}</span> "
+          f"**{c['name']}**  \n"
           f"<span style='font-size:0.85rem'>{c['bio']}</span>",
           unsafe_allow_html=True
         )
