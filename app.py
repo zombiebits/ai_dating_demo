@@ -173,7 +173,8 @@ if "user" not in st.session_state:
         st.error("Could not find access token in auth response")
         st.stop()
 
-    SB.postgrest._client._headers["Authorization"] = f"Bearer {token}"
+    # ←── **THIS LINE** is the only change in v2.17.0:
+    SB.postgrest.headers["Authorization"] = f"Bearer {token}"
 
     # upsert wallet / airdrop
     try:
@@ -207,24 +208,27 @@ if Path(LOGO).is_file():
 
 st.markdown(f"**Wallet:** `{user['tokens']} 💎`")
 tabs = ["Find matches","Chat","My Collection"]
-page = st.sidebar.radio("Navigation", tabs, index=0, key="nav")
-
+page = st.sidebar.radio("Navigation", tabs, key="nav")
 
 # ─────────────────── FIND MATCHES ────────────────────────────────
 if page == "Find matches":
-    hobby = st.selectbox("Pick a hobby",
-        ["space","foodie","gaming","music","art","sports","reading",
-         "travel","gardening","coding"])
-    trait = st.selectbox("Pick a trait",
-        ["curious","adventurous","night‑owl","chill","analytical",
-         "energetic","humorous","kind","bold","creative"])
-    vibe  = st.selectbox("Pick a vibe",
-        ["witty","caring","mysterious","romantic","sarcastic",
-         "intellectual","playful","stoic","optimistic","pragmatic"])
-    scene = st.selectbox("Pick a scene",
-        ["beach","forest","cafe","space‑station","cyberpunk‑city",
-         "medieval‑castle","mountain","underwater","neon‑disco",
-         "cozy‑library"])
+    hobby = st.selectbox("Pick a hobby", [
+        "space","foodie","gaming","music","art","sports","reading",
+        "travel","gardening","coding"
+    ])
+    trait = st.selectbox("Pick a trait", [
+        "curious","adventurous","night‑owl","chill","analytical",
+        "energetic","humorous","kind","bold","creative"
+    ])
+    vibe  = st.selectbox("Pick a vibe", [
+        "witty","caring","mysterious","romantic","sarcastic",
+        "intellectual","playful","stoic","optimistic","pragmatic"
+    ])
+    scene = st.selectbox("Pick a scene", [
+        "beach","forest","cafe","space‑station","cyberpunk‑city",
+        "medieval‑castle","mountain","underwater","neon‑disco",
+        "cozy‑library"
+    ])
 
     if st.button("Show matches"):
         st.session_state.matches = (
@@ -233,9 +237,8 @@ if page == "Find matches":
             or random.sample(COMPANIONS, 5)
         )
 
-    for c in st.session_state.get("matches", []):
-        rarity = c.get("rarity","Common")
-        clr    = CLR[rarity]
+    for c in st.session_state.matches:
+        rarity = c.get("rarity","Common"); clr = CLR[rarity]
         c1, c2, c3 = st.columns([1,3,2])
         c1.image(c.get("photo",PLACEHOLDER), width=90)
         c2.markdown(
@@ -255,35 +258,28 @@ if page == "Find matches":
                 st.warning(new_user)
             st.experimental_rerun()
 
-
 # ─────────────────── CHAT ────────────────────────────────────────
 elif page == "Chat":
     if not colset:
-        st.info("Bond with a companion first.")
-        st.stop()
+        st.info("Bond with a companion first."); st.stop()
 
+    # load history once
     names = [CID2COMP[x]["name"] for x in colset]
-    sel   = st.selectbox("Choose companion", names, index=0)
-    cid   = next(k for k, v in CID2COMP.items() if v["name"] == sel)
+    sel   = st.selectbox("Choose companion", names)
+    cid   = next(k for k,v in CID2COMP.items() if v["name"] == sel)
 
-    # load persisted history on first access
     if cid not in st.session_state.hist:
-        rows = (
-          SB.table("messages")
-            .select("role,content,created_at")
-            .eq("user_id", user["id"])
-            .eq("companion_id", cid)
-            .order("created_at", {"ascending": True})
-            .execute()
-            .data
-        )
+        rows = (SB.table("messages")
+                .select("role,content,created_at")
+                .eq("user_id", user["id"])
+                .eq("companion_id", cid)
+                .order("created_at", {"ascending": True})
+                .execute().data)
         base = [{
-          "role":    "system",
-          "content": f"You are {CID2COMP[cid]['name']}. {CID2COMP[cid]['bio']} Speak in first person, PG‑13."
+            "role":"system",
+            "content": f"You are {CID2COMP[cid]['name']}. {CID2COMP[cid]['bio']} Speak in first person, PG‑13."
         }]
-        st.session_state.hist[cid] = base + [
-          {"role": r["role"], "content": r["content"]} for r in rows
-        ]
+        st.session_state.hist[cid] = base + [{"role":r["role"], "content":r["content"]} for r in rows]
 
     hist = st.session_state.hist[cid]
 
@@ -297,20 +293,18 @@ elif page == "Chat":
           .eq("user_id", user["id"])\
           .eq("companion_id", cid)\
           .execute()
-        st.success("Chat history cleared.")
-        st.stop()
+        st.success("Chat history cleared."); st.stop()
 
     for msg in hist[1:]:
         st.chat_message("assistant" if msg["role"]=="assistant" else "user")\
           .write(msg["content"])
 
     if st.session_state.spent >= MAX_TOKENS:
-        st.warning("Daily token budget hit.")
-        st.stop()
+        st.warning("Daily token budget hit."); st.stop()
 
     user_input = st.chat_input("Say something…")
     if user_input:
-        hist.append({"role": "user", "content": user_input})
+        hist.append({"role":"user","content":user_input})
         try:
             resp = OA.chat.completions.create(
                 model="gpt-4o-mini", messages=hist, max_tokens=120
@@ -321,7 +315,6 @@ elif page == "Chat":
             hist.append({"role":"assistant","content":reply})
             st.chat_message("assistant").write(reply)
 
-            # persist both turns
             SB.table("messages").insert({
                 "user_id":      user["id"],
                 "companion_id": cid,
@@ -348,8 +341,7 @@ elif page == "My Collection":
         st.info("No Bonds yet.")
     for cid in sorted(colset):
         c   = CID2COMP[cid]
-        rar = c.get("rarity","Common")
-        clr = CLR[rar]
+        rar = c.get("rarity","Common"); clr = CLR[rar]
         col1, col2 = st.columns([1,5])
         col1.image(c.get("photo",PLACEHOLDER), width=80)
         col2.markdown(
