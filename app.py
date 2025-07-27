@@ -15,7 +15,7 @@ SB  = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
 SRS = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_KEY"])
 OA  = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
-# Persist JWT for RLS reads/writes
+# Persist JWT for RLS on SB
 if "user_jwt" in st.session_state:
     SB.postgrest.headers["Authorization"] = f"Bearer {st.session_state.user_jwt}"
 
@@ -26,11 +26,13 @@ st.set_page_config(
     layout="centered",
     menu_items={"Get Help": None, "Report a bug": None, "About": None},
 )
-# Hide default Streamlit header, footer and sidebar
+
+# Hide default Streamlit chrome:
 st.markdown(
     """
     <style>
-      #MainMenu, footer, [data-testid="stSidebar"] {
+      /* hide hamburger menu, header bar, footer & sidebar */
+      #MainMenu, header, footer, [data-testid="stSidebar"] {
         visibility: hidden;
         height: 0;
       }
@@ -119,13 +121,13 @@ def buy(user: dict, comp: dict):
     )
     if owned:
         return False, "Already owned"
-    # debit & mint
-    SRS.table("users").update({"tokens":user["tokens"]-price}).eq("id",user["id"]).execute()
+    # debit & mint via service role
+    SRS.table("users").update({"tokens": user["tokens"] - price}).eq("id", user["id"]).execute()
     SRS.table("collection").insert({
         "user_id":      user["id"],
         "companion_id": comp["id"]
     }).execute()
-    # resync
+    # resync and airdrop
     return True, profile_upsert(user["auth_uid"], user["username"])
 
 
@@ -177,9 +179,7 @@ if "user" not in st.session_state:
     st.session_state.spent   = 0
     st.session_state.matches = []
     st.session_state.hist    = {}
-
     raise RerunException(rerun_data=None)
-
 
 # ─────────────────── STATE BOOTSTRAP ──────────────────────────────
 st.session_state.setdefault("spent",   0)
@@ -213,12 +213,11 @@ st.markdown(
 )
 
 
-# ─────────────────── ON‑PAGE NAVIGATION ─────────────────────────
+# ─────────────────── IN‑PAGE NAVIGATION ──────────────────────────
 page = st.radio(
-    "", 
+    "",
     ["Find matches","Chat","My Collection"],
-    index=0 if "page" not in st.session_state else 
-          ["Find matches","Chat","My Collection"].index(st.session_state.page),
+    index=0 if "page" not in st.session_state else ["Find matches","Chat","My Collection"].index(st.session_state.page),
     horizontal=True,
 )
 st.session_state.page = page
@@ -226,11 +225,12 @@ st.session_state.page = page
 
 # ─────────────────── FIND MATCHES ────────────────────────────────
 if page == "Find matches":
-    st.image("assets/bondcosts.png", width=380)  # your legend graphic
-    hobby = st.selectbox("Pick a hobby",   [...])
-    trait = st.selectbox("Pick a trait",   [...])
-    vibe  = st.selectbox("Pick a vibe",    [...])
-    scene = st.selectbox("Pick a scene",   [...])
+    st.image("assets/bondcosts.png", width=380)  # your legend
+    hobby = st.selectbox("Pick a hobby",   ["space","foodie","gaming","music","art","sports","reading","travel","gardening","coding"])
+    trait = st.selectbox("Pick a trait",   ["curious","adventurous","night‑owl","chill","analytical","energetic","humorous","kind","bold","creative"])
+    vibe  = st.selectbox("Pick a vibe",    ["witty","caring","mysterious","romantic","sarcastic","intellectual","playful","stoic","optimistic","pragmatic"])
+    scene = st.selectbox("Pick a scene",   ["beach","forest","cafe","space‑station","cyberpunk‑city","medieval‑castle","mountain","underwater","neon‑disco","cozy‑library"])
+
     if st.button("Show matches"):
         st.session_state.matches = (
            [c for c in COMPANIONS if all(t in c["tags"] for t in [hobby,trait,vibe,scene])]
@@ -239,7 +239,7 @@ if page == "Find matches":
     for c in st.session_state.matches:
         rarity, clr = c.get("rarity","Common"), CLR[c.get("rarity","Common")]
         c1,c2,c3 = st.columns([1,3,2])
-        c1.image(c.get("photo",PLACEHOLDER),width=90)
+        c1.image(c.get("photo",PLACEHOLDER), width=90)
         c2.markdown(
           f"<span style='background:{clr}; color:black; padding:2px 6px;"
           f"border-radius:4px; font-size:0.75rem'>{rarity}</span> "
@@ -263,33 +263,41 @@ elif page == "Chat":
     sel = st.selectbox("Choose companion", [CID2COMP[i]["name"] for i in colset])
     cid = next(k for k,v in CID2COMP.items() if v["name"]==sel)
     if cid not in st.session_state.hist:
-        rows = ( SRS.table("messages")
-                   .select("role,content,created_at")
-                   .eq("user_id",user["id"])
-                   .eq("companion_id",cid)
-                   .order("created_at")
-                   .execute().data )
-        base = [{"role":"system","content":
-                 f"You are {CID2COMP[cid]['name']}. {CID2COMP[cid]['bio']} Speak in first person, PG‑13."}]
+        rows = (
+          SRS.table("messages")
+             .select("role,content,created_at")
+             .eq("user_id", user["id"])
+             .eq("companion_id", cid)
+             .order("created_at")
+             .execute().data
+        )
+        base = [{
+          "role":"system",
+          "content": f"You are {CID2COMP[cid]['name']}. {CID2COMP[cid]['bio']} Speak in first person, PG‑13."
+        }]
         st.session_state.hist[cid] = base + [{"role":r["role"],"content":r["content"]} for r in rows]
+
     hist = st.session_state.hist[cid]
-    st.image(CID2COMP[cid].get("photo",PLACEHOLDER),width=180)
+    st.image(CID2COMP[cid].get("photo",PLACEHOLDER), width=180)
     st.subheader(f"Chatting with **{CID2COMP[cid]['name']}**")
+
     if st.button("🗑️ Clear history"):
         st.session_state.hist[cid] = hist[:1]
-        SRS.table("messages").delete().eq("user_id",user["id"]).eq("companion_id",cid).execute()
-        st.success("Chat cleared."); st.stop()
+        SRS.table("messages").delete().eq("user_id", user["id"]).eq("companion_id", cid).execute()
+        st.success("Chat history cleared."); st.stop()
+
     for msg in hist[1:]:
         st.chat_message("assistant" if msg["role"]=="assistant" else "user").write(msg["content"])
     if st.session_state.spent >= MAX_TOKENS:
         st.warning("Daily token budget hit."); st.stop()
+
     ui = st.chat_input("Say something…")
     if ui:
         hist.append({"role":"user","content":ui})
         try:
-            resp  = OA.chat.completions.create(model="gpt-4o-mini",messages=hist,max_tokens=120)
+            resp  = OA.chat.completions.create(model="gpt-4o-mini", messages=hist, max_tokens=120)
             reply=resp.choices[0].message.content
-            st.session_state.spent += resp.usage.prompt_tokens+resp.usage.completion_tokens
+            st.session_state.spent += resp.usage.prompt_tokens + resp.usage.completion_tokens
             hist.append({"role":"assistant","content":reply})
             st.chat_message("assistant").write(reply)
             SRS.table("messages").insert({"user_id":user["id"],"companion_id":cid,"role":"user","content":ui}).execute()
@@ -299,7 +307,6 @@ elif page == "Chat":
         except OpenAIError as e:
             st.error(str(e))
 
-
 # ─────────────────── MY COLLECTION ───────────────────────────────
 elif page == "My Collection":
     st.header("My BONDIGO Collection")
@@ -308,12 +315,13 @@ elif page == "My Collection":
         st.info("No Bonds yet.")
     for cid in sorted(colset):
         c = CID2COMP[cid]
-        rar,clr = c.get("rarity","Common"),CLR[c.get("rarity","Common")]
+        rar,clr = c.get("rarity","Common"), CLR[c.get("rarity","Common")]
         a,b = st.columns([1,5])
-        a.image(c.get("photo",PLACEHOLDER),width=80)
+        a.image(c.get("photo",PLACEHOLDER), width=80)
         b.markdown(
           f"<span style='background:{clr}; color:black; padding:2px 6px;"
           f"border-radius:4px; font-size:0.75rem'>{rar}</span> "
-          f"**{c['name']}**\n<span style='font-size:0.85rem'>{c['bio']}</span>",
+          f"**{c['name']}**  \n"
+          f"<span style='font-size:0.85rem'>{c['bio']}</span>",
           unsafe_allow_html=True,
         )
