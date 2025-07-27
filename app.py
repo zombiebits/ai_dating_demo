@@ -17,7 +17,7 @@ SB  = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
 SRS = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_KEY"])
 OA  = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
-# persist the user's JWT for RLS‐protected reads on SB
+# Whenever we have a JWT, slap it onto SB so any RLS on collection/messages would still work
 if "user_jwt" in st.session_state:
     SB.postgrest.headers["Authorization"] = f"Bearer {st.session_state.user_jwt}"
 
@@ -36,7 +36,12 @@ CID2COMP   = {c["id"]: c for c in COMPANIONS}
 
 # ─────────────────── DATABASE HELPERS ──────────────────────────────
 def profile_upsert(auth_uid: str, username: str) -> dict:
+    """
+    All users-table ops use SRS, so you never run into RLS on users.
+    """
     tbl = SRS.table("users")
+
+    # existing?
     rows = tbl.select("*").eq("auth_uid", auth_uid).execute().data
     if rows:
         user = rows[0]
@@ -51,6 +56,7 @@ def profile_upsert(auth_uid: str, username: str) -> dict:
             except APIError:
                 pass
     else:
+        # first visit
         try:
             user = (
                 tbl.insert({
@@ -67,6 +73,7 @@ def profile_upsert(auth_uid: str, username: str) -> dict:
                 raise ValueError("username_taken")
             raise
 
+    # daily airdrop
     last = user["last_airdrop"] or user["created_at"]
     last = datetime.fromisoformat(last.replace("Z", "+00:00"))
     if datetime.now(timezone.utc) - last >= timedelta(hours=24):
@@ -79,15 +86,17 @@ def profile_upsert(auth_uid: str, username: str) -> dict:
             .execute()
             .data[0]
         )
+
     return user
 
 def collection_set(user_id: str) -> set[str]:
+    """Read the user's bonds directly via SRS"""
     rows = (
-        SB.table("collection")
-          .select("companion_id")
-          .eq("user_id", user_id)
-          .execute()
-          .data
+        SRS.table("collection")
+           .select("companion_id")
+           .eq("user_id", user_id)
+           .execute()
+           .data
     )
     return {r["companion_id"] for r in rows}
 
@@ -95,32 +104,36 @@ def buy(user: dict, comp: dict):
     price = COST[comp.get("rarity","Common")]
     if price > user["tokens"]:
         return False, "Not enough 💎"
+
+    # already owned?
     owned = (
-        SB.table("collection")
-          .select("companion_id")
-          .eq("user_id", user["id"])
-          .eq("companion_id", comp["id"])
-          .execute()
-          .data
+        SRS.table("collection")
+           .select("companion_id")
+           .eq("user_id", user["id"])
+           .eq("companion_id", comp["id"])
+           .execute()
+           .data
     )
     if owned:
         return False, "Already owned"
 
-    # debit & mint via service role
+    # debit & mint via SRS
     SRS.table("users")\
        .update({"tokens": user["tokens"] - price})\
        .eq("id", user["id"])\
        .execute()
+
     SRS.table("collection")\
        .insert({
            "user_id":      user["id"],
            "companion_id": comp["id"]
        }).execute()
 
+    # resync via profile_upsert
     return True, profile_upsert(user["auth_uid"], user["username"])
 
 
-# ─────────────────── STREAMLIT CONFIG ─────────────────────────────
+# ─────────────────── STREAMLIT PAGE CONFIG ─────────────────────────
 st.set_page_config("BONDIGO", "🩷", layout="centered")
 st.markdown("""
 <style>
@@ -133,10 +146,9 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-# ─────────────────── LOGIN / SIGN‑UP FORM ──────────────────────────
+# ─────────────────── LOGIN / SIGN‑UP ───────────────────────────────
 if "user" not in st.session_state:
     st.title("🔐 Sign in / Sign up to **BONDIGO**")
-
     with st.form("login_form"):
         mode  = st.radio("Choose", ["Sign in","Sign up"], horizontal=True)
         uname = st.text_input("Username", max_chars=20)
@@ -148,9 +160,10 @@ if "user" not in st.session_state:
     if not uname or not pwd:
         st.warning("Fill both fields."); st.stop()
 
+    # on sign‑up, precheck username
     if mode == "Sign up":
-        existing = SB.table("users").select("id").eq("username", uname).execute().data
-        if existing:
+        conflict = SRS.table("users").select("id").eq("username", uname).execute().data
+        if conflict:
             st.error("That username’s taken."); st.stop()
 
     email = f"{uname.lower()}@bondigo.local"
@@ -161,32 +174,29 @@ if "user" not in st.session_state:
     except Exception as e:
         st.error(f"Auth error: {e}"); st.stop()
 
-    token = None
-    if hasattr(sess, "session") and sess.session:
-        token = sess.session.access_token
-    elif hasattr(sess, "access_token"):
-        token = sess.access_token
+    # capture the JWT
+    token = getattr(sess, "session", {}).access_token if hasattr(sess, "session") else getattr(sess, "access_token", None)
     if not token:
         st.error("Couldn’t find access token."); st.stop()
 
     st.session_state.user_jwt = token
     SB.postgrest.headers["Authorization"] = f"Bearer {token}"
 
+    # upsert profile & initialize
     try:
         st.session_state.user = profile_upsert(sess.user.id, uname)
     except ValueError:
-        st.error("Username taken; choose another."); SB.auth.sign_out(); st.stop()
+        st.error("Username conflict; try another."); SB.auth.sign_out(); st.stop()
 
-    st.session_state.hist    = {}
     st.session_state.spent   = 0
     st.session_state.matches = []
 
+    # rerun into main UI
     raise RerunException(rerun_data=None)
 
 
-# ─────────────────── ENSURE OTHER KEYS ────────────────────────────
+# ─────────────────── BOOTSTRAP STATE KEYS ─────────────────────────
 if "user" in st.session_state:
-    if "hist"    not in st.session_state: st.session_state.hist    = {}
     if "spent"   not in st.session_state: st.session_state.spent   = 0
     if "matches" not in st.session_state: st.session_state.matches = []
 
@@ -194,7 +204,7 @@ user   = st.session_state.user
 colset = collection_set(user["id"])
 
 
-# HEADER & NAV
+# ─────────────────── HEADER & NAVIGATION ─────────────────────────
 if Path(LOGO).is_file():
     st.image(LOGO, width=380)
     st.markdown(
@@ -202,17 +212,16 @@ if Path(LOGO).is_file():
       unsafe_allow_html=True
     )
 st.markdown(f"**Wallet:** `{user['tokens']} 💎`")
-
 tabs = ["Find matches","Chat","My Collection"]
 page = st.sidebar.radio("Navigation", tabs, key="nav")
 
 
-# ─────────────────── FIND MATCHES ────────────────────────────────
+# ─────────────────── FIND MATCHES ─────────────────────────────────
 if page == "Find matches":
-    hobby = st.selectbox("Pick a hobby", ["space","foodie","gaming","music","art","sports","reading","travel","gardening","coding"])
-    trait = st.selectbox("Pick a trait", ["curious","adventurous","night‑owl","chill","analytical","energetic","humorous","kind","bold","creative"])
-    vibe  = st.selectbox("Pick a vibe", ["witty","caring","mysterious","romantic","sarcastic","intellectual","playful","stoic","optimistic","pragmatic"])
-    scene = st.selectbox("Pick a scene", ["beach","forest","cafe","space‑station","cyberpunk‑city","medieval‑castle","mountain","underwater","neon‑disco","cozy‑library"])
+    hobby = st.selectbox("Pick a hobby",   ["space","foodie","gaming","music","art","sports","reading","travel","gardening","coding"])
+    trait = st.selectbox("Pick a trait",   ["curious","adventurous","night‑owl","chill","analytical","energetic","humorous","kind","bold","creative"])
+    vibe  = st.selectbox("Pick a vibe",    ["witty","caring","mysterious","romantic","sarcastic","intellectual","playful","stoic","optimistic","pragmatic"])
+    scene = st.selectbox("Pick a scene",   ["beach","forest","cafe","space‑station","cyberpunk‑city","medieval‑castle","mountain","underwater","neon‑disco","cozy‑library"])
 
     if st.button("Show matches"):
         st.session_state.matches = (
@@ -249,29 +258,30 @@ elif page == "Chat":
     sel   = st.selectbox("Choose companion", names)
     cid   = next(k for k,v in CID2COMP.items() if v["name"] == sel)
 
-    if cid not in st.session_state.hist:
+    if cid not in st.session_state.matches:
+        # load saved messages
         rows = (
-          SB.table("messages")
-            .select("role,content,created_at")
-            .eq("user_id", user["id"])
-            .eq("companion_id", cid)
-            .order("created_at")
-            .execute()
-            .data
+          SRS.table("messages")
+             .select("role,content,created_at")
+             .eq("user_id", user["id"])
+             .eq("companion_id", cid)
+             .order("created_at")
+             .execute()
+             .data
         )
         base = [{
           "role":"system",
           "content": f"You are {CID2COMP[cid]['name']}. {CID2COMP[cid]['bio']} Speak in first person, PG‑13."
         }]
-        st.session_state.hist[cid] = base + [{"role":r["role"],"content":r["content"]} for r in rows]
+        st.session_state.hist = base + [{"role":r["role"],"content":r["content"]} for r in rows]
 
-    hist = st.session_state.hist[cid]
+    hist = st.session_state.hist
     st.image(CID2COMP[cid].get("photo",PLACEHOLDER), width=180)
     st.subheader(f"Chatting with **{CID2COMP[cid]['name']}**")
 
     if st.button("🗑️ Clear history"):
-        st.session_state.hist[cid] = hist[:1]
-        SB.table("messages").delete().eq("user_id", user["id"]).eq("companion_id", cid).execute()
+        st.session_state.hist = hist[:1]
+        SRS.table("messages").delete().eq("user_id", user["id"]).eq("companion_id", cid).execute()
         st.success("Chat history cleared."); st.stop()
 
     for msg in hist[1:]:
@@ -291,13 +301,13 @@ elif page == "Chat":
             hist.append({"role":"assistant","content":reply})
             st.chat_message("assistant").write(reply)
 
-            SB.table("messages").insert({
+            SRS.table("messages").insert({
                 "user_id":      user["id"],
                 "companion_id": cid,
                 "role":         "user",
                 "content":      user_input
             }).execute()
-            SB.table("messages").insert({
+            SRS.table("messages").insert({
                 "user_id":      user["id"],
                 "companion_id": cid,
                 "role":         "assistant",
