@@ -16,6 +16,10 @@ load_dotenv()
 SB = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
 OA = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
+# ─── Persist the user JWT across reruns ─────────────────────────────
+if "user_jwt" in st.session_state:
+    SB.postgrest.headers["Authorization"] = f"Bearer {st.session_state.user_jwt}"
+
 # ─────────────────── CONSTANTS ─────────────────────────────────────
 MAX_TOKENS    = 10_000
 DAILY_AIRDROP = 150
@@ -144,12 +148,11 @@ if "user" not in st.session_state:
     if not uname or not pwd:
         st.warning("Fill both fields."); st.stop()
 
-    # check on sign‑up
     if mode == "Sign up":
         conflict = SB.table("users").select("id")\
                      .eq("username", uname).execute().data
         if conflict:
-            st.error("Sorry, that username is already taken."); st.stop()
+            st.error("Username already taken."); st.stop()
 
     email = f"{uname.lower()}@bondigo.local"
     try:
@@ -161,7 +164,7 @@ if "user" not in st.session_state:
     except Exception as e:
         st.error(f"Auth error: {e}"); st.stop()
 
-    # ── inject the real JWT ────────────────────────────────────────
+    # ── capture and persist the real JWT ────────────────────────────
     token = None
     if hasattr(sess, "session") and sess.session:
         token = sess.session.access_token
@@ -171,22 +174,22 @@ if "user" not in st.session_state:
     if not token:
         st.error("Could not find access token."); st.stop()
 
-    # This is the correct way in supabase-py v2+
+    st.session_state.user_jwt = token
+    # immediately inject for the remainder of this run
     SB.postgrest.headers["Authorization"] = f"Bearer {token}"
 
-    # upsert wallet & airdrop
+    # upsert wallet & bootstrap
     try:
         st.session_state.user = profile_upsert(sess.user.id, uname)
     except ValueError:
-        st.error("Username just took; pick another."); SB.auth.sign_out(); st.stop()
+        st.error("Username conflict; pick another."); SB.auth.sign_out(); st.stop()
 
-    # bootstrap state
     st.session_state.col     = collection_set(st.session_state.user["id"])
     st.session_state.hist    = {}
     st.session_state.spent   = 0
     st.session_state.matches = []
 
-   # RerunException in Streamlit 1.47.1 requires a rerun_data argument
+    # rerun now that state is set
     raise RerunException(rerun_data=None)
 
 
@@ -234,16 +237,16 @@ if page == "Find matches":
     for c in st.session_state.matches:
         rarity = c.get("rarity","Common")
         clr    = CLR[rarity]
-        c1, c2, c3 = st.columns([1,3,2])
-        c1.image(c.get("photo",PLACEHOLDER), width=90)
-        c2.markdown(
+        cols = st.columns([1,3,2])
+        cols[0].image(c.get("photo",PLACEHOLDER), width=90)
+        cols[1].markdown(
           f"<span style='background:{clr};padding:2px 6px;"
           f"border-radius:4px;font-size:0.75rem'>{rarity}</span> "
           f"**{c['name']}** • {COST[rarity]} 💎  \n"
           f"<span class='match-bio'>{c['bio']}</span>",
           unsafe_allow_html=True
         )
-        if c3.button("💖 Bond", key=f"bond-{c['id']}"):
+        if cols[2].button("💖 Bond", key=f"bond-{c['id']}"):
             ok, new_user = buy(user, c)
             if ok:
                 st.session_state.user = new_user
@@ -260,10 +263,9 @@ elif page == "Chat":
         st.info("Bond with a companion first."); st.stop()
 
     names = [CID2COMP[x]["name"] for x in colset]
-    sel   = st.selectbox("Choose companion", names, index=0)
+    sel   = st.selectbox("Choose companion", names)
     cid   = next(k for k,v in CID2COMP.items() if v["name"] == sel)
 
-    # load persisted history once
     if cid not in st.session_state.hist:
         rows = (
           SB.table("messages")
@@ -316,7 +318,6 @@ elif page == "Chat":
             hist.append({"role":"assistant","content":reply})
             st.chat_message("assistant").write(reply)
 
-            # persist both turns
             SB.table("messages").insert({
                 "user_id":      user["id"],
                 "companion_id": cid,
