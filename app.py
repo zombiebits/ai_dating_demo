@@ -235,7 +235,15 @@ if Path(LOGO).is_file():
     )
 
 # Show the username in the wallet banner:
-st.markdown(f"**{user['username']}'s Wallet:** `{user['tokens']} 💎`")
+st.markdown(
+    f"<div style='background:#FFE5B4; padding:6px 12px; "
+    f"border-radius:8px; display:inline-block; font-size:1.25rem; "
+    f"color:#000; font-weight:600;'>"
+    f"{user['username']}'s Wallet: {user['tokens']} 💎"
+    f"</div>",
+    unsafe_allow_html=True,
+)
+
 
 tabs = ["Find matches","Chat","My Collection"]
 page = st.sidebar.radio("Navigation", tabs, key="nav")
