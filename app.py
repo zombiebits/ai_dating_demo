@@ -39,7 +39,8 @@ def profile_upsert(auth_uid: str, username: str) -> dict:
                 user = (
                     tbl.update({"username": username})
                        .eq("auth_uid", auth_uid)
-                       .execute().data[0]
+                       .execute()
+                       .data[0]
                 )
             except APIError:
                 pass
@@ -47,11 +48,13 @@ def profile_upsert(auth_uid: str, username: str) -> dict:
         try:
             user = (
                 tbl.insert({
-                    "id":       auth_uid,
-                    "auth_uid": auth_uid,
-                    "username": username,
-                    "tokens":   1000
-                }).execute().data[0]
+                    "id":         auth_uid,
+                    "auth_uid":   auth_uid,
+                    "username":   username,
+                    "tokens":     1000
+                })
+                .execute()
+                .data[0]
             )
         except APIError as e:
             if "duplicate key" in str(e):
@@ -68,7 +71,8 @@ def profile_upsert(auth_uid: str, username: str) -> dict:
                 "last_airdrop": datetime.now(timezone.utc).isoformat()
             })
             .eq("auth_uid", auth_uid)
-            .execute().data[0]
+            .execute()
+            .data[0]
         )
     return user
 
@@ -77,7 +81,8 @@ def collection_set(user_id: str) -> set[str]:
         SB.table("collection")
           .select("companion_id")
           .eq("user_id", user_id)
-          .execute().data
+          .execute()
+          .data
     )
     return {r["companion_id"] for r in rows}
 
@@ -90,7 +95,8 @@ def buy(user: dict, comp: dict):
           .select("companion_id")
           .eq("user_id", user["id"])
           .eq("companion_id", comp["id"])
-          .execute().data
+          .execute()
+          .data
     )
     if owned:
         return False, "Already owned"
@@ -105,7 +111,6 @@ def buy(user: dict, comp: dict):
         "companion_id": comp["id"]
     }).execute()
 
-    # refresh wallet & airdrop
     return True, profile_upsert(user["auth_uid"], user["username"])
 
 
@@ -158,11 +163,16 @@ if "user" not in st.session_state:
         st.stop()
 
     # ── inject real user JWT so RLS policies pass ────────────────────
-    token = getattr(sess, "access_token", None) \
-         or (hasattr(sess, "session") and sess.session.get("access_token"))
+    token = None
+    if hasattr(sess, "session") and sess.session:
+        token = sess.session.access_token
+    elif hasattr(sess, "access_token"):
+        token = sess.access_token
+
     if not token:
-        st.error("Could not find access token.")
+        st.error("Could not find access token in auth response")
         st.stop()
+
     SB.postgrest._client._headers["Authorization"] = f"Bearer {token}"
 
     # upsert wallet / airdrop
@@ -177,6 +187,7 @@ if "user" not in st.session_state:
     st.session_state.hist    = {}
     st.session_state.spent   = 0
     st.session_state.matches = []
+
     st.experimental_rerun()
 
 
@@ -197,7 +208,6 @@ if Path(LOGO).is_file():
 st.markdown(f"**Wallet:** `{user['tokens']} 💎`")
 tabs = ["Find matches","Chat","My Collection"]
 page = st.sidebar.radio("Navigation", tabs, index=0, key="nav")
-st.session_state.nav = page
 
 
 # ─────────────────── FIND MATCHES ────────────────────────────────
@@ -254,9 +264,9 @@ elif page == "Chat":
 
     names = [CID2COMP[x]["name"] for x in colset]
     sel   = st.selectbox("Choose companion", names, index=0)
-    cid   = next(k for k,v in CID2COMP.items() if v["name"] == sel)
+    cid   = next(k for k, v in CID2COMP.items() if v["name"] == sel)
 
-    # ── load persisted history if first time this session ───────────
+    # load persisted history on first access
     if cid not in st.session_state.hist:
         rows = (
           SB.table("messages")
@@ -264,10 +274,11 @@ elif page == "Chat":
             .eq("user_id", user["id"])
             .eq("companion_id", cid)
             .order("created_at", {"ascending": True})
-            .execute().data
+            .execute()
+            .data
         )
         base = [{
-          "role":"system",
+          "role":    "system",
           "content": f"You are {CID2COMP[cid]['name']}. {CID2COMP[cid]['bio']} Speak in first person, PG‑13."
         }]
         st.session_state.hist[cid] = base + [
@@ -280,9 +291,7 @@ elif page == "Chat":
     st.subheader(f"Chatting with **{CID2COMP[cid]['name']}**")
 
     if st.button("🗑️ Clear history"):
-        # 1) clear in‑memory
         st.session_state.hist[cid] = hist[:1]
-        # 2) delete from DB
         SB.table("messages")\
           .delete()\
           .eq("user_id", user["id"])\
@@ -291,7 +300,6 @@ elif page == "Chat":
         st.success("Chat history cleared.")
         st.stop()
 
-    # render prior messages
     for msg in hist[1:]:
         st.chat_message("assistant" if msg["role"]=="assistant" else "user")\
           .write(msg["content"])
@@ -302,9 +310,9 @@ elif page == "Chat":
 
     user_input = st.chat_input("Say something…")
     if user_input:
-        hist.append({"role":"user","content":user_input})
+        hist.append({"role": "user", "content": user_input})
         try:
-            resp  = OA.chat.completions.create(
+            resp = OA.chat.completions.create(
                 model="gpt-4o-mini", messages=hist, max_tokens=120
             )
             reply = resp.choices[0].message.content
