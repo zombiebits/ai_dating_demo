@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import streamlit as st
+from streamlit.runtime.scriptrunner import RerunException
 from openai import OpenAI, OpenAIError, RateLimitError
 from dotenv import load_dotenv
 from supabase import create_client
@@ -27,6 +28,7 @@ CLR           = {"Common":"#bbb","Rare":"#57C7FF","Legendary":"#FFAA33"}
 
 COMPANIONS    = json.load(open("companions.json", encoding="utf-8-sig"))
 CID2COMP      = {c["id"]: c for c in COMPANIONS}
+
 
 # ─────────────────── DATABASE HELPERS ──────────────────────────────
 def profile_upsert(auth_uid: str, username: str) -> dict:
@@ -114,7 +116,7 @@ def buy(user: dict, comp: dict):
     return True, profile_upsert(user["auth_uid"], user["username"])
 
 
-# ─────────────────── STREAMLIT PAGE CONFIG ─────────────────────────
+# ─────────────────── STREAMLIT CONFIG ─────────────────────────────
 st.set_page_config("BONDIGO", "🩷", layout="centered")
 st.markdown("""
 <style>
@@ -140,16 +142,14 @@ if "user" not in st.session_state:
     if not go:
         st.stop()
     if not uname or not pwd:
-        st.warning("Fill both fields.")
-        st.stop()
+        st.warning("Fill both fields."); st.stop()
 
-    # pre‑check username
+    # check on sign‑up
     if mode == "Sign up":
         conflict = SB.table("users").select("id")\
                      .eq("username", uname).execute().data
         if conflict:
-            st.error("Sorry, that username is already taken.")
-            st.stop()
+            st.error("Sorry, that username is already taken."); st.stop()
 
     email = f"{uname.lower()}@bondigo.local"
     try:
@@ -159,10 +159,9 @@ if "user" not in st.session_state:
             "email": email, "password": pwd
         })
     except Exception as e:
-        st.error(f"Auth error: {e}")
-        st.stop()
+        st.error(f"Auth error: {e}"); st.stop()
 
-    # ── inject real user JWT so RLS policies pass ────────────────────
+    # ── inject the real JWT ────────────────────────────────────────
     token = None
     if hasattr(sess, "session") and sess.session:
         token = sess.session.access_token
@@ -170,34 +169,32 @@ if "user" not in st.session_state:
         token = sess.access_token
 
     if not token:
-        st.error("Could not find access token in auth response")
-        st.stop()
+        st.error("Could not find access token."); st.stop()
 
-    # ←── **THIS LINE** is the only change in v2.17.0:
+    # This is the correct way in supabase-py v2+
     SB.postgrest.headers["Authorization"] = f"Bearer {token}"
 
-    # upsert wallet / airdrop
+    # upsert wallet & airdrop
     try:
         st.session_state.user = profile_upsert(sess.user.id, uname)
     except ValueError:
-        st.error("Username just got taken; pick another.")
-        SB.auth.sign_out()
-        st.stop()
+        st.error("Username just took; pick another."); SB.auth.sign_out(); st.stop()
 
+    # bootstrap state
     st.session_state.col     = collection_set(st.session_state.user["id"])
     st.session_state.hist    = {}
     st.session_state.spent   = 0
     st.session_state.matches = []
 
-    st.experimental_rerun()
+    # rerun now that session_state.user is set
+    raise RerunException()
 
 
-# ─────────────────── SHORTCUTS ────────────────────────────────────
+# ─────────────────── USER CONTEXT ─────────────────────────────────
 user   = st.session_state.user
 colset = st.session_state.col
 
-
-# ─────────────────── HEADER & NAV ─────────────────────────────────
+# HEADER & NAV
 if Path(LOGO).is_file():
     st.image(LOGO, width=380)
     st.markdown(
@@ -205,30 +202,27 @@ if Path(LOGO).is_file():
       f"font-size:1.05rem;color:#FFC8D8'>{TAGLINE}</p>",
       unsafe_allow_html=True
     )
-
 st.markdown(f"**Wallet:** `{user['tokens']} 💎`")
+
 tabs = ["Find matches","Chat","My Collection"]
 page = st.sidebar.radio("Navigation", tabs, key="nav")
 
+
 # ─────────────────── FIND MATCHES ────────────────────────────────
 if page == "Find matches":
-    hobby = st.selectbox("Pick a hobby", [
-        "space","foodie","gaming","music","art","sports","reading",
-        "travel","gardening","coding"
-    ])
-    trait = st.selectbox("Pick a trait", [
-        "curious","adventurous","night‑owl","chill","analytical",
-        "energetic","humorous","kind","bold","creative"
-    ])
-    vibe  = st.selectbox("Pick a vibe", [
-        "witty","caring","mysterious","romantic","sarcastic",
-        "intellectual","playful","stoic","optimistic","pragmatic"
-    ])
-    scene = st.selectbox("Pick a scene", [
-        "beach","forest","cafe","space‑station","cyberpunk‑city",
-        "medieval‑castle","mountain","underwater","neon‑disco",
-        "cozy‑library"
-    ])
+    hobby = st.selectbox("Pick a hobby",
+        ["space","foodie","gaming","music","art","sports","reading",
+         "travel","gardening","coding"])
+    trait = st.selectbox("Pick a trait",
+        ["curious","adventurous","night‑owl","chill","analytical",
+         "energetic","humorous","kind","bold","creative"])
+    vibe  = st.selectbox("Pick a vibe",
+        ["witty","caring","mysterious","romantic","sarcastic",
+         "intellectual","playful","stoic","optimistic","pragmatic"])
+    scene = st.selectbox("Pick a scene",
+        ["beach","forest","cafe","space‑station","cyberpunk‑city",
+         "medieval‑castle","mountain","underwater","neon‑disco",
+         "cozy‑library"])
 
     if st.button("Show matches"):
         st.session_state.matches = (
@@ -238,7 +232,8 @@ if page == "Find matches":
         )
 
     for c in st.session_state.matches:
-        rarity = c.get("rarity","Common"); clr = CLR[rarity]
+        rarity = c.get("rarity","Common")
+        clr    = CLR[rarity]
         c1, c2, c3 = st.columns([1,3,2])
         c1.image(c.get("photo",PLACEHOLDER), width=90)
         c2.markdown(
@@ -256,30 +251,36 @@ if page == "Find matches":
                 st.success("Bonded!")
             else:
                 st.warning(new_user)
-            st.experimental_rerun()
+            st.stop()
+
 
 # ─────────────────── CHAT ────────────────────────────────────────
 elif page == "Chat":
     if not colset:
         st.info("Bond with a companion first."); st.stop()
 
-    # load history once
     names = [CID2COMP[x]["name"] for x in colset]
-    sel   = st.selectbox("Choose companion", names)
+    sel   = st.selectbox("Choose companion", names, index=0)
     cid   = next(k for k,v in CID2COMP.items() if v["name"] == sel)
 
+    # load persisted history once
     if cid not in st.session_state.hist:
-        rows = (SB.table("messages")
-                .select("role,content,created_at")
-                .eq("user_id", user["id"])
-                .eq("companion_id", cid)
-                .order("created_at", {"ascending": True})
-                .execute().data)
+        rows = (
+          SB.table("messages")
+            .select("role,content,created_at")
+            .eq("user_id", user["id"])
+            .eq("companion_id", cid)
+            .order("created_at", {"ascending": True})
+            .execute()
+            .data
+        )
         base = [{
-            "role":"system",
-            "content": f"You are {CID2COMP[cid]['name']}. {CID2COMP[cid]['bio']} Speak in first person, PG‑13."
+          "role":    "system",
+          "content": f"You are {CID2COMP[cid]['name']}. {CID2COMP[cid]['bio']} Speak in first person, PG‑13."
         }]
-        st.session_state.hist[cid] = base + [{"role":r["role"], "content":r["content"]} for r in rows]
+        st.session_state.hist[cid] = base + [
+          {"role": r["role"], "content": r["content"]} for r in rows
+        ]
 
     hist = st.session_state.hist[cid]
 
@@ -315,6 +316,7 @@ elif page == "Chat":
             hist.append({"role":"assistant","content":reply})
             st.chat_message("assistant").write(reply)
 
+            # persist both turns
             SB.table("messages").insert({
                 "user_id":      user["id"],
                 "companion_id": cid,
@@ -341,7 +343,8 @@ elif page == "My Collection":
         st.info("No Bonds yet.")
     for cid in sorted(colset):
         c   = CID2COMP[cid]
-        rar = c.get("rarity","Common"); clr = CLR[rar]
+        rar = c.get("rarity","Common")
+        clr = CLR[rar]
         col1, col2 = st.columns([1,5])
         col1.image(c.get("photo",PLACEHOLDER), width=80)
         col2.markdown(
