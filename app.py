@@ -236,11 +236,16 @@ if Path(LOGO).is_file():
 
 # Show the username in the wallet banner:
 st.markdown(
-    f"<div style='background:#f93656; padding:6px 12px; "
+    f"<span style='background:#f93656; padding:6px 12px; "
     f"border-radius:8px; display:inline-block; font-size:1.25rem; "
-    f"color:#000; font-weight:600;'>"
-    f"{user['username']}'s Wallet: {user['tokens']} 💎"
-    f"</div>",
+    f"color:#000; font-weight:600; margin-right:8px;'>"
+    f"{user['username']}'s Wallet"
+    f"</span>"
+    # token balance
+    f"<span style='background:#000; color:#57C784; padding:6px 12px; "
+    f"border-radius:8px; display:inline-block; font-size:1.25rem;'>"
+    f"{user['tokens']} 💎"
+    f"</span>",
     unsafe_allow_html=True,
 )
 
