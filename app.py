@@ -1,6 +1,6 @@
 # app.py
 
-import os, json, random, jwt
+import os, json, random
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from supabase import create_client
 from postgrest.exceptions import APIError
 
-# ─────────────────── ENVIRONMENT & CLIENTS ──────────────────────────
+# ─────────────────── ENVIRONMENT & CLIENTS ─────────────────────────
 load_dotenv()
 SB = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
 OA = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
@@ -28,46 +28,37 @@ CLR           = {"Common":"#bbb","Rare":"#57C7FF","Legendary":"#FFAA33"}
 COMPANIONS    = json.load(open("companions.json", encoding="utf-8-sig"))
 CID2COMP      = {c["id"]: c for c in COMPANIONS}
 
-
 # ─────────────────── DATABASE HELPERS ──────────────────────────────
 def profile_upsert(auth_uid: str, username: str) -> dict:
     tbl = SB.table("users")
-
-    # 1️⃣ existing row?
     rows = tbl.select("*").eq("auth_uid", auth_uid).execute().data
     if rows:
         user = rows[0]
-        # sync username if it changed
         if user["username"] != username:
             try:
                 user = (
                     tbl.update({"username": username})
                        .eq("auth_uid", auth_uid)
-                       .execute()
-                       .data[0]
+                       .execute().data[0]
                 )
             except APIError:
                 pass
     else:
-        # 2️⃣ first visit: insert—and force id = auth_uid
         try:
             user = (
                 tbl.insert({
-                    "id":         auth_uid,     # ← use the Auth UID as the PK
-                    "auth_uid":   auth_uid,
-                    "username":   username,
-                    "tokens":     1000
-                })
-                .execute()
-                .data[0]
+                    "id":       auth_uid,
+                    "auth_uid": auth_uid,
+                    "username": username,
+                    "tokens":   1000
+                }).execute().data[0]
             )
         except APIError as e:
-            msg = str(e)
-            if "users_username_idx" in msg or "duplicate key" in msg:
+            if "duplicate key" in str(e):
                 raise ValueError("username_taken")
             raise
 
-    # 3️⃣ daily airdrop
+    # daily airdrop
     last = user["last_airdrop"] or user["created_at"]
     last = datetime.fromisoformat(last.replace("Z", "+00:00"))
     if datetime.now(timezone.utc) - last >= timedelta(hours=24):
@@ -77,23 +68,18 @@ def profile_upsert(auth_uid: str, username: str) -> dict:
                 "last_airdrop": datetime.now(timezone.utc).isoformat()
             })
             .eq("auth_uid", auth_uid)
-            .execute()
-            .data[0]
+            .execute().data[0]
         )
-
     return user
-
 
 def collection_set(user_id: str) -> set[str]:
     rows = (
         SB.table("collection")
           .select("companion_id")
           .eq("user_id", user_id)
-          .execute()
-          .data
+          .execute().data
     )
     return {r["companion_id"] for r in rows}
-
 
 def buy(user: dict, comp: dict):
     price = COST[comp.get("rarity","Common")]
@@ -104,15 +90,16 @@ def buy(user: dict, comp: dict):
           .select("companion_id")
           .eq("user_id", user["id"])
           .eq("companion_id", comp["id"])
-          .execute()
-          .data
+          .execute().data
     )
     if owned:
         return False, "Already owned"
 
     # debit & mint
-    SB.table("users").update({"tokens": user["tokens"] - price}) \
-      .eq("id", user["id"]).execute()
+    SB.table("users")\
+      .update({"tokens": user["tokens"] - price})\
+      .eq("id", user["id"])\
+      .execute()
     SB.table("collection").insert({
         "user_id":      user["id"],
         "companion_id": comp["id"]
@@ -135,62 +122,65 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-# ─────────────────── LOGIN / SIGN‑UP BLOCK ────────────────────────
+# ─────────────────── LOGIN / SIGN‑UP FORM ──────────────────────────
 if "user" not in st.session_state:
     st.title("🔐 Sign in / Sign up to **BONDIGO**")
 
-    mode  = st.radio("Choose", ["Sign in","Sign up"], horizontal=True)
-    uname = st.text_input("Username", max_chars=20)
-    pwd   = st.text_input("Password", type="password")
-    go    = st.button("Go ➜")
+    with st.form("login_form"):
+        mode  = st.radio("Choose", ["Sign in","Sign up"], horizontal=True)
+        uname = st.text_input("Username", max_chars=20)
+        pwd   = st.text_input("Password", type="password")
+        go    = st.form_submit_button("Go ➜")
 
-    if go:
-        if not uname or not pwd:
-            st.warning("Fill both fields.")
-            st.stop()
-
-        # pre‑check username on Sign up
-        if mode == "Sign up":
-            conflict = SB.table("users").select("id") \
-                        .eq("username", uname).execute().data
-            if conflict:
-                st.error("Sorry, that username is already taken.")
-                st.stop()
-
-        # Supabase Auth always needs an email:
-        email = f"{uname.lower()}@bondigo.local"
-
-        try:
-            if mode == "Sign up":
-                SB.auth.sign_up({"email": email, "password": pwd})
-            sess = SB.auth.sign_in_with_password({
-                "email": email, "password": pwd
-            })
-        except Exception as e:
-            st.error(f"Auth error: {e}")
-            st.stop()
-
-        # upsert our wallet—this will use id=auth_uid on first insert
-        try:
-            st.session_state.user = profile_upsert(sess.user.id, uname)
-        except ValueError:
-            st.error("Username just got taken; pick another.")
-            SB.auth.sign_out()
-            st.stop()
-
-        # now bootstrap the rest of our state
-        st.session_state.col     = collection_set(st.session_state.user["id"])
-        st.session_state.hist    = {}
-        st.session_state.spent   = 0
-        st.session_state.matches = []
-
-        # stop here; on the next interaction session_state.user exists
+    if not go:
+        st.stop()
+    if not uname or not pwd:
+        st.warning("Fill both fields.")
         st.stop()
 
-    st.stop()
+    # pre‑check username
+    if mode == "Sign up":
+        conflict = SB.table("users").select("id")\
+                     .eq("username", uname).execute().data
+        if conflict:
+            st.error("Sorry, that username is already taken.")
+            st.stop()
+
+    email = f"{uname.lower()}@bondigo.local"
+    try:
+        if mode == "Sign up":
+            SB.auth.sign_up({"email": email, "password": pwd})
+        sess = SB.auth.sign_in_with_password({
+            "email": email, "password": pwd
+        })
+    except Exception as e:
+        st.error(f"Auth error: {e}")
+        st.stop()
+
+    # ── inject real user JWT so RLS policies pass ────────────────────
+    token = getattr(sess, "access_token", None) \
+         or (hasattr(sess, "session") and sess.session.get("access_token"))
+    if not token:
+        st.error("Could not find access token.")
+        st.stop()
+    SB.postgrest._client._headers["Authorization"] = f"Bearer {token}"
+
+    # upsert wallet / airdrop
+    try:
+        st.session_state.user = profile_upsert(sess.user.id, uname)
+    except ValueError:
+        st.error("Username just got taken; pick another.")
+        SB.auth.sign_out()
+        st.stop()
+
+    st.session_state.col     = collection_set(st.session_state.user["id"])
+    st.session_state.hist    = {}
+    st.session_state.spent   = 0
+    st.session_state.matches = []
+    st.experimental_rerun()
 
 
-# ─────────────────── SHORTCUTS ─────────────────────────────────
+# ─────────────────── SHORTCUTS ────────────────────────────────────
 user   = st.session_state.user
 colset = st.session_state.col
 
@@ -205,15 +195,12 @@ if Path(LOGO).is_file():
     )
 
 st.markdown(f"**Wallet:** `{user['tokens']} 💎`")
-
 tabs = ["Find matches","Chat","My Collection"]
-page = st.sidebar.radio("Navigation", tabs, key="nav",
-                        index=tabs.index(st.session_state.get("nav",tabs[0])))
-if page != st.session_state.get("nav"):
-    st.session_state.nav = page
+page = st.sidebar.radio("Navigation", tabs, index=0, key="nav")
+st.session_state.nav = page
 
 
-# ─────────────────── FIND MATCHES ──────────────────────────────
+# ─────────────────── FIND MATCHES ────────────────────────────────
 if page == "Find matches":
     hobby = st.selectbox("Pick a hobby",
         ["space","foodie","gaming","music","art","sports","reading",
@@ -256,32 +243,58 @@ if page == "Find matches":
                 st.success("Bonded!")
             else:
                 st.warning(new_user)
-            st.stop()
+            st.experimental_rerun()
 
 
-# ─────────────────── CHAT ─────────────────────────────────────
+# ─────────────────── CHAT ────────────────────────────────────────
 elif page == "Chat":
     if not colset:
         st.info("Bond with a companion first.")
         st.stop()
 
-    names   = [CID2COMP[x]["name"] for x in colset]
-    sel     = st.selectbox("Choose companion", names, index=0)
-    cid     = next(k for k,v in CID2COMP.items() if v["name"] == sel)
+    names = [CID2COMP[x]["name"] for x in colset]
+    sel   = st.selectbox("Choose companion", names, index=0)
+    cid   = next(k for k,v in CID2COMP.items() if v["name"] == sel)
 
-    hist = st.session_state.hist.setdefault(cid, [{
-        "role":"system",
-        "content": f"You are {CID2COMP[cid]['name']}. {CID2COMP[cid]['bio']} Speak in first person, PG‑13."
-    }])
+    # ── load persisted history if first time this session ───────────
+    if cid not in st.session_state.hist:
+        rows = (
+          SB.table("messages")
+            .select("role,content,created_at")
+            .eq("user_id", user["id"])
+            .eq("companion_id", cid)
+            .order("created_at", {"ascending": True})
+            .execute().data
+        )
+        base = [{
+          "role":"system",
+          "content": f"You are {CID2COMP[cid]['name']}. {CID2COMP[cid]['bio']} Speak in first person, PG‑13."
+        }]
+        st.session_state.hist[cid] = base + [
+          {"role": r["role"], "content": r["content"]} for r in rows
+        ]
+
+    hist = st.session_state.hist[cid]
 
     st.image(CID2COMP[cid].get("photo",PLACEHOLDER), width=180)
     st.subheader(f"Chatting with **{CID2COMP[cid]['name']}**")
+
     if st.button("🗑️ Clear history"):
+        # 1) clear in‑memory
         st.session_state.hist[cid] = hist[:1]
+        # 2) delete from DB
+        SB.table("messages")\
+          .delete()\
+          .eq("user_id", user["id"])\
+          .eq("companion_id", cid)\
+          .execute()
+        st.success("Chat history cleared.")
         st.stop()
 
+    # render prior messages
     for msg in hist[1:]:
-        st.chat_message("assistant" if msg["role"]=="assistant" else "user").write(msg["content"])
+        st.chat_message("assistant" if msg["role"]=="assistant" else "user")\
+          .write(msg["content"])
 
     if st.session_state.spent >= MAX_TOKENS:
         st.warning("Daily token budget hit.")
@@ -300,17 +313,18 @@ elif page == "Chat":
             hist.append({"role":"assistant","content":reply})
             st.chat_message("assistant").write(reply)
 
+            # persist both turns
             SB.table("messages").insert({
-                "user_id":       user["id"],
-                "companion_id":  cid,
-                "role":          "user",
-                "content":       user_input
+                "user_id":      user["id"],
+                "companion_id": cid,
+                "role":         "user",
+                "content":      user_input
             }).execute()
             SB.table("messages").insert({
-                "user_id":       user["id"],
-                "companion_id":  cid,
-                "role":          "assistant",
-                "content":       reply
+                "user_id":      user["id"],
+                "companion_id": cid,
+                "role":         "assistant",
+                "content":      reply
             }).execute()
 
         except RateLimitError:
@@ -319,7 +333,7 @@ elif page == "Chat":
             st.error(str(e))
 
 
-# ─────────────────── MY COLLECTION ─────────────────────────────
+# ─────────────────── MY COLLECTION ───────────────────────────────
 elif page == "My Collection":
     st.header("My BONDIGO Collection")
     if not colset:
