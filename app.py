@@ -19,6 +19,27 @@ OA  = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 if "user_jwt" in st.session_state:
     SB.postgrest.headers["Authorization"] = f"Bearer {st.session_state.user_jwt}"
 
+# ─────────────────── STREAMLIT CONFIG ──────────────────────────────
+st.set_page_config(
+    page_title="BONDIGO",
+    page_icon="🩷",
+    layout="centered",
+    menu_items={
+        'Get Help': None,
+        'Report a bug': None,
+        'About': None
+    }
+)
+# Hide Streamlit header/footer/menu
+st.markdown("""
+    <style>
+      /* Hide the hamburger menu & header */
+      #MainMenu, header { visibility: hidden; }
+      /* Hide the “Made with Streamlit” footer */
+      footer { visibility: hidden; }
+    </style>
+""", unsafe_allow_html=True)
+
 # ─────────────────── CONSTANTS ─────────────────────────────────────
 MAX_TOKENS    = 10_000
 DAILY_AIRDROP = 150
@@ -31,7 +52,6 @@ CLR         = {"Common":"#bbb","Rare":"#57C7FF","Legendary":"#FFAA33"}
 
 COMPANIONS = json.load(open("companions.json", encoding="utf-8-sig"))
 CID2COMP   = {c["id"]: c for c in COMPANIONS}
-
 
 # ─────────────────── DATABASE HELPERS ──────────────────────────────
 def profile_upsert(auth_uid: str, username: str) -> dict:
@@ -82,7 +102,6 @@ def profile_upsert(auth_uid: str, username: str) -> dict:
 
     return user
 
-
 def collection_set(user_id: str) -> set[str]:
     rows = (
         SRS.table("collection")
@@ -92,7 +111,6 @@ def collection_set(user_id: str) -> set[str]:
            .data
     )
     return {r["companion_id"] for r in rows}
-
 
 def buy(user: dict, comp: dict):
     price = COST[comp.get("rarity","Common")]
@@ -124,20 +142,6 @@ def buy(user: dict, comp: dict):
     # resync token count + airdrop
     return True, profile_upsert(user["auth_uid"], user["username"])
 
-
-# ─────────────────── STREAMLIT PAGE CONFIG ─────────────────────────
-st.set_page_config("BONDIGO", "🩷", layout="centered")
-st.markdown("""
-<style>
-[data-testid="stSidebar"] div[role="radiogroup"] label {
-  font-size:1.25rem; line-height:1.5rem; padding:8px 0 8px 4px;
-}
-.match-name { font-size:1.2rem; font-weight:700; }
-.match-bio  { font-size:1.0rem; line-height:1.5; }
-</style>
-""", unsafe_allow_html=True)
-
-
 # ─────────────────── LOGIN / SIGN‑UP ───────────────────────────────
 if "user" not in st.session_state:
 
@@ -159,10 +163,8 @@ if "user" not in st.session_state:
 
     if not go:
         st.stop()
-
     if not uname or not pwd:
-        st.warning("Fill both fields.")
-        st.stop()
+        st.warning("Fill both fields."); st.stop()
 
     # on sign‑up, block a taken username early:
     if mode == "Sign up":
@@ -182,8 +184,7 @@ if "user" not in st.session_state:
             "email": email, "password": pwd
         })
     except Exception as e:
-        st.error(f"Auth error: {e}")
-        st.stop()
+        st.error(f"Auth error: {e}"); st.stop()
 
     # grab the real JWT so RLS on SB still works:
     token = None
@@ -193,8 +194,7 @@ if "user" not in st.session_state:
         token = sess.access_token
 
     if not token:
-        st.error("Couldn’t find access token.")
-        st.stop()
+        st.error("Couldn’t find access token."); st.stop()
 
     st.session_state.user_jwt = token
     SB.postgrest.headers["Authorization"] = f"Bearer {token}"
@@ -204,26 +204,23 @@ if "user" not in st.session_state:
         st.session_state.user = profile_upsert(sess.user.id, uname)
     except ValueError:
         st.error("Username conflict; try another.")
-        SB.auth.sign_out()
-        st.stop()
+        SB.auth.sign_out(); st.stop()
 
     # init some other state
     st.session_state.spent   = 0
     st.session_state.matches = []
-    st.session_state.hist    = {}    # ← newly added
+    st.session_state.hist    = {}
 
     # now restart into the main app
     raise RerunException(rerun_data=None)
 
-
 # ─────────────────── ENSURE STATE KEYS ────────────────────────────
 if "spent"   not in st.session_state: st.session_state.spent   = 0
 if "matches" not in st.session_state: st.session_state.matches = []
-if "hist"    not in st.session_state: st.session_state.hist    = {}  # ← newly added
+if "hist"    not in st.session_state: st.session_state.hist    = {}
 
 user   = st.session_state.user
 colset = collection_set(user["id"])
-
 
 # ─────────────────── HEADER & NAV ────────────────────────────────
 if Path(LOGO).is_file():
@@ -234,25 +231,22 @@ if Path(LOGO).is_file():
       unsafe_allow_html=True
     )
 
-# Show the username in the wallet banner:
+# Show username + wallet in styled badges:
 st.markdown(
-    f"<span style='background:#f93656; padding:6px 12px; "
-    f"border-radius:8px; display:inline-block; font-size:1.25rem; "
+    f"<span style='background:#f93656; padding:6px 12px;"
+    f"border-radius:8px; display:inline-block; font-size:1.25rem;"
     f"color:#000; font-weight:600; margin-right:8px;'>"
     f"{user['username']}'s Wallet"
     f"</span>"
-    # token balance
-    f"<span style='background:#000; color:#57C784; padding:6px 12px; "
+    f"<span style='background:#000; color:#57C784; padding:6px 12px;"
     f"border-radius:8px; display:inline-block; font-size:1.25rem;'>"
     f"{user['tokens']} 💎"
     f"</span>",
     unsafe_allow_html=True,
 )
 
-
 tabs = ["Find matches","Chat","My Collection"]
 page = st.sidebar.radio("Navigation", tabs, key="nav")
-
 
 # ─────────────────── FIND MATCHES ────────────────────────────────
 if page == "Find matches":
@@ -282,7 +276,7 @@ if page == "Find matches":
         c1, c2, c3 = st.columns([1,3,2])
         c1.image(c.get("photo",PLACEHOLDER), width=90)
         c2.markdown(
-          f"<span style='background:{clr}; color:black; padding:2px 6px; "
+          f"<span style='background:{clr}; color:black; padding:2px 6px;"
           f"border-radius:4px; font-size:0.75rem'>{rarity}</span> "
           f"**{c['name']}** • {COST[rarity]} 💎  \n"
           f"<span class='match-bio'>{c['bio']}</span>",
@@ -296,7 +290,6 @@ if page == "Find matches":
             else:
                 st.warning(new_user)
             st.stop()
-
 
 # ─────────────────── CHAT ────────────────────────────────────────
 elif page == "Chat":
@@ -333,16 +326,14 @@ elif page == "Chat":
            .eq("user_id", user["id"])\
            .eq("companion_id", cid)\
            .execute()
-        st.success("Chat history cleared.")
-        st.stop()
+        st.success("Chat history cleared."); st.stop()
 
     for msg in hist[1:]:
         st.chat_message("assistant" if msg["role"]=="assistant" else "user")\
           .write(msg["content"])
 
     if st.session_state.spent >= MAX_TOKENS:
-        st.warning("Daily token budget hit.")
-        st.stop()
+        st.warning("Daily token budget hit."); st.stop()
 
     user_input = st.chat_input("Say something…")
     if user_input:
@@ -375,7 +366,6 @@ elif page == "Chat":
         except OpenAIError as e:
             st.error(str(e))
 
-
 # ─────────────────── MY COLLECTION ───────────────────────────────
 elif page == "My Collection":
     st.header("My BONDIGO Collection")
@@ -388,7 +378,7 @@ elif page == "My Collection":
         col1, col2 = st.columns([1,5])
         col1.image(c.get("photo",PLACEHOLDER), width=80)
         col2.markdown(
-          f"<span style='background:{clr}; color:black; padding:2px 6px; "
+          f"<span style='background:{clr}; color:black; padding:2px 6px;"
           f"border-radius:4px; font-size:0.75rem'>{rar}</span> "
           f"**{c['name']}**  \n"
           f"<span style='font-size:0.85rem'>{c['bio']}</span>",
