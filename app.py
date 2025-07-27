@@ -1,5 +1,3 @@
-# app.py
-
 import os, json, random
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -212,6 +210,7 @@ if "user" not in st.session_state:
     # init some other state
     st.session_state.spent   = 0
     st.session_state.matches = []
+    st.session_state.hist    = {}    # ← newly added
 
     # now restart into the main app
     raise RerunException(rerun_data=None)
@@ -220,6 +219,7 @@ if "user" not in st.session_state:
 # ─────────────────── ENSURE STATE KEYS ────────────────────────────
 if "spent"   not in st.session_state: st.session_state.spent   = 0
 if "matches" not in st.session_state: st.session_state.matches = []
+if "hist"    not in st.session_state: st.session_state.hist    = {}  # ← newly added
 
 user   = st.session_state.user
 colset = collection_set(user["id"])
@@ -276,7 +276,6 @@ if page == "Find matches":
         rarity, clr = c.get("rarity","Common"), CLR[c.get("rarity","Common")]
         c1, c2, c3 = st.columns([1,3,2])
         c1.image(c.get("photo",PLACEHOLDER), width=90)
-        # badge with black text:
         c2.markdown(
           f"<span style='background:{clr}; color:black; padding:2px 6px; "
           f"border-radius:4px; font-size:0.75rem'>{rarity}</span> "
@@ -383,7 +382,6 @@ elif page == "My Collection":
         rar = c.get("rarity","Common"); clr = CLR[rar]
         col1, col2 = st.columns([1,5])
         col1.image(c.get("photo",PLACEHOLDER), width=80)
-        # badge with black text:
         col2.markdown(
           f"<span style='background:{clr}; color:black; padding:2px 6px; "
           f"border-radius:4px; font-size:0.75rem'>{rar}</span> "
