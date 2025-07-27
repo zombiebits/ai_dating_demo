@@ -245,14 +245,17 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ── Legend for bond costs & airdrop ───────────────────────
-st.image("assets/bondcosts.png", width=380)
+
 
 tabs = ["Find matches","Chat","My Collection"]
 page = st.sidebar.radio("Navigation", tabs, key="nav")
 
 # ─────────────────── FIND MATCHES ────────────────────────────────
 if page == "Find matches":
+
+    # ── Legend for bond costs & airdrop ───────────────────────
+    st.image("assets/bondcosts.png", width=380)
+
     hobby = st.selectbox("Pick a hobby",
         ["space","foodie","gaming","music","art","sports","reading",
          "travel","gardening","coding"])
