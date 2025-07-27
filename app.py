@@ -13,14 +13,13 @@ from postgrest.exceptions import APIError
 
 # ─────────────────── ENVIRONMENT & CLIENTS ─────────────────────────
 load_dotenv()
-# <-- anon+JWT client, used for ALL reads (and writes that you want to respect RLS) -->
+# anon+JWT client for reads (and any RLS‑protected writes you wish)
 SB  = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
-# <-- service‑role client, used only for secure server‑side writes -->
+# service‑role client for all secure server‑side writes
 SRS = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_KEY"])
+OA  = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
-OA = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
-
-# ─── Persist user JWT on every rerun so RLS works for reads ────────
+# persist the user JWT across reruns so RLS works on SB
 if "user_jwt" in st.session_state:
     SB.postgrest.headers["Authorization"] = f"Bearer {st.session_state.user_jwt}"
 
@@ -41,46 +40,61 @@ CID2COMP   = {c["id"]: c for c in COMPANIONS}
 
 # ─────────────────── DATABASE HELPERS ──────────────────────────────
 def profile_upsert(auth_uid: str, username: str) -> dict:
-    tbl = SB.table("users")
-    rows = tbl.select("*").eq("auth_uid", auth_uid).execute().data
+    # read via SB (RLS‑protected)
+    tbl_read  = SB.table("users")
+    # write via SRS (bypass RLS)
+    tbl_write = SRS.table("users")
+
+    # 1️⃣ existing row?
+    rows = tbl_read.select("*").eq("auth_uid", auth_uid).execute().data
     if rows:
         user = rows[0]
+        # sync username if changed
         if user["username"] != username:
             try:
                 user = (
-                    tbl.update({"username": username})
-                       .eq("auth_uid", auth_uid)
-                       .execute().data[0]
+                    tbl_write
+                      .update({"username": username})
+                      .eq("auth_uid", auth_uid)
+                      .execute()
+                      .data[0]
                 )
             except APIError:
                 pass
     else:
+        # first visit: insert
         try:
             user = (
-                tbl.insert({
-                    "id":       auth_uid,
-                    "auth_uid": auth_uid,
-                    "username": username,
-                    "tokens":   1000
-                }).execute().data[0]
+                tbl_write
+                  .insert({
+                      "id":       auth_uid,
+                      "auth_uid": auth_uid,
+                      "username": username,
+                      "tokens":   1000
+                  })
+                  .execute()
+                  .data[0]
             )
         except APIError as e:
             if "duplicate key" in str(e):
                 raise ValueError("username_taken")
             raise
 
-    # daily airdrop logic (also RLS‑protected)
+    # 2️⃣ daily airdrop (write via SRS)
     last = user["last_airdrop"] or user["created_at"]
     last = datetime.fromisoformat(last.replace("Z", "+00:00"))
     if datetime.now(timezone.utc) - last >= timedelta(hours=24):
         user = (
-            tbl.update({
-                "tokens":       user["tokens"] + DAILY_AIRDROP,
-                "last_airdrop": datetime.now(timezone.utc).isoformat()
-            })
-            .eq("auth_uid", auth_uid)
-            .execute().data[0]
+            tbl_write
+              .update({
+                  "tokens":       user["tokens"] + DAILY_AIRDROP,
+                  "last_airdrop": datetime.now(timezone.utc).isoformat()
+              })
+              .eq("auth_uid", auth_uid)
+              .execute()
+              .data[0]
         )
+
     return user
 
 def collection_set(user_id: str) -> set[str]:
@@ -88,42 +102,41 @@ def collection_set(user_id: str) -> set[str]:
         SB.table("collection")
           .select("companion_id")
           .eq("user_id", user_id)
-          .execute().data
+          .execute()
+          .data
     )
     return {r["companion_id"] for r in rows}
 
 def buy(user: dict, comp: dict):
-    """
-    Uses the SERVICE‑ROLE client (SRS) to debit tokens and
-    mint a new collection row, bypassing RLS safely.
-    """
+    # check affordability & ownership via SB
     price = COST[comp.get("rarity","Common")]
     if price > user["tokens"]:
         return False, "Not enough 💎"
-
     owned = (
         SB.table("collection")
           .select("companion_id")
           .eq("user_id", user["id"])
           .eq("companion_id", comp["id"])
-          .execute().data
+          .execute()
+          .data
     )
     if owned:
         return False, "Already owned"
 
-    # ---- SERVICE‑ROLE writes ----
+    # debit tokens (SRS write)
     SRS.table("users")\
        .update({"tokens": user["tokens"] - price})\
        .eq("id", user["id"])\
        .execute()
 
+    # mint bond (SRS write)
     SRS.table("collection")\
        .insert({
-         "user_id":      user["id"],
-         "companion_id": comp["id"]
+           "user_id":      user["id"],
+           "companion_id": comp["id"]
        }).execute()
 
-    # sync JWT‑protected client by re‑upserting
+    # resync JWT‑protected SB client & return updated user
     return True, profile_upsert(user["auth_uid"], user["username"])
 
 
@@ -155,7 +168,7 @@ if "user" not in st.session_state:
     if not uname or not pwd:
         st.warning("Fill both fields."); st.stop()
 
-    # on sign‑up, pre‑check username
+    # on sign‑up precheck username
     if mode == "Sign up":
         conflict = SB.table("users").select("id")\
                      .eq("username", uname).execute().data
@@ -172,7 +185,7 @@ if "user" not in st.session_state:
     except Exception as e:
         st.error(f"Auth error: {e}"); st.stop()
 
-    # capture + persist the JWT for future RLS reads
+    # capture + persist the JWT for SB
     token = None
     if hasattr(sess, "session") and sess.session:
         token = sess.session.access_token
@@ -185,19 +198,19 @@ if "user" not in st.session_state:
     st.session_state.user_jwt = token
     SB.postgrest.headers["Authorization"] = f"Bearer {token}"
 
-    # upsert the profile (gives 1000 tokens + sets airdrop schedule)
+    # upsert profile (1000 tokens + set last_airdrop)
     try:
         st.session_state.user = profile_upsert(sess.user.id, uname)
     except ValueError:
         st.error("Username conflict; try another."); SB.auth.sign_out(); st.stop()
 
-    # bootstrap collection + history
+    # bootstrap collection & history
     st.session_state.col     = collection_set(st.session_state.user["id"])
     st.session_state.hist    = {}
     st.session_state.spent   = 0
     st.session_state.matches = []
 
-    # now that state is set, rerun into the main UI
+    # now rerun into main UI
     raise RerunException(rerun_data=None)
 
 
@@ -233,17 +246,15 @@ if page == "Find matches":
         ["beach","forest","cafe","space‑station","cyberpunk‑city",
          "medieval‑castle","mountain","underwater","neon‑disco",
          "cozy‑library"])
-
     if st.button("Show matches"):
         st.session_state.matches = (
             [c for c in COMPANIONS
                if all(t in c["tags"] for t in [hobby,trait,vibe,scene])]
             or random.sample(COMPANIONS, 5)
         )
-
     for c in st.session_state.matches:
-        rarity = c.get("rarity","Common"); clr = CLR[rarity]
-        c1,c2,c3 = st.columns([1,3,2])
+        rarity, clr = c.get("rarity","Common"), CLR[c.get("rarity","Common")]
+        c1,c2,c3     = st.columns([1,3,2])
         c1.image(c.get("photo",PLACEHOLDER), width=90)
         c2.markdown(
           f"<span style='background:{clr};padding:2px 6px;"
@@ -267,12 +278,9 @@ if page == "Find matches":
 elif page == "Chat":
     if not colset:
         st.info("Bond first!"); st.stop()
-
     names = [CID2COMP[x]["name"] for x in colset]
     sel   = st.selectbox("Choose companion", names)
     cid   = next(k for k,v in CID2COMP.items() if v["name"] == sel)
-
-    # load persisted messages on first view
     if cid not in st.session_state.hist:
         rows = (
           SB.table("messages")
@@ -287,30 +295,18 @@ elif page == "Chat":
           "role":"system",
           "content": f"You are {CID2COMP[cid]['name']}. {CID2COMP[cid]['bio']} Speak in first person, PG‑13."
         }]
-        st.session_state.hist[cid] = base + [
-          {"role": r["role"], "content": r["content"]} for r in rows
-        ]
-
+        st.session_state.hist[cid] = base + [{"role":r["role"],"content":r["content"]} for r in rows]
     hist = st.session_state.hist[cid]
     st.image(CID2COMP[cid].get("photo",PLACEHOLDER), width=180)
     st.subheader(f"Chatting with **{CID2COMP[cid]['name']}**")
-
     if st.button("🗑️ Clear history"):
         st.session_state.hist[cid] = hist[:1]
-        SB.table("messages")\
-          .delete()\
-          .eq("user_id", user["id"])\
-          .eq("companion_id", cid)\
-          .execute()
+        SB.table("messages").delete().eq("user_id", user["id"]).eq("companion_id", cid).execute()
         st.success("Chat history cleared."); st.stop()
-
     for msg in hist[1:]:
-        st.chat_message("assistant" if msg["role"]=="assistant" else "user")\
-          .write(msg["content"])
-
+        st.chat_message("assistant" if msg["role"]=="assistant" else "user").write(msg["content"])
     if st.session_state.spent >= MAX_TOKENS:
         st.warning("Daily token budget hit."); st.stop()
-
     user_input = st.chat_input("Say something…")
     if user_input:
         hist.append({"role":"user","content":user_input})
@@ -323,8 +319,6 @@ elif page == "Chat":
             st.session_state.spent += usage.prompt_tokens + usage.completion_tokens
             hist.append({"role":"assistant","content":reply})
             st.chat_message("assistant").write(reply)
-
-            # persist both turns via ANON+JWT (reads) & RLS
             SB.table("messages").insert({
                 "user_id":      user["id"],
                 "companion_id": cid,
@@ -337,7 +331,6 @@ elif page == "Chat":
                 "role":         "assistant",
                 "content":      reply
             }).execute()
-
         except RateLimitError:
             st.warning("OpenAI rate‑limit.")
         except OpenAIError as e:
@@ -350,9 +343,8 @@ elif page == "My Collection":
     if not colset:
         st.info("No Bonds yet.")
     for cid in sorted(colset):
-        c   = CID2COMP[cid]
-        rar = c.get("rarity","Common"); clr = CLR[rar]
-        col1, col2 = st.columns([1,5])
+        c, rar, clr = CID2COMP[cid], c.get("rarity","Common"), CLR[c.get("rarity","Common")]
+        col1, col2  = st.columns([1,5])
         col1.image(c.get("photo",PLACEHOLDER), width=80)
         col2.markdown(
           f"<span style='background:{clr};padding:2px 6px;border-radius:4px;"
