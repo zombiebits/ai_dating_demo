@@ -186,8 +186,8 @@ if "user" not in st.session_state:
     st.session_state.spent   = 0
     st.session_state.matches = []
 
-    # rerun now that session_state.user is set
-    raise RerunException()
+   # RerunException in Streamlit 1.47.1 requires a rerun_data argument
+    raise RerunException(rerun_data=None)
 
 
 # ─────────────────── USER CONTEXT ─────────────────────────────────
