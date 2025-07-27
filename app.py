@@ -22,7 +22,7 @@ COST          = {"Common": 50, "Rare": 200, "Legendary": 700}
 
 PLACEHOLDER   = "assets/placeholder.png"
 LOGO          = "assets/bondigo_banner.png"
-TAGLINE       = "Talk the Lingo · Master the Bond · Dominate the Game."
+TAGLINE       = "Talk the Lingo · Master the Bond · Dominate the Game·"
 CLR           = {"Common":"#bbb","Rare":"#57C7FF","Legendary":"#FFAA33"}
 
 # load your companions list
