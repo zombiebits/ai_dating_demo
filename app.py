@@ -279,7 +279,7 @@ elif page == "Chat":
             .select("role,content,created_at")
             .eq("user_id", user["id"])
             .eq("companion_id", cid)
-            .order("created_at", {"ascending": True})
+            .order("created_at", ascending=True)
             .execute()
             .data
         )
