@@ -13,13 +13,11 @@ from postgrest.exceptions import APIError
 
 # ─────────────────── ENVIRONMENT & CLIENTS ─────────────────────────
 load_dotenv()
-# anon+JWT for all reads and RLS‑protected writes (messages/collection)
 SB  = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
-# service role for all users‑table writes and reads (bypass RLS)
 SRS = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_KEY"])
 OA  = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
-# persist the user JWT across reruns so RLS works on SB
+# persist the user's JWT for RLS‐protected reads on SB
 if "user_jwt" in st.session_state:
     SB.postgrest.headers["Authorization"] = f"Bearer {st.session_state.user_jwt}"
 
@@ -36,20 +34,12 @@ CLR         = {"Common":"#bbb","Rare":"#57C7FF","Legendary":"#FFAA33"}
 COMPANIONS = json.load(open("companions.json", encoding="utf-8-sig"))
 CID2COMP   = {c["id"]: c for c in COMPANIONS}
 
-
 # ─────────────────── DATABASE HELPERS ──────────────────────────────
 def profile_upsert(auth_uid: str, username: str) -> dict:
-    """
-    Uses SRS (service‑role) for both reads & writes on the users table,
-    so you never hit RLS on users.
-    """
     tbl = SRS.table("users")
-
-    # 1️⃣ existing row?
     rows = tbl.select("*").eq("auth_uid", auth_uid).execute().data
     if rows:
         user = rows[0]
-        # sync username if changed
         if user["username"] != username:
             try:
                 user = (
@@ -61,7 +51,6 @@ def profile_upsert(auth_uid: str, username: str) -> dict:
             except APIError:
                 pass
     else:
-        # first visit: insert
         try:
             user = (
                 tbl.insert({
@@ -78,7 +67,6 @@ def profile_upsert(auth_uid: str, username: str) -> dict:
                 raise ValueError("username_taken")
             raise
 
-    # 2️⃣ daily airdrop
     last = user["last_airdrop"] or user["created_at"]
     last = datetime.fromisoformat(last.replace("Z", "+00:00"))
     if datetime.now(timezone.utc) - last >= timedelta(hours=24):
@@ -91,7 +79,6 @@ def profile_upsert(auth_uid: str, username: str) -> dict:
             .execute()
             .data[0]
         )
-
     return user
 
 def collection_set(user_id: str) -> set[str]:
@@ -119,24 +106,21 @@ def buy(user: dict, comp: dict):
     if owned:
         return False, "Already owned"
 
-    # debit tokens via SRS
+    # debit & mint via service role
     SRS.table("users")\
        .update({"tokens": user["tokens"] - price})\
        .eq("id", user["id"])\
        .execute()
-
-    # mint the bond via SRS
     SRS.table("collection")\
        .insert({
            "user_id":      user["id"],
            "companion_id": comp["id"]
        }).execute()
 
-    # then resync via profile_upsert
     return True, profile_upsert(user["auth_uid"], user["username"])
 
 
-# ─────────────────── STREAMLIT PAGE CONFIG ─────────────────────────
+# ─────────────────── STREAMLIT CONFIG ─────────────────────────────
 st.set_page_config("BONDIGO", "🩷", layout="centered")
 st.markdown("""
 <style>
@@ -165,28 +149,23 @@ if "user" not in st.session_state:
         st.warning("Fill both fields."); st.stop()
 
     if mode == "Sign up":
-        conflict = SB.table("users").select("id")\
-                     .eq("username", uname).execute().data
-        if conflict:
+        existing = SB.table("users").select("id").eq("username", uname).execute().data
+        if existing:
             st.error("That username’s taken."); st.stop()
 
     email = f"{uname.lower()}@bondigo.local"
     try:
         if mode == "Sign up":
             SB.auth.sign_up({"email": email, "password": pwd})
-        sess = SB.auth.sign_in_with_password({
-            "email": email, "password": pwd
-        })
+        sess = SB.auth.sign_in_with_password({"email": email, "password": pwd})
     except Exception as e:
         st.error(f"Auth error: {e}"); st.stop()
 
-    # capture + persist the JWT for SB reads
     token = None
     if hasattr(sess, "session") and sess.session:
         token = sess.session.access_token
     elif hasattr(sess, "access_token"):
         token = sess.access_token
-
     if not token:
         st.error("Couldn’t find access token."); st.stop()
 
@@ -196,10 +175,8 @@ if "user" not in st.session_state:
     try:
         st.session_state.user = profile_upsert(sess.user.id, uname)
     except ValueError:
-        st.error("Username conflict; try another."); SB.auth.sign_out(); st.stop()
+        st.error("Username taken; choose another."); SB.auth.sign_out(); st.stop()
 
-    # initialize other session state
-    st.session_state.col     = collection_set(st.session_state.user["id"])
     st.session_state.hist    = {}
     st.session_state.spent   = 0
     st.session_state.matches = []
@@ -207,21 +184,21 @@ if "user" not in st.session_state:
     raise RerunException(rerun_data=None)
 
 
-# ─────────────────── ENSURE STATE KEYS ────────────────────────────
+# ─────────────────── ENSURE OTHER KEYS ────────────────────────────
 if "user" in st.session_state:
-    if "col"     not in st.session_state: st.session_state.col     = collection_set(st.session_state.user["id"])
     if "hist"    not in st.session_state: st.session_state.hist    = {}
     if "spent"   not in st.session_state: st.session_state.spent   = 0
     if "matches" not in st.session_state: st.session_state.matches = []
 
 user   = st.session_state.user
-colset = st.session_state.col
+colset = collection_set(user["id"])
+
 
 # HEADER & NAV
 if Path(LOGO).is_file():
     st.image(LOGO, width=380)
     st.markdown(
-      f"<p style='text-align:center;margin-top:-2px; font-size:1.05rem;color:#FFC8D8'>{TAGLINE}</p>",
+      f"<p style='text-align:center;margin-top:-2px;font-size:1.05rem;color:#FFC8D8'>{TAGLINE}</p>",
       unsafe_allow_html=True
     )
 st.markdown(f"**Wallet:** `{user['tokens']} 💎`")
@@ -232,10 +209,10 @@ page = st.sidebar.radio("Navigation", tabs, key="nav")
 
 # ─────────────────── FIND MATCHES ────────────────────────────────
 if page == "Find matches":
-    hobby = st.selectbox("Pick a hobby",     ["space","foodie","gaming","music","art","sports","reading","travel","gardening","coding"])
-    trait = st.selectbox("Pick a trait",     ["curious","adventurous","night‑owl","chill","analytical","energetic","humorous","kind","bold","creative"])
-    vibe  = st.selectbox("Pick a vibe",      ["witty","caring","mysterious","romantic","sarcastic","intellectual","playful","stoic","optimistic","pragmatic"])
-    scene = st.selectbox("Pick a scene",     ["beach","forest","cafe","space‑station","cyberpunk‑city","medieval‑castle","mountain","underwater","neon‑disco","cozy‑library"])
+    hobby = st.selectbox("Pick a hobby", ["space","foodie","gaming","music","art","sports","reading","travel","gardening","coding"])
+    trait = st.selectbox("Pick a trait", ["curious","adventurous","night‑owl","chill","analytical","energetic","humorous","kind","bold","creative"])
+    vibe  = st.selectbox("Pick a vibe", ["witty","caring","mysterious","romantic","sarcastic","intellectual","playful","stoic","optimistic","pragmatic"])
+    scene = st.selectbox("Pick a scene", ["beach","forest","cafe","space‑station","cyberpunk‑city","medieval‑castle","mountain","underwater","neon‑disco","cozy‑library"])
 
     if st.button("Show matches"):
         st.session_state.matches = (
@@ -257,7 +234,6 @@ if page == "Find matches":
             ok, new_user = buy(user, c)
             if ok:
                 st.session_state.user = new_user
-                colset.add(c["id"])
                 st.success("Bonded!")
             else:
                 st.warning(new_user)
@@ -279,7 +255,7 @@ elif page == "Chat":
             .select("role,content,created_at")
             .eq("user_id", user["id"])
             .eq("companion_id", cid)
-            .order("created_at", ascending=True)
+            .order("created_at")
             .execute()
             .data
         )
@@ -308,12 +284,13 @@ elif page == "Chat":
     if user_input:
         hist.append({"role":"user","content":user_input})
         try:
-            resp = OA.chat.completions.create(model="gpt-4o-mini", messages=hist, max_tokens=120)
+            resp  = OA.chat.completions.create(model="gpt-4o-mini", messages=hist, max_tokens=120)
             reply = resp.choices[0].message.content
             usage = resp.usage
             st.session_state.spent += usage.prompt_tokens + usage.completion_tokens
             hist.append({"role":"assistant","content":reply})
             st.chat_message("assistant").write(reply)
+
             SB.table("messages").insert({
                 "user_id":      user["id"],
                 "companion_id": cid,
@@ -335,6 +312,7 @@ elif page == "Chat":
 # ─────────────────── MY COLLECTION ───────────────────────────────
 elif page == "My Collection":
     st.header("My BONDIGO Collection")
+    colset = collection_set(user["id"])
     if not colset:
         st.info("No Bonds yet.")
     for cid in sorted(colset):
