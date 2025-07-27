@@ -25,9 +25,8 @@ LOGO          = "assets/bondigo_banner.png"
 TAGLINE       = "Talk the Lingo · Master the Bond · Dominate the Game"
 CLR           = {"Common":"#bbb","Rare":"#57C7FF","Legendary":"#FFAA33"}
 
-# load your companions list
-COMPANIONS = json.load(open("companions.json", encoding="utf-8-sig"))
-CID2COMP   = {c["id"]:c for c in COMPANIONS}
+COMPANIONS    = json.load(open("companions.json", encoding="utf-8-sig"))
+CID2COMP      = {c["id"]: c for c in COMPANIONS}
 
 
 # ─────────────────── DATABASE HELPERS ──────────────────────────────
@@ -50,13 +49,14 @@ def profile_upsert(auth_uid: str, username: str) -> dict:
             except APIError:
                 pass
     else:
-        # 2️⃣ first visit: insert
+        # 2️⃣ first visit: insert—and force id = auth_uid
         try:
             user = (
                 tbl.insert({
-                    "auth_uid": auth_uid,
-                    "username": username,
-                    "tokens":   1000
+                    "id":         auth_uid,     # ← use the Auth UID as the PK
+                    "auth_uid":   auth_uid,
+                    "username":   username,
+                    "tokens":     1000
                 })
                 .execute()
                 .data[0]
@@ -114,7 +114,7 @@ def buy(user: dict, comp: dict):
     SB.table("users").update({"tokens": user["tokens"] - price}) \
       .eq("id", user["id"]).execute()
     SB.table("collection").insert({
-        "user_id": user["id"],
+        "user_id":      user["id"],
         "companion_id": comp["id"]
     }).execute()
 
@@ -123,7 +123,7 @@ def buy(user: dict, comp: dict):
 
 
 # ─────────────────── STREAMLIT PAGE CONFIG ─────────────────────────
-st.set_page_config("BONDIGO","🩷",layout="centered")
+st.set_page_config("BONDIGO", "🩷", layout="centered")
 st.markdown("""
 <style>
 [data-testid="stSidebar"] div[role="radiogroup"] label {
@@ -170,7 +170,7 @@ if "user" not in st.session_state:
             st.error(f"Auth error: {e}")
             st.stop()
 
-        # upsert our wallet--this will raise ValueError("username_taken")
+        # upsert our wallet—this will use id=auth_uid on first insert
         try:
             st.session_state.user = profile_upsert(sess.user.id, uname)
         except ValueError:
@@ -184,12 +184,9 @@ if "user" not in st.session_state:
         st.session_state.spent   = 0
         st.session_state.matches = []
 
-        # ***always*** stop here; on the very next rerun streamlit will see
-        #    `st.session_state.user` and bypass this whole block.
+        # stop here; on the next interaction session_state.user exists
         st.stop()
 
-    # if they haven’t pressed Go yet, or we’ve just stopped above,
-    # we _must_ stop—otherwise “user” will not exist below.
     st.stop()
 
 
@@ -198,7 +195,7 @@ user   = st.session_state.user
 colset = st.session_state.col
 
 
-# ─────────────────── HEADER & NAV ───────────────────────────────
+# ─────────────────── HEADER & NAV ─────────────────────────────────
 if Path(LOGO).is_file():
     st.image(LOGO, width=380)
     st.markdown(
@@ -212,23 +209,31 @@ st.markdown(f"**Wallet:** `{user['tokens']} 💎`")
 tabs = ["Find matches","Chat","My Collection"]
 page = st.sidebar.radio("Navigation", tabs, key="nav",
                         index=tabs.index(st.session_state.get("nav",tabs[0])))
-# write back only if changed
 if page != st.session_state.get("nav"):
     st.session_state.nav = page
 
 
 # ─────────────────── FIND MATCHES ──────────────────────────────
 if page == "Find matches":
-    hobby = st.selectbox("Pick a hobby",   ["space","foodie","gaming","music","art","sports","reading","travel","gardening","coding"])
-    trait = st.selectbox("Pick a trait",   ["curious","adventurous","night‑owl","chill","analytical","energetic","humorous","kind","bold","creative"])
-    vibe  = st.selectbox("Pick a vibe",    ["witty","caring","mysterious","romantic","sarcastic","intellectual","playful","stoic","optimistic","pragmatic"])
-    scene = st.selectbox("Pick a scene",   ["beach","forest","cafe","space‑station","cyberpunk‑city","medieval‑castle","mountain","underwater","neon‑disco","cozy‑library"])
+    hobby = st.selectbox("Pick a hobby",
+        ["space","foodie","gaming","music","art","sports","reading",
+         "travel","gardening","coding"])
+    trait = st.selectbox("Pick a trait",
+        ["curious","adventurous","night‑owl","chill","analytical",
+         "energetic","humorous","kind","bold","creative"])
+    vibe  = st.selectbox("Pick a vibe",
+        ["witty","caring","mysterious","romantic","sarcastic",
+         "intellectual","playful","stoic","optimistic","pragmatic"])
+    scene = st.selectbox("Pick a scene",
+        ["beach","forest","cafe","space‑station","cyberpunk‑city",
+         "medieval‑castle","mountain","underwater","neon‑disco",
+         "cozy‑library"])
 
     if st.button("Show matches"):
         st.session_state.matches = (
             [c for c in COMPANIONS
-               if all(tag in c["tags"] for tag in [hobby, trait, vibe, scene])]
-          or random.sample(COMPANIONS, 5)
+               if all(t in c["tags"] for t in [hobby,trait,vibe,scene])]
+            or random.sample(COMPANIONS, 5)
         )
 
     for c in st.session_state.get("matches", []):
@@ -237,9 +242,9 @@ if page == "Find matches":
         c1, c2, c3 = st.columns([1,3,2])
         c1.image(c.get("photo",PLACEHOLDER), width=90)
         c2.markdown(
-          f"<span style='background:{clr};padding:2px 6px;border-radius:4px;"
-          f"font-size:0.75rem'>{rarity}</span> **{c['name']}** • "
-          f"{COST[rarity]} 💎  \n"
+          f"<span style='background:{clr};padding:2px 6px;"
+          f"border-radius:4px;font-size:0.75rem'>{rarity}</span> "
+          f"**{c['name']}** • {COST[rarity]} 💎  \n"
           f"<span class='match-bio'>{c['bio']}</span>",
           unsafe_allow_html=True
         )
@@ -251,7 +256,6 @@ if page == "Find matches":
                 st.success("Bonded!")
             else:
                 st.warning(new_user)
-            # after mint, stop so the next run will render with the updated wallet
             st.stop()
 
 
@@ -262,13 +266,12 @@ elif page == "Chat":
         st.stop()
 
     names   = [CID2COMP[x]["name"] for x in colset]
-    default = names[0]
-    sel     = st.selectbox("Choose companion", names, index=names.index(default))
+    sel     = st.selectbox("Choose companion", names, index=0)
     cid     = next(k for k,v in CID2COMP.items() if v["name"] == sel)
 
     hist = st.session_state.hist.setdefault(cid, [{
         "role":"system",
-        "content":f"You are {CID2COMP[cid]['name']}. {CID2COMP[cid]['bio']} Speak in first person, PG‑13."
+        "content": f"You are {CID2COMP[cid]['name']}. {CID2COMP[cid]['bio']} Speak in first person, PG‑13."
     }])
 
     st.image(CID2COMP[cid].get("photo",PLACEHOLDER), width=180)
@@ -288,7 +291,9 @@ elif page == "Chat":
     if user_input:
         hist.append({"role":"user","content":user_input})
         try:
-            resp  = OA.chat.completions.create(model="gpt-4o-mini", messages=hist, max_tokens=120)
+            resp  = OA.chat.completions.create(
+                model="gpt-4o-mini", messages=hist, max_tokens=120
+            )
             reply = resp.choices[0].message.content
             usage = resp.usage
             st.session_state.spent += usage.prompt_tokens + usage.completion_tokens
@@ -296,14 +301,16 @@ elif page == "Chat":
             st.chat_message("assistant").write(reply)
 
             SB.table("messages").insert({
-                "user_id": user["id"],
-                "companion_id": cid,
-                "role":"user","content":user_input
+                "user_id":       user["id"],
+                "companion_id":  cid,
+                "role":          "user",
+                "content":       user_input
             }).execute()
             SB.table("messages").insert({
-                "user_id": user["id"],
-                "companion_id": cid,
-                "role":"assistant","content":reply
+                "user_id":       user["id"],
+                "companion_id":  cid,
+                "role":          "assistant",
+                "content":       reply
             }).execute()
 
         except RateLimitError:
