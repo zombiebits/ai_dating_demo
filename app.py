@@ -243,12 +243,12 @@ if page == "Find matches":
           f"<span class='match-bio'>{c['bio']}</span>",
           unsafe_allow_html=True
         )
-        if c3.button("💖 Mint", key=f"mint-{c['id']}"):
+        if c3.button("💖 Bond", key=f"bond-{c['id']}"):
             ok, new_user = buy(user, c)
             if ok:
                 st.session_state.user = new_user
                 colset.add(c["id"])
-                st.success("Minted!")
+                st.success("Bonded!")
             else:
                 st.warning(new_user)
             # after mint, stop so the next run will render with the updated wallet
@@ -258,7 +258,7 @@ if page == "Find matches":
 # ─────────────────── CHAT ─────────────────────────────────────
 elif page == "Chat":
     if not colset:
-        st.info("Mint a companion first.")
+        st.info("Bond with a companion first.")
         st.stop()
 
     names   = [CID2COMP[x]["name"] for x in colset]
@@ -316,7 +316,7 @@ elif page == "Chat":
 elif page == "My Collection":
     st.header("My BONDIGO Collection")
     if not colset:
-        st.info("Nothing minted yet.")
+        st.info("No Bonds yet.")
     for cid in sorted(colset):
         c   = CID2COMP[cid]
         rar = c.get("rarity","Common")
