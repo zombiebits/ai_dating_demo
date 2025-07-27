@@ -30,11 +30,11 @@ st.set_page_config(
         'About': None
     }
 )
-# Hide Streamlit header/footer/menu
+# Hide Streamlit menu & footer (leave the Navigation sidebar intact)
 st.markdown("""
     <style>
-      /* Hide the hamburger menu & header */
-      #MainMenu, header { visibility: hidden; }
+      /* Hide the hamburger menu only */
+      #MainMenu { visibility: hidden; }
       /* Hide the “Made with Streamlit” footer */
       footer { visibility: hidden; }
     </style>
