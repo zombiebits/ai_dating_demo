@@ -389,6 +389,29 @@ if st.sidebar.button("🧪 Test Email"):
     except Exception as e:
         st.sidebar.error(f"Email system broken: {str(e)}")
 
+        # Add this to your admin panel in the sidebar:
+if st.sidebar.button("🔍 Debug Email System"):
+    st.sidebar.markdown("Testing email sending...")
+    try:
+        # Test 1: Password reset (should work with your SendGrid)
+        SB.auth.reset_password_email("web34llc@gmail.com")
+        st.sidebar.success("✅ Password reset sent (check SendGrid)")
+        
+        # Test 2: Try OTP signup
+        result = SB.auth.sign_up({
+            "email": "web34llc@gmail.com", 
+            "password": "TestPass123!"
+        })
+        st.sidebar.success("✅ Signup completed")
+        st.sidebar.json({"user_created": bool(result.user)})
+        
+        # Cleanup
+        if result.user:
+            SRS.auth.admin.delete_user(result.user.id)
+            
+    except Exception as e:
+        st.sidebar.error(f"❌ Error: {str(e)}")
+
 # ─────────────────── OTP VERIFICATION INTERFACE ─────────────────────────
 if st.session_state.get("show_otp", False):
     st.title("📧 Check Your Email!")
