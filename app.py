@@ -408,6 +408,14 @@ if st.session_state.get("show_admin", False):
 # Clean up expired signups on app start
 cleanup_expired_signups()
 
+if st.sidebar.button("🧪 Test Email"):
+    try:
+        # This tests if Supabase email is working
+        SB.auth.reset_password_email("test@example.com")
+        st.sidebar.success("Email system working!")
+    except Exception as e:
+        st.sidebar.error(f"Email system broken: {str(e)}")
+
 # ─────────────────── EMAIL RESEND INTERFACE ────────────────────────
 if st.session_state.get("show_resend", False):
     st.warning("⏰ Your confirmation link has expired or failed.")
