@@ -532,7 +532,7 @@ if "user" not in st.session_state:
             # 6) call GoTrue sign_up with proper redirect URL
             try:
                 # Get the current app URL for redirect
-                streamlit_url = "http://localhost:8501"  # Change this to your actual Streamlit URL
+                streamlit_url = "https://ai-matchmaker-demo.streamlit.app/"  # Change this to your actual Streamlit URL
                 
                 res = SB.auth.sign_up({
                     "email": email, 
