@@ -11,8 +11,8 @@ from postgrest.exceptions import APIError
 
 # ─────────────────── ENVIRONMENT & CLIENTS ─────────────────────────
 load_dotenv()
-SB  = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
-SRS = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_KEY"])
+SB  = create_client(os.environ["SUPABASE_URL"],   os.environ["SUPABASE_KEY"])
+SRS = create_client(os.environ["SUPABASE_URL"],   os.environ["SUPABASE_SERVICE_KEY"])
 OA  = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
 # Persist JWT for RLS on SB
@@ -26,7 +26,6 @@ st.set_page_config(
     layout="centered",
     menu_items={"Get Help": None, "Report a bug": None, "About": None},
 )
-# hide all default chrome (header, footer, sidebar)
 st.markdown("""
     <style>
       #MainMenu, header, footer, [data-testid="stSidebar"] {
@@ -114,7 +113,6 @@ def buy(user: dict, comp: dict):
     )
     if owned:
         return False, "Already owned"
-    # debit & mint via service role
     SRS.table("users")\
        .update({"tokens": user["tokens"] - price})\
        .eq("id", user["id"])\
@@ -180,14 +178,13 @@ if "user" not in st.session_state:
     st.session_state.hist     = {}
     st.session_state.page     = "Find matches"
     st.session_state.chat_cid = None
-
     raise RerunException(rerun_data=None)
 
-# ─────────────────── ENSURE STATE KEYS ────────────────────────────
-st.session_state.setdefault("spent",   0)
-st.session_state.setdefault("matches", [])
-st.session_state.setdefault("hist",    {})
-st.session_state.setdefault("page",    "Find matches")
+# ─────────────────── STATE BOOTSTRAP ────────────────────────────
+st.session_state.setdefault("spent",    0)
+st.session_state.setdefault("matches",  [])
+st.session_state.setdefault("hist",     {})
+st.session_state.setdefault("page",     "Find matches")
 st.session_state.setdefault("chat_cid", None)
 
 user   = st.session_state.user
@@ -226,16 +223,16 @@ if page == "Find matches":
     st.image("assets/bondcosts.png", width=380)
 
     hobby = st.selectbox("Pick a hobby",   ["space","foodie","gaming","music","art",
-                                          "sports","reading","travel","gardening","coding"])
+                                           "sports","reading","travel","gardening","coding"])
     trait = st.selectbox("Pick a trait",   ["curious","adventurous","night‑owl","chill",
-                                          "analytical","energetic","humorous","kind",
-                                          "bold","creative"])
+                                           "analytical","energetic","humorous","kind",
+                                           "bold","creative"])
     vibe  = st.selectbox("Pick a vibe",    ["witty","caring","mysterious","romantic",
-                                          "sarcastic","intellectual","playful","stoic",
-                                          "optimistic","pragmatic"])
+                                           "sarcastic","intellectual","playful","stoic",
+                                           "optimistic","pragmatic"])
     scene = st.selectbox("Pick a scene",   ["beach","forest","cafe","space‑station",
-                                          "cyberpunk‑city","medieval‑castle","mountain",
-                                          "underwater","neon‑disco","cozy‑library"])
+                                           "cyberpunk‑city","medieval‑castle","mountain",
+                                           "underwater","neon‑disco","cozy‑library"])
 
     if st.button("Show matches"):
         st.session_state.matches = (
@@ -255,12 +252,12 @@ if page == "Find matches":
           unsafe_allow_html=True,
         )
 
-        # ◀— if owned, Chat; if new, Bond & immediately go chat
+        # if owned, show Chat; if new, Bond & instantly Chat
         if c["id"] in colset:
             if c3.button("💬 Chat", key=f"chat-{c['id']}"):
                 st.session_state.page    = "Chat"
                 st.session_state.chat_cid = c["id"]
-                st.stop()
+                raise RerunException(rerun_data=None)
         else:
             if c3.button("💖 Bond", key=f"bond-{c['id']}"):
                 ok, new = buy(user, c)
@@ -268,7 +265,7 @@ if page == "Find matches":
                     st.session_state.user     = new
                     st.session_state.page     = "Chat"
                     st.session_state.chat_cid = c["id"]
-                    st.experimental_rerun()
+                    raise RerunException(rerun_data=None)
                 else:
                     st.warning(new)
                 st.stop()
@@ -306,6 +303,7 @@ elif page == "Chat":
         st.session_state.hist[cid] = hist[:1]
         SRS.table("messages").delete().eq("user_id", user["id"]).eq("companion_id", cid).execute()
         st.success("Chat history cleared."); st.stop()
+
     for msg in hist[1:]:
         st.chat_message("assistant" if msg["role"]=="assistant" else "user").write(msg["content"])
     if st.session_state.spent >= MAX_TOKENS:
