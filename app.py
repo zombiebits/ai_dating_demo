@@ -55,66 +55,56 @@ def profile_upsert(auth_uid: str, username: str) -> dict:
         user = rows[0]
         if user["username"] != username:
             try:
-                user = (
-                    tbl.update({"username": username})
-                       .eq("auth_uid", auth_uid)
-                       .execute().data[0]
-                )
+                user = tbl.update({"username": username})\
+                          .eq("auth_uid", auth_uid)\
+                          .execute().data[0]
             except APIError:
                 pass
     else:
         try:
-            user = (
-                tbl.insert({
-                    "id":       auth_uid,
-                    "auth_uid": auth_uid,
-                    "username": username,
-                    "tokens":   1000
-                }).execute().data[0]
-            )
+            user = tbl.insert({
+                        "id":       auth_uid,
+                        "auth_uid": auth_uid,
+                        "username": username,
+                        "tokens":   1000
+                    }).execute().data[0]
         except APIError as e:
             if "duplicate key" in str(e):
                 raise ValueError("username_taken")
             raise
 
-    # daily airdrop
     last = user["last_airdrop"] or user["created_at"]
     last = datetime.fromisoformat(last.replace("Z", "+00:00"))
     if datetime.now(timezone.utc) - last >= timedelta(hours=24):
-        user = (
-            tbl.update({
-                "tokens":       user["tokens"] + DAILY_AIRDROP,
-                "last_airdrop": datetime.now(timezone.utc).isoformat()
-            })
-            .eq("auth_uid", auth_uid)
-            .execute().data[0]
-        )
+        user = tbl.update({
+                    "tokens":       user["tokens"] + DAILY_AIRDROP,
+                    "last_airdrop": datetime.now(timezone.utc).isoformat()
+                })\
+                .eq("auth_uid", auth_uid)\
+                .execute().data[0]
     return user
 
 def collection_set(user_id: str) -> set[str]:
-    rows = (
-        SRS.table("collection")
-           .select("companion_id")
-           .eq("user_id", user_id)
-           .execute().data
-    )
+    rows = (SRS.table("collection")
+               .select("companion_id")
+               .eq("user_id", user_id)
+               .execute().data)
     return {r["companion_id"] for r in rows}
 
 def buy(user: dict, comp: dict):
     price = COST[comp.get("rarity","Common")]
     if price > user["tokens"]:
         return False, "Not enough 💎"
-    owned = (
-        SRS.table("collection")
-           .select("companion_id")
-           .eq("user_id", user["id"])
-           .eq("companion_id", comp["id"])
-           .execute().data
-    )
+    owned = (SRS.table("collection")
+                .select("companion_id")
+                .eq("user_id", user["id"])
+                .eq("companion_id", comp["id"])
+                .execute().data)
     if owned:
         return False, "Already owned"
     # debit & mint
-    SRS.table("users").update({"tokens": user["tokens"] - price}).eq("id", user["id"]).execute()
+    SRS.table("users").update({"tokens": user["tokens"] - price})\
+       .eq("id", user["id"]).execute()
     SRS.table("collection").insert({
         "user_id":      user["id"],
         "companion_id": comp["id"]
@@ -144,7 +134,8 @@ if "user" not in st.session_state:
         st.warning("Fill both fields."); st.stop()
 
     if mode == "Sign up":
-        conflict = SRS.table("users").select("id").eq("username", uname).execute().data
+        conflict = SRS.table("users").select("id")\
+                      .eq("username", uname).execute().data
         if conflict:
             st.error("That username’s taken."); st.stop()
 
@@ -156,9 +147,12 @@ if "user" not in st.session_state:
     except Exception as e:
         st.error(f"Auth error: {e}"); st.stop()
 
-    token = getattr(sess.session, "access_token", None) if hasattr(sess, "session") else getattr(sess, "access_token", None)
+    token = (getattr(sess.session, "access_token", None)
+             if hasattr(sess, "session")
+             else getattr(sess, "access_token", None))
     if not token:
         st.error("Couldn’t find access token."); st.stop()
+
     st.session_state.user_jwt = token
     SB.postgrest.headers["Authorization"] = f"Bearer {token}"
 
@@ -167,7 +161,7 @@ if "user" not in st.session_state:
     except ValueError:
         st.error("Username conflict; try another."); SB.auth.sign_out(); st.stop()
 
-    # bootstrap session state
+    # Bootstrap
     st.session_state.spent    = 0
     st.session_state.matches  = []
     st.session_state.hist     = {}
@@ -218,20 +212,31 @@ st.session_state.page = page
 
 # ─────────────────── FIND MATCHES ────────────────────────────────
 if page == "Find matches":
+    # show our flash banner immediately when you bond
+    if st.session_state.flash:
+        st.success(st.session_state.flash)
+        st.session_state.flash = None
+
     st.image("assets/bondcosts.png", width=380)
 
     hobby = st.selectbox("Pick a hobby",
-        ["space","foodie","gaming","music","art","sports","reading","travel","gardening","coding"])
+        ["space","foodie","gaming","music","art","sports","reading",
+         "travel","gardening","coding"])
     trait = st.selectbox("Pick a trait",
-        ["curious","adventurous","night‑owl","chill","analytical","energetic","humorous","kind","bold","creative"])
+        ["curious","adventurous","night‑owl","chill","analytical",
+         "energetic","humorous","kind","bold","creative"])
     vibe  = st.selectbox("Pick a vibe",
-        ["witty","caring","mysterious","romantic","sarcastic","intellectual","playful","stoic","optimistic","pragmatic"])
+        ["witty","caring","mysterious","romantic","sarcastic",
+         "intellectual","playful","stoic","optimistic","pragmatic"])
     scene = st.selectbox("Pick a scene",
-        ["beach","forest","cafe","space‑station","cyberpunk‑city","medieval‑castle","mountain","underwater","neon‑disco","cozy‑library"])
+        ["beach","forest","cafe","space‑station","cyberpunk‑city",
+         "medieval‑castle","mountain","underwater","neon‑disco",
+         "cozy‑library"])
 
     if st.button("Show matches"):
         st.session_state.matches = (
-           [c for c in COMPANIONS if all(tag in c["tags"] for tag in (hobby, trait, vibe, scene))]
+           [c for c in COMPANIONS if all(tag in c["tags"]
+            for tag in (hobby, trait, vibe, scene))]
            or random.sample(COMPANIONS, 5)
         )
 
@@ -247,7 +252,7 @@ if page == "Find matches":
           unsafe_allow_html=True,
         )
 
-        # Owned → Chat immediately
+        # ← if already bonded, show Chat immediately
         if c["id"] in colset:
             if c3.button("💬 Chat", key=f"chat-{c['id']}"):
                 st.session_state.page     = "Chat"
@@ -259,15 +264,14 @@ if page == "Find matches":
                 if ok:
                     st.session_state.user  = new
                     colset.add(c["id"])
+                    # set a flash so that “Bonded!” shows on this same screen
                     st.session_state.flash = f"Bonded with {c['name']}!"
                 else:
                     st.warning(new)
-                # rerun so the button flips to Chat
                 raise RerunException(rerun_data=None)
 
 # ─────────────────── CHAT ────────────────────────────────────────
 elif page == "Chat":
-    # one‑time flash
     if st.session_state.flash:
         st.success(st.session_state.flash)
         st.session_state.flash = None
@@ -286,14 +290,12 @@ elif page == "Chat":
     st.session_state.chat_cid = cid
 
     if cid not in st.session_state.hist:
-        rows = (
-          SRS.table("messages")
-             .select("role,content,created_at")
-             .eq("user_id", user["id"])
-             .eq("companion_id", cid)
-             .order("created_at")
-             .execute().data
-        )
+        rows = (SRS.table("messages")
+                  .select("role,content,created_at")
+                  .eq("user_id", user["id"])
+                  .eq("companion_id", cid)
+                  .order("created_at")
+                  .execute().data)
         base = [{"role":"system","content":
                  f"You are {CID2COMP[cid]['name']}. {CID2COMP[cid]['bio']} Speak PG‑13."}]
         st.session_state.hist[cid] = base + [{"role":r["role"],"content":r["content"]} for r in rows]
@@ -316,9 +318,9 @@ elif page == "Chat":
     if st.session_state.spent >= MAX_TOKENS:
         st.warning("Daily token budget hit."); st.stop()
 
-    user_input = st.chat_input("Say something…")
-    if user_input:
-        hist.append({"role":"user","content":user_input})
+    ui = st.chat_input("Say something…")
+    if ui:
+        hist.append({"role":"user","content":ui})
         try:
             resp = OA.chat.completions.create(model="gpt-4o-mini",
                                               messages=hist,
@@ -332,7 +334,7 @@ elif page == "Chat":
                 "user_id":      user["id"],
                 "companion_id": cid,
                 "role":         "user",
-                "content":      user_input
+                "content":      ui
             }).execute()
             SRS.table("messages").insert({
                 "user_id":      user["id"],
