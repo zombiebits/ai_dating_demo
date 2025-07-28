@@ -34,7 +34,7 @@ confirmation_type = params.get("type", [""])[0] if "type" in params else ""
 error_code = params.get("error_code", [""])[0] if "error_code" in params else ""
 error_description = params.get("error_description", [""])[0] if "error_description" in params else ""
 
-# Handle email confirmation (legacy support for existing link-based confirmations)
+# Handle email confirmation
 if confirmation_type == "signup":
     access_token = params.get("access_token", [""])[0] if "access_token" in params else ""
     refresh_token = params.get("refresh_token", [""])[0] if "refresh_token" in params else ""
@@ -89,6 +89,31 @@ if confirmation_type == "signup":
             st.error(f"❌ Email confirmation error: {str(e)}")
     else:
         st.error("❌ Invalid confirmation link.")
+
+# Also check for fragment parameters (alternative method)
+elif st.query_params.get("access_token"):
+    access_token = params.get("access_token", [""])[0] if "access_token" in params else ""
+    refresh_token = params.get("refresh_token", [""])[0] if "refresh_token" in params else ""
+    
+    if access_token and refresh_token:
+        try:
+            session_response = SB.auth.set_session(access_token, refresh_token)
+            if session_response and session_response.user:
+                user_meta = session_response.user
+                existing_user = get_user_row(user_meta.id)
+                if not existing_user:
+                    pending = get_pending_signup(user_meta.email)
+                    if pending:
+                        username = pending["username"]
+                        create_user_row(user_meta.id, username)
+                        SRS.table("invitees").update({"claimed": True}).eq("email", user_meta.email).execute()
+                        cleanup_pending_signup(user_meta.email)
+                st.success("✅ Your email has been confirmed! You can now sign in below.")
+                if st.button("Continue to Sign In"):
+                    st.query_params.clear()
+                    st.rerun()
+        except Exception as e:
+            st.error(f"❌ Email confirmation error: {str(e)}")
 
 # ─────────────────── STREAMLIT CONFIG ──────────────────────────────
 st.set_page_config(
@@ -255,52 +280,11 @@ def check_user_status(email: str) -> dict:
         logger.error(f"Failed to check user status: {str(e)}")
         return status
 
-def verify_otp(email: str, token: str) -> tuple[bool, str]:
-    """Verify OTP token and handle user creation"""
-    try:
-        result = SB.auth.verify_otp({
-            "email": email,
-            "token": token,
-            "type": "signup"
-        })
-        
-        if result.user:
-            logger.info(f"OTP verified for: {email}")
-            
-            existing_user = get_user_row(result.user.id)
-            if not existing_user:
-                pending = get_pending_signup(email)
-                if pending:
-                    username = pending["username"]
-                    create_user_row(result.user.id, username)
-                    SRS.table("invitees").update({"claimed": True}).eq("email", email).execute()
-                    cleanup_pending_signup(email)
-                    return True, "Email verified! You can now sign in."
-                else:
-                    username = result.user.user_metadata.get("username", f"user_{result.user.id[:8]}")
-                    create_user_row(result.user.id, username)
-                    SRS.table("invitees").update({"claimed": True}).eq("email", email).execute()
-                    return True, "Email verified! You can now sign in."
-            else:
-                return True, "Email already verified! You can sign in."
-        else:
-            return False, "Invalid verification code."
-            
-    except Exception as e:
-        error_msg = str(e).lower()
-        logger.error(f"OTP verification error for {email}: {str(e)}")
-        
-        if "expired" in error_msg or "invalid" in error_msg:
-            return False, "Code expired or invalid. Please request a new one."
-        else:
-            return False, f"Verification failed: {str(e)}"
-
-def resend_otp(email: str) -> bool:
-    """Resend OTP code"""
+def resend_confirmation_email(email: str) -> bool:
     try:
         pending = get_pending_signup(email)
         if not pending:
-            logger.warning(f"No pending signup found for OTP resend: {email}")
+            logger.warning(f"No pending signup found for resend: {email}")
             return False
         
         SB.auth.resend(type="signup", email=email)
@@ -310,10 +294,10 @@ def resend_otp(email: str) -> bool:
            .eq("email", email)\
            .execute()
         
-        logger.info(f"Resent OTP to: {email}")
+        logger.info(f"Resent confirmation email to: {email}")
         return True
     except Exception as e:
-        logger.error(f"Failed to resend OTP: {str(e)}")
+        logger.error(f"Failed to resend confirmation email: {str(e)}")
         return False
 
 def collection_set(user_id: str) -> set[str]:
@@ -389,77 +373,30 @@ if st.sidebar.button("🧪 Test Email"):
     except Exception as e:
         st.sidebar.error(f"Email system broken: {str(e)}")
 
-        # Add this to your admin panel in the sidebar:
-if st.sidebar.button("🔍 Debug Email System"):
-    st.sidebar.markdown("Testing email sending...")
-    try:
-        # Test 1: Password reset (should work with your SendGrid)
-        SB.auth.reset_password_email("web34llc@gmail.com")
-        st.sidebar.success("✅ Password reset sent (check SendGrid)")
+# ─────────────────── EMAIL RESEND INTERFACE ────────────────────────
+if st.session_state.get("show_resend", False):
+    st.warning("⏰ Your confirmation link has expired or failed.")
+    
+    with st.expander("🔄 Resend Confirmation Email", expanded=True):
+        resend_email = st.text_input("Enter your email to resend confirmation:", key="resend_email")
+        col1, col2 = st.columns(2)
         
-        # Test 2: Try OTP signup
-        result = SB.auth.sign_up({
-            "email": "web34llc@gmail.com", 
-            "password": "TestPass123!"
-        })
-        st.sidebar.success("✅ Signup completed")
-        st.sidebar.json({"user_created": bool(result.user)})
-        
-        # Cleanup
-        if result.user:
-            SRS.auth.admin.delete_user(result.user.id)
-            
-    except Exception as e:
-        st.sidebar.error(f"❌ Error: {str(e)}")
-
-# ─────────────────── OTP VERIFICATION INTERFACE ─────────────────────────
-if st.session_state.get("show_otp", False):
-    st.title("📧 Check Your Email!")
-    
-    email = st.session_state.get("otp_email", "")
-    st.success(f"✅ We sent a 6-digit code to **{email}**")
-    st.info("💡 Check your inbox and spam folder for the verification code")
-    
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        otp_code = st.text_input(
-            "Enter 6-digit code:", 
-            max_chars=6, 
-            key="otp_input",
-            placeholder="123456"
-        )
-    
-    with col2:
-        if st.button("Verify ✅", key="verify_otp"):
-            if otp_code and len(otp_code) == 6:
-                success, message = verify_otp(email, otp_code)
-                if success:
-                    st.success(f"🎉 {message}")
-                    st.session_state.show_otp = False
-                    st.session_state.otp_email = None
-                    time.sleep(2)
-                    st.rerun()
+        with col1:
+            if st.button("📧 Resend Email", key="resend_btn"):
+                if resend_email:
+                    if resend_confirmation_email(resend_email):
+                        st.success("✅ Confirmation email resent! Check your inbox.")
+                        st.session_state.show_resend = False
+                        st.rerun()
+                    else:
+                        st.error("❌ Failed to resend email. Please check the email address or contact support.")
                 else:
-                    st.error(f"❌ {message}")
-            else:
-                st.warning("Please enter a 6-digit code.")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("📧 Resend Code", key="resend_otp"):
-            if resend_otp(email):
-                st.success("✅ New code sent!")
-            else:
-                st.error("❌ Failed to resend code. Please try again.")
-    
-    with col2:
-        if st.button("❌ Cancel", key="cancel_otp"):
-            st.session_state.show_otp = False
-            st.session_state.otp_email = None
-            cleanup_pending_signup(email)
-            st.rerun()
-    
-    st.stop()
+                    st.warning("Please enter your email address.")
+        
+        with col2:
+            if st.button("❌ Cancel", key="cancel_resend"):
+                st.session_state.show_resend = False
+                st.rerun()
 
 # ─────────────────── LOGIN / SIGN‑UP ───────────────────────────────
 if "user" not in st.session_state:
@@ -508,7 +445,7 @@ if "user" not in st.session_state:
             st.error("❌ System error. Please try again.")
             st.stop()
 
-        # ─── SIGN UP WITH OTP ─────────────────────────────
+        # ─── SIGN UP WITH WORKING EMAIL CONFIRMATION ─────────────────────────────
         if mode == "Sign up":
             if invite[0]["claimed"]:
                 st.error("🚫 This email has already been used.")
@@ -540,12 +477,14 @@ if "user" not in st.session_state:
                 st.error("❌ Failed to process signup. Please try again.")
                 st.stop()
 
+            # Use the WORKING link-based confirmation with SendGrid
             try:
                 res = SB.auth.sign_up({
                     "email": email, 
                     "password": pwd,
                     "options": {
-                        "data": {"username": uname}
+                        "data": {"username": uname},
+                        "emailRedirectTo": "https://ai-matchmaker-demo.streamlit.app/"
                     }
                 })
                 
@@ -555,11 +494,38 @@ if "user" not in st.session_state:
                        .eq("email", email)\
                        .execute()
                     
-                    logger.info(f"OTP signup initiated for: {email} with username: {uname}")
+                    logger.info(f"Link-based signup initiated for: {email} with username: {uname}")
                     
-                    st.session_state.show_otp = True
-                    st.session_state.otp_email = email
-                    st.rerun()
+                    # Enhanced success message with better guidance
+                    st.success("✅ Check your email for the confirmation link!")
+                    
+                    st.info("📧 **Where to look for your email:**")
+                    st.markdown("""
+                    - 📥 **Primary inbox** (Gmail main tab)
+                    - 🎯 **Promotions tab** (most likely location)  
+                    - 🚫 **Spam folder** (check here too)
+                    - 📱 **Mobile app notifications**
+                    """)
+                    
+                    st.warning("🔍 **Search your email** for 'BONDIGO' or 'Welcome to BONDIGO' if you can't find it!")
+                    
+                    st.info("💡 After clicking the confirmation link, come back here and sign in with your credentials.")
+                    
+                    # Show helpful debug info
+                    with st.expander("🔧 Troubleshooting Info", expanded=False):
+                        st.json({
+                            "email": email,
+                            "auth_uid": res.user.id,
+                            "signup_time": datetime.now().isoformat(),
+                            "status": "confirmation_email_sent_via_sendgrid",
+                            "note": "Email should appear in SendGrid activity feed"
+                        })
+                        st.markdown("**If no email arrives in 5 minutes:**")
+                        st.markdown("1. Check SendGrid activity feed")
+                        st.markdown("2. Try the 'Resend Email' option below")
+                        st.markdown("3. Contact support if still having issues")
+                    
+                    st.stop()
                 else:
                     cleanup_pending_signup(email)
                     st.error("❌ Failed to create account. Please try again.")
@@ -568,7 +534,7 @@ if "user" not in st.session_state:
             except Exception as e:
                 cleanup_pending_signup(email)
                 error_msg = str(e)
-                logger.error(f"OTP signup error for {email}: {error_msg}")
+                logger.error(f"Link-based signup error for {email}: {error_msg}")
                 
                 if "already registered" in error_msg.lower():
                     st.error("🚫 This email is already registered. Please sign in instead.")
@@ -589,9 +555,8 @@ if "user" not in st.session_state:
             if "invalid_credentials" in error_msg.lower():
                 st.error("🚫 Invalid email or password.")
             elif "email_not_confirmed" in error_msg.lower():
-                st.error("📬 Please confirm your email before signing in. Check your inbox for the verification code.")
-                st.session_state.show_otp = True
-                st.session_state.otp_email = email
+                st.error("📬 Please confirm your email before signing in. Check your inbox for the confirmation link.")
+                st.session_state.show_resend = True
                 st.rerun()
             elif "too_many_requests" in error_msg.lower():
                 st.error("⏰ Too many login attempts. Please wait a few minutes and try again.")
@@ -604,9 +569,8 @@ if "user" not in st.session_state:
 
         if not getattr(user_meta, "email_confirmed_at", None) and not getattr(user_meta, "confirmed_at", None):
             logger.warning(f"Unconfirmed email sign-in attempt: {email}")
-            st.error("📬 Please confirm your email before continuing. Check your inbox for the verification code.")
-            st.session_state.show_otp = True
-            st.session_state.otp_email = email
+            st.error("📬 Please confirm your email before continuing. Check your inbox for the confirmation link.")
+            st.session_state.show_resend = True
             st.rerun()
 
         user = get_user_row(user_meta.id)
@@ -628,8 +592,6 @@ if "user" not in st.session_state:
         st.session_state.chat_cid = None
         st.session_state.flash    = None
         st.session_state.show_resend = False
-        st.session_state.show_otp = False
-        st.session_state.otp_email = None
 
         raise RerunException()
 
@@ -639,7 +601,7 @@ if "user" not in st.session_state:
 for k,v in {
     "spent":0, "matches":[], "hist":{},
     "page":"Find matches", "chat_cid":None, "flash":None, 
-    "show_resend":False, "show_otp":False, "otp_email":None
+    "show_resend":False
 }.items():
     st.session_state.setdefault(k, v)
 
