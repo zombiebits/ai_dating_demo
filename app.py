@@ -25,6 +25,7 @@ st.set_page_config(
     layout="centered",
     menu_items={"Get Help": None, "Report a bug": None, "About": None},
 )
+# hide all default chrome
 st.markdown("""
     <style>
       #MainMenu, header, footer, [data-testid="stSidebar"] {
@@ -46,7 +47,7 @@ CLR         = {"Common":"#bbb","Rare":"#57C7FF","Legendary":"#FFAA33"}
 COMPANIONS = json.load(open("companions.json", encoding="utf-8-sig"))
 CID2COMP   = {c["id"]: c for c in COMPANIONS}
 
-# ─────────────────── DATABASE HELPERS ──────────────────────────────
+# ─────────────────── HELPERS ───────────────────────────────────────
 def profile_upsert(auth_uid: str, username: str) -> dict:
     tbl = SRS.table("users")
     rows = tbl.select("*").eq("auth_uid", auth_uid).execute().data
@@ -72,7 +73,6 @@ def profile_upsert(auth_uid: str, username: str) -> dict:
                 raise ValueError("username_taken")
             raise
 
-    # daily airdrop
     last = user["last_airdrop"] or user["created_at"]
     last = datetime.fromisoformat(last.replace("Z", "+00:00"))
     if datetime.now(timezone.utc) - last >= timedelta(hours=24):
@@ -102,7 +102,6 @@ def buy(user: dict, comp: dict):
                 .execute().data)
     if owned:
         return False, "Already owned"
-    # debit & mint
     SRS.table("users").update({"tokens": user["tokens"] - price})\
        .eq("id", user["id"]).execute()
     SRS.table("collection").insert({
@@ -113,7 +112,6 @@ def buy(user: dict, comp: dict):
 
 # ─────────────────── LOGIN / SIGN‑UP ───────────────────────────────
 if "user" not in st.session_state:
-    # logo + tagline
     if Path(LOGO).is_file():
         st.image(LOGO, width=380)
         st.markdown(
@@ -126,9 +124,8 @@ if "user" not in st.session_state:
     with st.form("login_form"):
         mode = st.radio("Choose", ["Sign in","Sign up"], horizontal=True)
         uname = st.text_input("Username", max_chars=20)
-        pwd = st.text_input("Password", type="password")
-        go = st.form_submit_button("Go ➜")
-
+        pwd   = st.text_input("Password", type="password")
+        go    = st.form_submit_button("Go ➜")
     if not go:
         st.stop()
     if not uname or not pwd:
@@ -153,7 +150,6 @@ if "user" not in st.session_state:
              else getattr(sess, "access_token", None))
     if not token:
         st.error("Couldn’t find access token."); st.stop()
-
     st.session_state.user_jwt = token
     SB.postgrest.headers["Authorization"] = f"Bearer {token}"
 
@@ -170,10 +166,9 @@ if "user" not in st.session_state:
     st.session_state.chat_cid = None
     st.session_state.flash    = None
 
-    # ← use the original rerun exception here to reload into your main UI
     raise RerunException(rerun_data=None)
 
-# ─────────────────── ENSURE STATE KEYS ────────────────────────────
+# ─────────────────── STATE ENSURE ─────────────────────────────────
 st.session_state.setdefault("spent",    0)
 st.session_state.setdefault("matches",  [])
 st.session_state.setdefault("hist",     {})
@@ -219,21 +214,10 @@ if page == "Find matches":
         st.session_state.flash = None
 
     st.image("assets/bondcosts.png", width=380)
-
-    hobby = st.selectbox("Pick a hobby",
-        ["space","foodie","gaming","music","art","sports","reading",
-         "travel","gardening","coding"])
-    trait = st.selectbox("Pick a trait",
-        ["curious","adventurous","night‑owl","chill","analytical",
-         "energetic","humorous","kind","bold","creative"])
-    vibe  = st.selectbox("Pick a vibe",
-        ["witty","caring","mysterious","romantic","sarcastic",
-         "intellectual","playful","stoic","optimistic","pragmatic"])
-    scene = st.selectbox("Pick a scene",
-        ["beach","forest","cafe","space‑station","cyberpunk‑city",
-         "medieval‑castle","mountain","underwater","neon‑disco",
-         "cozy‑library"])
-
+    hobby = st.selectbox("Pick a hobby",   ["space","foodie","gaming","music","art","sports","reading","travel","gardening","coding"])
+    trait = st.selectbox("Pick a trait",   ["curious","adventurous","night‑owl","chill","analytical","energetic","humorous","kind","bold","creative"])
+    vibe  = st.selectbox("Pick a vibe",    ["witty","caring","mysterious","romantic","sarcastic","intellectual","playful","stoic","optimistic","pragmatic"])
+    scene = st.selectbox("Pick a scene",   ["beach","forest","cafe","space‑station","cyberpunk‑city","medieval‑castle","mountain","underwater","neon‑disco","cozy‑library"])
     if st.button("Show matches"):
         st.session_state.matches = (
            [c for c in COMPANIONS
@@ -253,22 +237,26 @@ if page == "Find matches":
           unsafe_allow_html=True,
         )
 
-        # already bonded → immediate Chat
+        # ← bonded? show Chat immediately
         if c["id"] in colset:
             if c3.button("💬 Chat", key=f"chat-{c['id']}"):
                 st.session_state.page     = "Chat"
                 st.session_state.chat_cid = c["id"]
-                st.experimental_rerun()
+                st.stop()
+
+        # otherwise Bond
         else:
             if c3.button("💖 Bond", key=f"bond-{c['id']}"):
                 ok, new = buy(user, c)
                 if ok:
                     st.session_state.user  = new
                     colset.add(c["id"])
-                    st.session_state.flash = f"Bonded with {c['name']}!"
+                    st.session_state.page     = "Chat"
+                    st.session_state.chat_cid = c["id"]
+                    st.session_state.flash    = f"Bonded with {c['name']}!"
                 else:
                     st.warning(new)
-                st.experimental_rerun()
+                st.stop()
 
 # ─────────────────── CHAT ────────────────────────────────────────
 elif page == "Chat":
