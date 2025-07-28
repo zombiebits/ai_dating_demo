@@ -125,7 +125,6 @@ def goto_chat(cid: str):
     st.session_state.chat_cid = cid
 
 # ─────────────────── LOGIN / SIGN‑UP ───────────────────────────────
-
 if "user" not in st.session_state:
     # logo + tagline
     if Path(LOGO).is_file():
@@ -138,7 +137,6 @@ if "user" not in st.session_state:
 
     st.title("🔐 Sign in / Sign up to **BONDIGO**")
 
-    # —––– everything happens in here on one click
     with st.form("login_form"):
         mode = st.radio("Choose", ["Sign in","Sign up"], horizontal=True)
         uname = st.text_input("Username", max_chars=20)
@@ -146,11 +144,9 @@ if "user" not in st.session_state:
         go    = st.form_submit_button("Go ➜")
 
         if go:
-            # validate
             if not uname or not pwd:
                 st.warning("Fill both fields.")
             else:
-                # check signup collision
                 if mode == "Sign up":
                     conflict = (
                         SRS.table("users")
@@ -172,7 +168,6 @@ if "user" not in st.session_state:
                     st.error(f"Auth error: {e}")
                     st.stop()
 
-                # grab token
                 token = (
                     getattr(sess.session, "access_token", None)
                     if hasattr(sess, "session")
@@ -182,7 +177,6 @@ if "user" not in st.session_state:
                     st.error("Couldn’t find access token.")
                     st.stop()
 
-                # stash JWT & upsert profile
                 st.session_state.user_jwt = token
                 SB.postgrest.headers["Authorization"] = f"Bearer {token}"
                 try:
@@ -192,7 +186,6 @@ if "user" not in st.session_state:
                     SB.auth.sign_out()
                     st.stop()
 
-                # bootstrap the rest of your session_state
                 st.session_state.spent    = 0
                 st.session_state.matches  = []
                 st.session_state.hist     = {}
@@ -200,11 +193,12 @@ if "user" not in st.session_state:
                 st.session_state.chat_cid = None
                 st.session_state.flash    = None
 
-                # rerun into the app proper
-                raise RerunException()
+                # ← corrected: include rerun_data
+                raise RerunException(rerun_data=None)
 
-    # until the form is submitted, nothing else runs
+    # before first submit, nothing else runs
     st.stop()
+
 
 
 # ─────────────────── ENSURE STATE KEYS ────────────────────────────
