@@ -25,7 +25,6 @@ st.set_page_config(
     layout="centered",
     menu_items={"Get Help": None, "Report a bug": None, "About": None},
 )
-# hide all default chrome
 st.markdown("""
     <style>
       #MainMenu, header, footer, [data-testid="stSidebar"] {
@@ -169,12 +168,11 @@ if "user" not in st.session_state:
     raise RerunException(rerun_data=None)
 
 # ─────────────────── STATE ENSURE ─────────────────────────────────
-st.session_state.setdefault("spent",    0)
-st.session_state.setdefault("matches",  [])
-st.session_state.setdefault("hist",     {})
-st.session_state.setdefault("page",     "Find matches")
-st.session_state.setdefault("chat_cid", None)
-st.session_state.setdefault("flash",    None)
+for k,v in {
+    "spent":0, "matches":[], "hist":{}, 
+    "page":"Find matches", "chat_cid":None, "flash":None
+}.items():
+    st.session_state.setdefault(k, v)
 
 user   = st.session_state.user
 colset = collection_set(user["id"])
@@ -237,26 +235,26 @@ if page == "Find matches":
           unsafe_allow_html=True,
         )
 
-        # ← bonded? show Chat immediately
+        # ← already bonded? jump straight to Chat with one click
         if c["id"] in colset:
             if c3.button("💬 Chat", key=f"chat-{c['id']}"):
                 st.session_state.page     = "Chat"
                 st.session_state.chat_cid = c["id"]
-                st.stop()
+                raise RerunException(rerun_data=None)
 
-        # otherwise Bond
+        # otherwise Bond → Chat in one click
         else:
             if c3.button("💖 Bond", key=f"bond-{c['id']}"):
                 ok, new = buy(user, c)
                 if ok:
-                    st.session_state.user  = new
+                    st.session_state.user      = new
                     colset.add(c["id"])
                     st.session_state.page     = "Chat"
                     st.session_state.chat_cid = c["id"]
                     st.session_state.flash    = f"Bonded with {c['name']}!"
                 else:
                     st.warning(new)
-                st.stop()
+                raise RerunException(rerun_data=None)
 
 # ─────────────────── CHAT ────────────────────────────────────────
 elif page == "Chat":
