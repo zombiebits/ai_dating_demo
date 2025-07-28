@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import streamlit as st
+from streamlit.runtime.scriptrunner import RerunException
 from openai import OpenAI, OpenAIError, RateLimitError
 from dotenv import load_dotenv
 from supabase import create_client
@@ -75,11 +76,11 @@ def profile_upsert(auth_uid: str, username: str) -> dict:
     last = datetime.fromisoformat(last.replace("Z", "+00:00"))
     if datetime.now(timezone.utc) - last >= timedelta(hours=24):
         user = tbl.update({
-                    "tokens":       user["tokens"] + DAILY_AIRDROP,
-                    "last_airdrop": datetime.now(timezone.utc).isoformat()
-                })\
-                .eq("auth_uid", auth_uid)\
-                .execute().data[0]
+            "tokens":       user["tokens"] + DAILY_AIRDROP,
+            "last_airdrop": datetime.now(timezone.utc).isoformat()
+        })\
+        .eq("auth_uid", auth_uid)\
+        .execute().data[0]
     return user
 
 def collection_set(user_id: str) -> set[str]:
@@ -100,14 +101,12 @@ def buy(user: dict, comp: dict):
                 .execute().data)
     if owned:
         return False, "Already owned"
-
     SRS.table("users").update({"tokens": user["tokens"] - price})\
        .eq("id", user["id"]).execute()
     SRS.table("collection").insert({
         "user_id":      user["id"],
         "companion_id": comp["id"]
     }).execute()
-
     return True, profile_upsert(user["auth_uid"], user["username"])
 
 # ─────────────────── CALLBACKS ────────────────────────────────────
@@ -115,10 +114,9 @@ def bond_and_chat(cid: str, comp: dict):
     ok, new_user = buy(st.session_state.user, comp)
     if ok:
         st.session_state.user      = new_user
-        # update collection cache
-        st.session_state.page     = "Chat"
-        st.session_state.chat_cid = cid
-        st.session_state.flash    = f"Bonded with {comp['name']}!"
+        st.session_state.page      = "Chat"
+        st.session_state.chat_cid  = cid
+        st.session_state.flash     = f"Bonded with {comp['name']}!"
     else:
         st.warning(new_user)
 
@@ -172,7 +170,7 @@ if "user" not in st.session_state:
     except ValueError:
         st.error("Username conflict; try another."); SB.auth.sign_out(); st.stop()
 
-    # bootstrap session state
+    # bootstrap
     st.session_state.spent    = 0
     st.session_state.matches  = []
     st.session_state.hist     = {}
@@ -180,11 +178,11 @@ if "user" not in st.session_state:
     st.session_state.chat_cid = None
     st.session_state.flash    = None
 
-    st.experimental_rerun()
+    raise RerunException(rerun_data=None)
 
-# ─────────────────── STATE ENSURE ─────────────────────────────────
+# ─────────────────── ENSURE STATE KEYS ────────────────────────────
 for k,v in {
-    "spent":0, "matches":[], "hist":{}, 
+    "spent":0, "matches":[], "hist":{},
     "page":"Find matches", "chat_cid":None, "flash":None
 }.items():
     st.session_state.setdefault(k, v)
@@ -231,7 +229,6 @@ if page == "Find matches":
     trait = st.selectbox("Pick a trait",   ["curious","adventurous","night‑owl","chill","analytical","energetic","humorous","kind","bold","creative"])
     vibe  = st.selectbox("Pick a vibe",    ["witty","caring","mysterious","romantic","sarcastic","intellectual","playful","stoic","optimistic","pragmatic"])
     scene = st.selectbox("Pick a scene",   ["beach","forest","cafe","space‑station","cyberpunk‑city","medieval‑castle","mountain","underwater","neon‑disco","cozy‑library"])
-
     if st.button("Show matches"):
         st.session_state.matches = (
            [c for c in COMPANIONS if all(t in c["tags"] for t in (hobby, trait, vibe, scene))]
@@ -251,7 +248,7 @@ if page == "Find matches":
         )
 
         if c["id"] in colset:
-            # one‑click to chat
+            # one‑click straight to chat
             c3.button(
                 "💬 Chat",
                 key=f"chat-{c['id']}",
@@ -259,7 +256,7 @@ if page == "Find matches":
                 args=(c["id"],)
             )
         else:
-            # one‑click to bond & then chat
+            # one‑click bond & then chat
             c3.button(
                 "💖 Bond",
                 key=f"bond-{c['id']}",
