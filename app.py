@@ -151,32 +151,32 @@ if "user" not in st.session_state:
 
         # ─── SIGN UP ─────────────────────────────
         if mode == "Sign up":
-            # 1) ensure they haven't claimed
+            # 1) ensure they haven't claimed yet
             if invite[0]["claimed"]:
                 st.error("🚫 This email has already been used.")
                 st.stop()
 
-            # 2) call GoTrue sign_up and capture response
-            resp = SB.auth.sign_up({"email": email, "password": pwd})
-            if resp.error:
-                st.error(f"Sign‑up error: {resp.error.message}")
+            # 2) call GoTrue sign_up and catch any failure
+            try:
+                res = SB.auth.sign_up({"email": email, "password": pwd})
+                user_obj = res.user
+            except Exception as e:
+                st.error(f"Sign-up error: {e}")
                 st.stop()
 
-            # 3) take the newly created user ID
-            user_obj = resp.user
-
-            # 4) persist your own users row immediately
+            # 3) persist your own user-row right away
             create_user_row(user_obj.id, uname)
 
-            # 5) mark invite as claimed
+            # 4) mark invite as claimed
             SRS.table("invitees")\
                .update({"claimed": True})\
                .eq("email", email)\
                .execute()
 
-            # 6) inform the user
+            # 5) let the user know to check their inbox
             st.success("✅ Check your inbox for the confirmation link!")
             st.stop()
+
 
         # ─── SIGN IN ─────────────────────────────
         try:
