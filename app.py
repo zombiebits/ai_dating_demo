@@ -78,6 +78,7 @@ def profile_upsert(auth_uid: str, username: str) -> dict:
                 raise ValueError("username_taken")
             raise
 
+    # daily airdrop check
     last = user["last_airdrop"] or user["created_at"]
     last = datetime.fromisoformat(last.replace("Z", "+00:00"))
     if datetime.now(timezone.utc) - last >= timedelta(hours=24):
@@ -113,6 +114,7 @@ def buy(user: dict, comp: dict):
     )
     if owned:
         return False, "Already owned"
+    # debit + mint
     SRS.table("users")\
        .update({"tokens": user["tokens"] - price})\
        .eq("id", user["id"])\
@@ -126,6 +128,7 @@ def buy(user: dict, comp: dict):
 
 # ─────────────────── LOGIN / SIGN‑UP ───────────────────────────────
 if "user" not in st.session_state:
+    # show logo & tagline
     if Path(LOGO).is_file():
         st.image(LOGO, width=380)
         st.markdown(
@@ -135,16 +138,23 @@ if "user" not in st.session_state:
         )
 
     st.title("🔐 Sign in / Sign up to **BONDIGO**")
-    mode  = st.radio("Choose", ["Sign in","Sign up"], horizontal=True)
-    uname = st.text_input("Username", max_chars=20)
-    pwd   = st.text_input("Password", type="password")
-    if not st.button("Go ➜"):
+    # ← wrap in form so “Go” only needs one click
+    with st.form("login_form"):
+        mode  = st.radio("Choose", ["Sign in","Sign up"], horizontal=True)
+        uname = st.text_input("Username", max_chars=20)
+        pwd   = st.text_input("Password", type="password")
+        go    = st.form_submit_button("Go ➜")
+
+    if not go:
         st.stop()
     if not uname or not pwd:
         st.warning("Fill both fields."); st.stop()
 
     if mode == "Sign up":
-        conflict = SRS.table("users").select("id").eq("username", uname).execute().data
+        conflict = SRS.table("users")\
+                      .select("id")\
+                      .eq("username", uname)\
+                      .execute().data
         if conflict:
             st.error("That username’s taken."); st.stop()
 
@@ -156,25 +166,27 @@ if "user" not in st.session_state:
     except Exception as e:
         st.error(f"Auth error: {e}"); st.stop()
 
+    # grab JWT
     token = getattr(sess.session, "access_token", None) if hasattr(sess, "session") else getattr(sess, "access_token", None)
     if not token:
         st.error("Couldn’t find access token."); st.stop()
     st.session_state.user_jwt = token
     SB.postgrest.headers["Authorization"] = f"Bearer {token}"
 
+    # upsert profile + init state
     try:
         st.session_state.user = profile_upsert(sess.user.id, uname)
     except ValueError:
         st.error("Username conflict; try another."); SB.auth.sign_out(); st.stop()
+    st.session_state.spent    = 0
+    st.session_state.matches  = []
+    st.session_state.hist     = {}
+    st.session_state.page     = "Find matches"
+    st.session_state.chat_cid = None
 
-    st.session_state.spent   = 0
-    st.session_state.matches = []
-    st.session_state.hist    = {}
-    st.session_state.page    = "Find matches"
-    st.session_state.chat_cid= None
     raise RerunException(rerun_data=None)
 
-# ─────────────────── STATE BOOTSTRAP ──────────────────────────────
+# ─────────────────── ENSURE STATE KEYS ────────────────────────────
 st.session_state.setdefault("spent",   0)
 st.session_state.setdefault("matches", [])
 st.session_state.setdefault("hist",    {})
@@ -217,14 +229,10 @@ st.session_state.page = page
 # ─────────────────── FIND MATCHES ────────────────────────────────
 if page == "Find matches":
     st.image("assets/bondcosts.png", width=380)
-    hobby = st.selectbox("Pick a hobby",
-        ["space","foodie","gaming","music","art","sports","reading","travel","gardening","coding"])
-    trait = st.selectbox("Pick a trait",
-        ["curious","adventurous","night‑owl","chill","analytical","energetic","humorous","kind","bold","creative"])
-    vibe  = st.selectbox("Pick a vibe",
-        ["witty","caring","mysterious","romantic","sarcastic","intellectual","playful","stoic","optimistic","pragmatic"])
-    scene = st.selectbox("Pick a scene",
-        ["beach","forest","cafe","space‑station","cyberpunk‑city","medieval‑castle","mountain","underwater","neon‑disco","cozy‑library"])
+    hobby = st.selectbox("Pick a hobby",   ["space","foodie","gaming","music","art","sports","reading","travel","gardening","coding"])
+    trait = st.selectbox("Pick a trait",   ["curious","adventurous","night‑owl","chill","analytical","energetic","humorous","kind","bold","creative"])
+    vibe  = st.selectbox("Pick a vibe",    ["witty","caring","mysterious","romantic","sarcastic","intellectual","playful","stoic","optimistic","pragmatic"])
+    scene = st.selectbox("Pick a scene",   ["beach","forest","cafe","space‑station","cyberpunk‑city","medieval‑castle","mountain","underwater","neon‑disco","cozy‑library"])
 
     if st.button("Show matches"):
         st.session_state.matches = (
@@ -233,7 +241,7 @@ if page == "Find matches":
         )
 
     for c in st.session_state.matches:
-        rarity, clr = c.get("rarity","Common"), CLR[ c.get("rarity","Common") ]
+        rarity, clr = c.get("rarity","Common"), CLR[c.get("rarity","Common")]
         c1,c2,c3 = st.columns([1,3,2])
         c1.image(c.get("photo",PLACEHOLDER), width=90)
         c2.markdown(
@@ -243,8 +251,7 @@ if page == "Find matches":
           f"<span class='match-bio'>{c['bio']}</span>",
           unsafe_allow_html=True,
         )
-
-        # if already owned → show Chat button
+        # if owned → Chat button, else Bond
         if c["id"] in colset:
             if c3.button("💬 Chat", key=f"chat-{c['id']}"):
                 st.session_state.page    = "Chat"
@@ -265,7 +272,6 @@ elif page == "Chat":
     if not colset:
         st.info("Bond first!"); st.stop()
 
-    # pre‑select if arrived via “Chat” button
     options = [CID2COMP[i]["name"] for i in colset]
     if st.session_state.chat_cid:
         default = CID2COMP[st.session_state.chat_cid]["name"]
@@ -290,15 +296,10 @@ elif page == "Chat":
     hist = st.session_state.hist[cid]
     st.image(CID2COMP[cid].get("photo",PLACEHOLDER), width=180)
     st.subheader(f"Chatting with **{CID2COMP[cid]['name']}**")
-
     if st.button("🗑️ Clear history"):
         st.session_state.hist[cid] = hist[:1]
-        SRS.table("messages").delete()\
-           .eq("user_id", user["id"])\
-           .eq("companion_id", cid)\
-           .execute()
+        SRS.table("messages").delete().eq("user_id", user["id"]).eq("companion_id", cid).execute()
         st.success("Chat history cleared."); st.stop()
-
     for msg in hist[1:]:
         st.chat_message("assistant" if msg["role"]=="assistant" else "user").write(msg["content"])
     if st.session_state.spent >= MAX_TOKENS:
