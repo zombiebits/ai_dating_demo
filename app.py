@@ -210,13 +210,13 @@ st.markdown(
 )
 
 # ─────────────────── IN‑PAGE NAVIGATION ──────────────────────────
+# ←—— Here's the one tiny tweak: bind the radio directly to st.session_state["page"]
 page = st.radio(
     "",
     ["Find matches","Chat","My Collection"],
-    index=["Find matches","Chat","My Collection"].index(st.session_state.page),
+    key="page",
     horizontal=True
 )
-st.session_state.page = page
 
 # ─────────────────── FIND MATCHES ────────────────────────────────
 if page == "Find matches":
@@ -248,7 +248,6 @@ if page == "Find matches":
         )
 
         if c["id"] in colset:
-            # one‑click straight to chat
             c3.button(
                 "💬 Chat",
                 key=f"chat-{c['id']}",
@@ -256,7 +255,6 @@ if page == "Find matches":
                 args=(c["id"],)
             )
         else:
-            # one‑click bond & then chat
             c3.button(
                 "💖 Bond",
                 key=f"bond-{c['id']}",
