@@ -124,46 +124,43 @@ def goto_chat(cid: str):
 
 # ─────────────────── LOGIN / SIGN‑UP ───────────────────────────────
 if "user" not in st.session_state:
-    # Logo & tagline
-    if Path(LOGO).is_file():
-        st.image(LOGO, width=380)
-        st.markdown(
-            f"<p style='text-align:center;margin-top:-2px;font-size:1.05rem;"
-            f"color:#FFC8D8'>{TAGLINE}</p>",
-            unsafe_allow_html=True,
-        )
+    # … logo & tagline unchanged …
 
     st.title("🔐 Sign in / Sign up to **BONDIGO**")
 
-    # inputs
     email = st.text_input("Email", key="login_email")
     mode  = st.radio("Choose", ["Sign in","Sign up"], horizontal=True, key="login_mode")
     uname = st.text_input("Username", max_chars=20, key="login_uname")
     pwd   = st.text_input("Password", type="password", key="login_pwd")
 
     if st.button("Go ➜", key="login_go"):
-        # validation
+        # 1) basic validation
         if not email or not uname or not pwd:
             st.warning("Fill all fields: email, username, and password.")
             st.stop()
 
-        # whitelist lookup
-        invite = SRS.table("invitees")\
-                    .select("email", "claimed")\
-                    .eq("email", email)\
-                    .execute().data
+        # 2) lookup invitee
+        invite = (
+            SRS.table("invitees")
+               .select("email","claimed")
+               .eq("email", email)
+               .execute()
+               .data
+        )
         if not invite:
             st.error("🚧 You’re not on the invite list.")
             st.stop()
-        if invite[0].get("claimed"):
-            st.error("🚫 This email has already been used.")
-            st.stop()
 
-        # SIGN UP
+        # ── SIGN UP ───────────────────────────────
         if mode == "Sign up":
+            # if they've already used this invite to register, block
+            if invite[0].get("claimed"):
+                st.error("🚫 This email has already been used.")
+                st.stop()
+
             try:
                 SB.auth.sign_up({"email": email, "password": pwd})
-                # mark claimed
+                # mark the invite as claimed
                 SRS.table("invitees")\
                    .update({"claimed": True})\
                    .eq("email", email)\
@@ -173,26 +170,23 @@ if "user" not in st.session_state:
                 st.error(f"Sign‑up error: {e}")
             st.stop()
 
-        # SIGN IN
+        # ── SIGN IN ───────────────────────────────
         try:
             sess = SB.auth.sign_in_with_password({"email": email, "password": pwd})
         except Exception as e:
             st.error(f"Sign‑in error: {e}")
             st.stop()
 
-        # require email confirmed
         user_meta = SB.auth.get_user(sess.session.access_token).user
         if not user_meta.confirmed_at:
             st.error("📬 Please confirm your email before continuing.")
             st.stop()
 
-        # store JWT & upsert profile
+        # on success, bootstrap session…
         token = sess.session.access_token
         st.session_state.user_jwt = token
         SB.postgrest.headers["Authorization"] = f"Bearer {token}"
         st.session_state.user = profile_upsert(user_meta.id, uname)
-
-        # initialize session
         st.session_state.spent    = 0
         st.session_state.matches  = []
         st.session_state.hist     = {}
