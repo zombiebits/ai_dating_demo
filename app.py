@@ -124,7 +124,14 @@ def goto_chat(cid: str):
 
 # ─────────────────── LOGIN / SIGN‑UP ───────────────────────────────
 if "user" not in st.session_state:
-    # … logo & tagline unchanged …
+     # Logo & tagline
+    if Path(LOGO).is_file():
+        st.image(LOGO, width=380)
+        st.markdown(
+            f"<p style='text-align:center;margin-top:-2px;font-size:1.05rem;"
+            f"color:#FFC8D8'>{TAGLINE}</p>",
+            unsafe_allow_html=True,
+        )
 
     st.title("🔐 Sign in / Sign up to **BONDIGO**")
 
