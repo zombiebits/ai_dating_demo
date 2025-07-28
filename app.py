@@ -103,7 +103,7 @@ def collection_set(user_id: str) -> set[str]:
 def buy(user: dict, comp: dict):
     price = COST[comp.get("rarity","Common")]
     if price > user["tokens"]:
-        return False, "Not enough 💎"
+        return False, "Not enough 💎"
     owned = (
         SRS.table("collection")
            .select("companion_id")
@@ -113,15 +113,13 @@ def buy(user: dict, comp: dict):
     )
     if owned:
         return False, "Already owned"
-    SRS.table("users")\
-       .update({"tokens": user["tokens"] - price})\
-       .eq("id", user["id"])\
-       .execute()
-    SRS.table("collection")\
-       .insert({
-           "user_id":      user["id"],
-           "companion_id": comp["id"]
-       }).execute()
+    # debit & mint
+    SRS.table("users").update({"tokens": user["tokens"] - price}).eq("id", user["id"]).execute()
+    SRS.table("collection").insert({
+        "user_id":      user["id"],
+        "companion_id": comp["id"]
+    }).execute()
+    # return fresh user
     return True, profile_upsert(user["auth_uid"], user["username"])
 
 # ─────────────────── LOGIN / SIGN‑UP ───────────────────────────────
@@ -162,7 +160,8 @@ if "user" not in st.session_state:
     except Exception as e:
         st.error(f"Auth error: {e}"); st.stop()
 
-    token = getattr(sess.session, "access_token", None) if hasattr(sess, "session") else getattr(sess, "access_token", None)
+    token = getattr(sess.session, "access_token", None) \
+         if hasattr(sess, "session") else getattr(sess, "access_token", None)
     if not token:
         st.error("Couldn’t find access token."); st.stop()
     st.session_state.user_jwt = token
@@ -173,11 +172,13 @@ if "user" not in st.session_state:
     except ValueError:
         st.error("Username conflict; try another."); SB.auth.sign_out(); st.stop()
 
+    # initialize
     st.session_state.spent    = 0
     st.session_state.matches  = []
     st.session_state.hist     = {}
     st.session_state.page     = "Find matches"
     st.session_state.chat_cid = None
+    st.session_state.flash    = None
     raise RerunException(rerun_data=None)
 
 # ─────────────────── STATE BOOTSTRAP ────────────────────────────
@@ -186,6 +187,7 @@ st.session_state.setdefault("matches",  [])
 st.session_state.setdefault("hist",     {})
 st.session_state.setdefault("page",     "Find matches")
 st.session_state.setdefault("chat_cid", None)
+st.session_state.setdefault("flash",    None)
 
 user   = st.session_state.user
 colset = collection_set(user["id"])
@@ -221,30 +223,29 @@ st.session_state.page = page
 # ─────────────────── FIND MATCHES ────────────────────────────────
 if page == "Find matches":
     st.image("assets/bondcosts.png", width=380)
-
-    hobby = st.selectbox("Pick a hobby",   ["space","foodie","gaming","music","art",
-                                           "sports","reading","travel","gardening","coding"])
-    trait = st.selectbox("Pick a trait",   ["curious","adventurous","night‑owl","chill",
-                                           "analytical","energetic","humorous","kind",
-                                           "bold","creative"])
-    vibe  = st.selectbox("Pick a vibe",    ["witty","caring","mysterious","romantic",
-                                           "sarcastic","intellectual","playful","stoic",
-                                           "optimistic","pragmatic"])
-    scene = st.selectbox("Pick a scene",   ["beach","forest","cafe","space‑station",
-                                           "cyberpunk‑city","medieval‑castle","mountain",
-                                           "underwater","neon‑disco","cozy‑library"])
+    h = st.selectbox("Pick a hobby",   [c for c in ["space","foodie","gaming","music","art",
+                                                    "sports","reading","travel","gardening","coding"]])
+    t = st.selectbox("Pick a trait",   [c for c in ["curious","adventurous","night‑owl","chill",
+                                                    "analytical","energetic","humorous","kind",
+                                                    "bold","creative"]])
+    v = st.selectbox("Pick a vibe",    [c for c in ["witty","caring","mysterious","romantic",
+                                                    "sarcastic","intellectual","playful","stoic",
+                                                    "optimistic","pragmatic"]])
+    s = st.selectbox("Pick a scene",   [c for c in ["beach","forest","cafe","space‑station",
+                                                    "cyberpunk‑city","medieval‑castle","mountain",
+                                                    "underwater","neon‑disco","cozy‑library"]])
 
     if st.button("Show matches"):
         st.session_state.matches = (
-           [c for c in COMPANIONS if all(t in c["tags"] for t in [hobby,trait,vibe,scene])]
+           [c for c in COMPANIONS if all(tag in c["tags"] for tag in [h,t,v,s])]
            or random.sample(COMPANIONS, 5)
         )
 
     for c in st.session_state.matches:
         rarity, clr = c.get("rarity","Common"), CLR[c.get("rarity","Common")]
-        c1,c2,c3 = st.columns([1,3,2])
-        c1.image(c.get("photo",PLACEHOLDER), width=90)
-        c2.markdown(
+        col1,col2,col3 = st.columns([1,5,2])
+        col1.image(c.get("photo",PLACEHOLDER), width=90)
+        col2.markdown(
           f"<span style='background:{clr};color:black;padding:2px 6px;"
           f"border-radius:4px;font-size:0.75rem'>{rarity}</span> "
           f"**{c['name']}** • {COST[rarity]} 💎  \n"
@@ -252,35 +253,40 @@ if page == "Find matches":
           unsafe_allow_html=True,
         )
 
-        # if owned, show Chat; if new, Bond & instantly Chat
+        # two‐step: show Bond or Chat
         if c["id"] in colset:
-            if c3.button("💬 Chat", key=f"chat-{c['id']}"):
-                st.session_state.page    = "Chat"
+            if col3.button("💬 Chat", key=f"chat-{c['id']}"):
+                st.session_state.page     = "Chat"
                 st.session_state.chat_cid = c["id"]
                 raise RerunException(rerun_data=None)
         else:
-            if c3.button("💖 Bond", key=f"bond-{c['id']}"):
+            if col3.button("💖 Bond", key=f"bond-{c['id']}"):
                 ok, new = buy(user, c)
                 if ok:
                     st.session_state.user     = new
-                    st.session_state.page     = "Chat"
-                    st.session_state.chat_cid = c["id"]
-                    raise RerunException(rerun_data=None)
+                    # immediately reflect locally
+                    colset.add(c["id"])
+                    st.session_state.flash    = f"Bonded with {c['name']}!"
                 else:
                     st.warning(new)
-                st.stop()
+                # no rerun—flash + Chat button now visible
+                st.experimental_rerun()
 
 # ─────────────────── CHAT ────────────────────────────────────────
 elif page == "Chat":
+    if st.session_state.flash:
+        st.success(st.session_state.flash)
+        st.session_state.flash = None
+
     if not colset:
         st.info("Bond first!"); st.stop()
 
-    options = [CID2COMP[i]["name"] for i in colset]
+    opts = [CID2COMP[i]["name"] for i in colset]
     if st.session_state.chat_cid:
         default = CID2COMP[st.session_state.chat_cid]["name"]
-        sel = st.selectbox("Choose companion", options, index=options.index(default))
+        sel = st.selectbox("Choose companion", opts, index=opts.index(default))
     else:
-        sel = st.selectbox("Choose companion", options)
+        sel = st.selectbox("Choose companion", opts)
     cid = next(k for k,v in CID2COMP.items() if v["name"] == sel)
     st.session_state.chat_cid = cid
 
@@ -293,19 +299,25 @@ elif page == "Chat":
              .order("created_at")
              .execute().data
         )
-        base = [{"role":"system","content":f"You are {CID2COMP[cid]['name']}. {CID2COMP[cid]['bio']} Speak PG‑13."}]
+        base = [{"role":"system","content":
+                 f"You are {CID2COMP[cid]['name']}. {CID2COMP[cid]['bio']} Speak PG‑13."}]
         st.session_state.hist[cid] = base + [{"role":r["role"],"content":r["content"]} for r in rows]
 
     hist = st.session_state.hist[cid]
     st.image(CID2COMP[cid].get("photo",PLACEHOLDER), width=180)
     st.subheader(f"Chatting with **{CID2COMP[cid]['name']}**")
-    if st.button("🗑️ Clear history"):
+    if st.button("🗑️ Clear history"):
         st.session_state.hist[cid] = hist[:1]
-        SRS.table("messages").delete().eq("user_id", user["id"]).eq("companion_id", cid).execute()
+        SRS.table("messages")\
+           .delete()\
+           .eq("user_id", user["id"])\
+           .eq("companion_id", cid)\
+           .execute()
         st.success("Chat history cleared."); st.stop()
 
     for msg in hist[1:]:
-        st.chat_message("assistant" if msg["role"]=="assistant" else "user").write(msg["content"])
+        st.chat_message("assistant" if msg["role"]=="assistant" else "user")\
+          .write(msg["content"])
     if st.session_state.spent >= MAX_TOKENS:
         st.warning("Daily token budget hit."); st.stop()
 
@@ -313,11 +325,14 @@ elif page == "Chat":
     if ui:
         hist.append({"role":"user","content":ui})
         try:
-            resp = OA.chat.completions.create(model="gpt-4o-mini", messages=hist, max_tokens=120)
+            resp = OA.chat.completions.create(model="gpt-4o-mini",
+                                              messages=hist,
+                                              max_tokens=120)
             reply = resp.choices[0].message.content
             st.session_state.spent += resp.usage.prompt_tokens + resp.usage.completion_tokens
             hist.append({"role":"assistant","content":reply})
             st.chat_message("assistant").write(reply)
+
             SRS.table("messages").insert({
                 "user_id":      user["id"],
                 "companion_id": cid,
@@ -344,9 +359,9 @@ elif page == "My Collection":
     for cid in sorted(colset):
         c = CID2COMP[cid]
         rar, clr = c.get("rarity","Common"), CLR[c.get("rarity","Common")]
-        col1, col2 = st.columns([1,5])
-        col1.image(c.get("photo",PLACEHOLDER), width=80)
-        col2.markdown(
+        c1,c2 = st.columns([1,5])
+        c1.image(c.get("photo",PLACEHOLDER), width=80)
+        c2.markdown(
           f"<span style='background:{clr};color:black;padding:2px 6px;"
           f"border-radius:4px;font-size:0.75rem'>{rar}</span> "
           f"**{c['name']}**  \n"
