@@ -78,7 +78,7 @@ def profile_upsert(auth_uid: str, username: str) -> dict:
                 raise ValueError("username_taken")
             raise
 
-    # daily airdrop check
+    # daily airdrop
     last = user["last_airdrop"] or user["created_at"]
     last = datetime.fromisoformat(last.replace("Z", "+00:00"))
     if datetime.now(timezone.utc) - last >= timedelta(hours=24):
@@ -114,7 +114,7 @@ def buy(user: dict, comp: dict):
     )
     if owned:
         return False, "Already owned"
-    # debit + mint
+    # debit & mint via service role
     SRS.table("users")\
        .update({"tokens": user["tokens"] - price})\
        .eq("id", user["id"])\
@@ -128,7 +128,6 @@ def buy(user: dict, comp: dict):
 
 # ─────────────────── LOGIN / SIGN‑UP ───────────────────────────────
 if "user" not in st.session_state:
-    # show logo & tagline
     if Path(LOGO).is_file():
         st.image(LOGO, width=380)
         st.markdown(
@@ -138,7 +137,6 @@ if "user" not in st.session_state:
         )
 
     st.title("🔐 Sign in / Sign up to **BONDIGO**")
-    # ← wrap in form so “Go” only needs one click
     with st.form("login_form"):
         mode  = st.radio("Choose", ["Sign in","Sign up"], horizontal=True)
         uname = st.text_input("Username", max_chars=20)
@@ -166,18 +164,17 @@ if "user" not in st.session_state:
     except Exception as e:
         st.error(f"Auth error: {e}"); st.stop()
 
-    # grab JWT
     token = getattr(sess.session, "access_token", None) if hasattr(sess, "session") else getattr(sess, "access_token", None)
     if not token:
         st.error("Couldn’t find access token."); st.stop()
     st.session_state.user_jwt = token
     SB.postgrest.headers["Authorization"] = f"Bearer {token}"
 
-    # upsert profile + init state
     try:
         st.session_state.user = profile_upsert(sess.user.id, uname)
     except ValueError:
         st.error("Username conflict; try another."); SB.auth.sign_out(); st.stop()
+
     st.session_state.spent    = 0
     st.session_state.matches  = []
     st.session_state.hist     = {}
@@ -206,11 +203,9 @@ if Path(LOGO).is_file():
     )
 
 st.markdown(
-    # username badge
     f"<span style='background:#f93656;padding:6px 12px;border-radius:8px;"
     f"display:inline-block;font-size:1.25rem;color:#000;font-weight:600;"
     f"margin-right:8px;'>{user['username']}'s Wallet</span>"
-    # token badge
     f"<span style='background:#000;color:#57C784;padding:6px 12px;"
     f"border-radius:8px;display:inline-block;font-size:1.25rem;'>"
     f"{user['tokens']} 💎</span>",
@@ -229,10 +224,18 @@ st.session_state.page = page
 # ─────────────────── FIND MATCHES ────────────────────────────────
 if page == "Find matches":
     st.image("assets/bondcosts.png", width=380)
-    hobby = st.selectbox("Pick a hobby",   ["space","foodie","gaming","music","art","sports","reading","travel","gardening","coding"])
-    trait = st.selectbox("Pick a trait",   ["curious","adventurous","night‑owl","chill","analytical","energetic","humorous","kind","bold","creative"])
-    vibe  = st.selectbox("Pick a vibe",    ["witty","caring","mysterious","romantic","sarcastic","intellectual","playful","stoic","optimistic","pragmatic"])
-    scene = st.selectbox("Pick a scene",   ["beach","forest","cafe","space‑station","cyberpunk‑city","medieval‑castle","mountain","underwater","neon‑disco","cozy‑library"])
+
+    hobby = st.selectbox("Pick a hobby",   ["space","foodie","gaming","music","art",
+                                          "sports","reading","travel","gardening","coding"])
+    trait = st.selectbox("Pick a trait",   ["curious","adventurous","night‑owl","chill",
+                                          "analytical","energetic","humorous","kind",
+                                          "bold","creative"])
+    vibe  = st.selectbox("Pick a vibe",    ["witty","caring","mysterious","romantic",
+                                          "sarcastic","intellectual","playful","stoic",
+                                          "optimistic","pragmatic"])
+    scene = st.selectbox("Pick a scene",   ["beach","forest","cafe","space‑station",
+                                          "cyberpunk‑city","medieval‑castle","mountain",
+                                          "underwater","neon‑disco","cozy‑library"])
 
     if st.button("Show matches"):
         st.session_state.matches = (
@@ -251,7 +254,8 @@ if page == "Find matches":
           f"<span class='match-bio'>{c['bio']}</span>",
           unsafe_allow_html=True,
         )
-        # if owned → Chat button, else Bond
+
+        # ◀— if owned, Chat; if new, Bond & immediately go chat
         if c["id"] in colset:
             if c3.button("💬 Chat", key=f"chat-{c['id']}"):
                 st.session_state.page    = "Chat"
@@ -261,8 +265,10 @@ if page == "Find matches":
             if c3.button("💖 Bond", key=f"bond-{c['id']}"):
                 ok, new = buy(user, c)
                 if ok:
-                    st.session_state.user = new
-                    st.success("Bonded!")
+                    st.session_state.user     = new
+                    st.session_state.page     = "Chat"
+                    st.session_state.chat_cid = c["id"]
+                    st.experimental_rerun()
                 else:
                     st.warning(new)
                 st.stop()
