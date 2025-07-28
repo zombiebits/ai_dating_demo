@@ -19,10 +19,9 @@ if "user_jwt" in st.session_state:
     SB.postgrest.headers["Authorization"] = f"Bearer {st.session_state.user_jwt}"
 
 
-# after
 params = st.query_params
-if params.get("type", [""])[0] == "signup":
-    st.success("✅ Your email is confirmed! Go ahead and sign in below.")
+if params.get("confirmed", [""])[0] == "true":
+    st.success("✅ Your email has been confirmed! Please sign in below.")
 
 
 
@@ -172,7 +171,11 @@ if "user" not in st.session_state:
         if mode == "Sign up":
             # trigger Supabase’s email-confirm flow
             try:
-                SB.auth.sign_up({"email": email, "password": pwd})
+                confirm_url = "https://ai-matchmaker-demo.streamlit.app/?confirmed=true"
+                SB.auth.sign_up(
+                    {"email": email, "password": pwd},
+                    {"redirect_to": confirm_url}
+)
                 st.success("✅ Check your inbox for the confirmation link!")
             except Exception as e:
                 st.error(f"Sign‑up error: {e}")
