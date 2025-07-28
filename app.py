@@ -11,11 +11,11 @@ from postgrest.exceptions import APIError
 
 # ─────────────────── ENVIRONMENT & CLIENTS ─────────────────────────
 load_dotenv()
-SB  = create_client(os.environ["SUPABASE_URL"],   os.environ["SUPABASE_KEY"])
-SRS = create_client(os.environ["SUPABASE_URL"],   os.environ["SUPABASE_SERVICE_KEY"])
+SB  = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
+SRS = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_KEY"])
 OA  = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
-# Persist JWT for RLS on SB
+# Persist JWT for RLS on SB across reruns
 if "user_jwt" in st.session_state:
     SB.postgrest.headers["Authorization"] = f"Bearer {st.session_state.user_jwt}"
 
@@ -119,7 +119,6 @@ def buy(user: dict, comp: dict):
         "user_id":      user["id"],
         "companion_id": comp["id"]
     }).execute()
-    # return fresh user
     return True, profile_upsert(user["auth_uid"], user["username"])
 
 # ─────────────────── LOGIN / SIGN‑UP ───────────────────────────────
@@ -145,10 +144,7 @@ if "user" not in st.session_state:
         st.warning("Fill both fields."); st.stop()
 
     if mode == "Sign up":
-        conflict = SRS.table("users")\
-                      .select("id")\
-                      .eq("username", uname)\
-                      .execute().data
+        conflict = SRS.table("users").select("id").eq("username", uname).execute().data
         if conflict:
             st.error("That username’s taken."); st.stop()
 
@@ -160,8 +156,7 @@ if "user" not in st.session_state:
     except Exception as e:
         st.error(f"Auth error: {e}"); st.stop()
 
-    token = getattr(sess.session, "access_token", None) \
-         if hasattr(sess, "session") else getattr(sess, "access_token", None)
+    token = getattr(sess.session, "access_token", None) if hasattr(sess, "session") else getattr(sess, "access_token", None)
     if not token:
         st.error("Couldn’t find access token."); st.stop()
     st.session_state.user_jwt = token
@@ -172,16 +167,17 @@ if "user" not in st.session_state:
     except ValueError:
         st.error("Username conflict; try another."); SB.auth.sign_out(); st.stop()
 
-    # initialize
+    # bootstrap session state
     st.session_state.spent    = 0
     st.session_state.matches  = []
     st.session_state.hist     = {}
     st.session_state.page     = "Find matches"
     st.session_state.chat_cid = None
     st.session_state.flash    = None
+
     raise RerunException(rerun_data=None)
 
-# ─────────────────── STATE BOOTSTRAP ────────────────────────────
+# ─────────────────── ENSURE STATE KEYS ────────────────────────────
 st.session_state.setdefault("spent",    0)
 st.session_state.setdefault("matches",  [])
 st.session_state.setdefault("hist",     {})
@@ -223,57 +219,55 @@ st.session_state.page = page
 # ─────────────────── FIND MATCHES ────────────────────────────────
 if page == "Find matches":
     st.image("assets/bondcosts.png", width=380)
-    h = st.selectbox("Pick a hobby",   [c for c in ["space","foodie","gaming","music","art",
-                                                    "sports","reading","travel","gardening","coding"]])
-    t = st.selectbox("Pick a trait",   [c for c in ["curious","adventurous","night‑owl","chill",
-                                                    "analytical","energetic","humorous","kind",
-                                                    "bold","creative"]])
-    v = st.selectbox("Pick a vibe",    [c for c in ["witty","caring","mysterious","romantic",
-                                                    "sarcastic","intellectual","playful","stoic",
-                                                    "optimistic","pragmatic"]])
-    s = st.selectbox("Pick a scene",   [c for c in ["beach","forest","cafe","space‑station",
-                                                    "cyberpunk‑city","medieval‑castle","mountain",
-                                                    "underwater","neon‑disco","cozy‑library"]])
+
+    hobby = st.selectbox("Pick a hobby",
+        ["space","foodie","gaming","music","art","sports","reading","travel","gardening","coding"])
+    trait = st.selectbox("Pick a trait",
+        ["curious","adventurous","night‑owl","chill","analytical","energetic","humorous","kind","bold","creative"])
+    vibe  = st.selectbox("Pick a vibe",
+        ["witty","caring","mysterious","romantic","sarcastic","intellectual","playful","stoic","optimistic","pragmatic"])
+    scene = st.selectbox("Pick a scene",
+        ["beach","forest","cafe","space‑station","cyberpunk‑city","medieval‑castle","mountain","underwater","neon‑disco","cozy‑library"])
 
     if st.button("Show matches"):
         st.session_state.matches = (
-           [c for c in COMPANIONS if all(tag in c["tags"] for tag in [h,t,v,s])]
+           [c for c in COMPANIONS if all(tag in c["tags"] for tag in (hobby, trait, vibe, scene))]
            or random.sample(COMPANIONS, 5)
         )
 
     for c in st.session_state.matches:
         rarity, clr = c.get("rarity","Common"), CLR[c.get("rarity","Common")]
-        col1,col2,col3 = st.columns([1,5,2])
-        col1.image(c.get("photo",PLACEHOLDER), width=90)
-        col2.markdown(
+        c1,c2,c3 = st.columns([1,5,2])
+        c1.image(c.get("photo",PLACEHOLDER), width=90)
+        c2.markdown(
           f"<span style='background:{clr};color:black;padding:2px 6px;"
           f"border-radius:4px;font-size:0.75rem'>{rarity}</span> "
-          f"**{c['name']}** • {COST[rarity]} 💎  \n"
+          f"**{c['name']}** • {COST[rarity]} 💎\n"
           f"<span class='match-bio'>{c['bio']}</span>",
           unsafe_allow_html=True,
         )
 
-        # two‐step: show Bond or Chat
+        # Owned → Chat immediately
         if c["id"] in colset:
-            if col3.button("💬 Chat", key=f"chat-{c['id']}"):
+            if c3.button("💬 Chat", key=f"chat-{c['id']}"):
                 st.session_state.page     = "Chat"
                 st.session_state.chat_cid = c["id"]
                 raise RerunException(rerun_data=None)
         else:
-            if col3.button("💖 Bond", key=f"bond-{c['id']}"):
+            if c3.button("💖 Bond", key=f"bond-{c['id']}"):
                 ok, new = buy(user, c)
                 if ok:
-                    st.session_state.user     = new
-                    # immediately reflect locally
+                    st.session_state.user  = new
                     colset.add(c["id"])
-                    st.session_state.flash    = f"Bonded with {c['name']}!"
+                    st.session_state.flash = f"Bonded with {c['name']}!"
                 else:
                     st.warning(new)
-                # no rerun—flash + Chat button now visible
-                st.experimental_rerun()
+                # rerun so the button flips to Chat
+                raise RerunException(rerun_data=None)
 
 # ─────────────────── CHAT ────────────────────────────────────────
 elif page == "Chat":
+    # one‑time flash
     if st.session_state.flash:
         st.success(st.session_state.flash)
         st.session_state.flash = None
@@ -281,12 +275,13 @@ elif page == "Chat":
     if not colset:
         st.info("Bond first!"); st.stop()
 
-    opts = [CID2COMP[i]["name"] for i in colset]
+    options = [CID2COMP[i]["name"] for i in colset]
     if st.session_state.chat_cid:
         default = CID2COMP[st.session_state.chat_cid]["name"]
-        sel = st.selectbox("Choose companion", opts, index=opts.index(default))
+        sel = st.selectbox("Choose companion", options, index=options.index(default))
     else:
-        sel = st.selectbox("Choose companion", opts)
+        sel = st.selectbox("Choose companion", options)
+
     cid = next(k for k,v in CID2COMP.items() if v["name"] == sel)
     st.session_state.chat_cid = cid
 
@@ -306,7 +301,8 @@ elif page == "Chat":
     hist = st.session_state.hist[cid]
     st.image(CID2COMP[cid].get("photo",PLACEHOLDER), width=180)
     st.subheader(f"Chatting with **{CID2COMP[cid]['name']}**")
-    if st.button("🗑️ Clear history"):
+
+    if st.button("🗑️ Clear history"):
         st.session_state.hist[cid] = hist[:1]
         SRS.table("messages")\
            .delete()\
@@ -316,14 +312,13 @@ elif page == "Chat":
         st.success("Chat history cleared."); st.stop()
 
     for msg in hist[1:]:
-        st.chat_message("assistant" if msg["role"]=="assistant" else "user")\
-          .write(msg["content"])
+        st.chat_message("assistant" if msg["role"]=="assistant" else "user").write(msg["content"])
     if st.session_state.spent >= MAX_TOKENS:
         st.warning("Daily token budget hit."); st.stop()
 
-    ui = st.chat_input("Say something…")
-    if ui:
-        hist.append({"role":"user","content":ui})
+    user_input = st.chat_input("Say something…")
+    if user_input:
+        hist.append({"role":"user","content":user_input})
         try:
             resp = OA.chat.completions.create(model="gpt-4o-mini",
                                               messages=hist,
@@ -337,7 +332,7 @@ elif page == "Chat":
                 "user_id":      user["id"],
                 "companion_id": cid,
                 "role":         "user",
-                "content":      ui
+                "content":      user_input
             }).execute()
             SRS.table("messages").insert({
                 "user_id":      user["id"],
@@ -357,11 +352,11 @@ elif page == "My Collection":
     if not colset:
         st.info("No Bonds yet.")
     for cid in sorted(colset):
-        c = CID2COMP[cid]
-        rar, clr = c.get("rarity","Common"), CLR[c.get("rarity","Common")]
-        c1,c2 = st.columns([1,5])
-        c1.image(c.get("photo",PLACEHOLDER), width=80)
-        c2.markdown(
+        c   = CID2COMP[cid]
+        rar = c.get("rarity","Common"); clr = CLR[rar]
+        col1, col2 = st.columns([1,5])
+        col1.image(c.get("photo",PLACEHOLDER), width=80)
+        col2.markdown(
           f"<span style='background:{clr};color:black;padding:2px 6px;"
           f"border-radius:4px;font-size:0.75rem'>{rar}</span> "
           f"**{c['name']}**  \n"
