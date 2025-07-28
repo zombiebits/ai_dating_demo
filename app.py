@@ -124,75 +124,78 @@ def goto_chat(cid: str):
     st.session_state.page     = "Chat"
     st.session_state.chat_cid = cid
 
-# ─────────────────── LOGIN / SIGN‑UP ───────────────────────────────
+# ─────────────────── LOGIN / SIGN‑UP (REPLACEMENT) ────────────────────────────
 if "user" not in st.session_state:
-    # ─── Logo & tagline ─────────────────────
+    # Logo & tagline (unchanged)
     if Path(LOGO).is_file():
         st.image(LOGO, width=380)
         st.markdown(
-            f"<p style='text-align:center;margin-top:-2px;font-size:1.05rem;"
-            f"color:#FFC8D8'>{TAGLINE}</p>",
+            f"<p style='text-align:center;margin-top:-2px;font-size:1.05rem;color:#FFC8D8'>{TAGLINE}</p>",
             unsafe_allow_html=True,
         )
 
     st.title("🔐 Sign in / Sign up to **BONDIGO**")
 
-    # ─── Inputs ───────────────────────────────
-    mode = st.radio("Choose", ["Sign in","Sign up"], horizontal=True, key="login_mode")
+    # — User enters a real email address (instead of faked one)
+    email = st.text_input("Email", type="default", key="login_email")
+    mode  = st.radio("Choose", ["Sign in","Sign up"], horizontal=True, key="login_mode")
     uname = st.text_input("Username", max_chars=20, key="login_uname")
     pwd   = st.text_input("Password", type="password", key="login_pwd")
 
-    # ─── Single‑click button ──────────────────
     if st.button("Go ➜", key="login_go"):
-        # Validate:
-        if not uname or not pwd:
-            st.warning("Fill both fields.")
+        # 1) basic validation
+        if not email or not uname or not pwd:
+            st.warning("Fill all fields: email, username, and password.")
             st.stop()
 
-        # Sign‑up collision check
-        if mode == "Sign up":
-            conflict = (
-                SRS.table("users")
-                   .select("id")
-                   .eq("username", uname)
-                   .execute()
-                   .data
-            )
-            if conflict:
-                st.error("That username’s taken.")
-                st.stop()
-
-        # Perform auth
-        email = f"{uname.lower()}@bondigo.local"
-        try:
-            if mode == "Sign up":
-                SB.auth.sign_up({"email":email,"password":pwd})
-            sess = SB.auth.sign_in_with_password({"email":email,"password":pwd})
-        except Exception as e:
-            st.error(f"Auth error: {e}")
-            st.stop()
-
-        # Grab token
-        token = (
-            getattr(sess.session, "access_token", None)
-            if hasattr(sess, "session")
-            else getattr(sess, "access_token", None)
+        # 2) whitelist check
+        allowed = (
+            SRS.table("invitees")
+               .select("email")
+               .eq("email", email)
+               .execute()
+               .data
         )
-        if not token:
-            st.error("Couldn’t find access token.")
+        if not allowed:
+            st.error("🚧 You’re not on the invite list. Join our waitlist at hello@yourdomain.com.")
             st.stop()
 
-        # Store JWT & upsert profile
+        # 3) SIGN UP flow
+        if mode == "Sign up":
+            # trigger Supabase’s email-confirm flow
+            try:
+                SB.auth.sign_up({"email": email, "password": pwd})
+                st.success("✅ Check your inbox for the confirmation link!")
+            except Exception as e:
+                st.error(f"Sign‑up error: {e}")
+            st.stop()
+
+        # 4) SIGN IN flow
+        try:
+            sess = SB.auth.sign_in_with_password({"email": email, "password": pwd})
+        except Exception as e:
+            st.error(f"Sign‑in error: {e}")
+            st.stop()
+
+        # 5) ensure email confirmed
+        user_meta = SB.auth.get_user(sess.session.access_token).user
+        if not user_meta.confirmed_at:
+            st.error("📬 Please confirm your email before continuing.")
+            st.stop()
+
+        # 6) pull out the JWT and set headers
+        token = sess.session.access_token
         st.session_state.user_jwt = token
         SB.postgrest.headers["Authorization"] = f"Bearer {token}"
+
+        # 7) upsert profile + bootstrap state (unchanged)
         try:
-            st.session_state.user = profile_upsert(sess.user.id, uname)
+            st.session_state.user = profile_upsert(user_meta.id, uname)
         except ValueError:
-            st.error("Username conflict; try another.")
+            st.error("Username conflict; pick another.")
             SB.auth.sign_out()
             st.stop()
 
-        # Bootstrap the rest of session_state
         st.session_state.spent    = 0
         st.session_state.matches  = []
         st.session_state.hist     = {}
@@ -200,12 +203,11 @@ if "user" not in st.session_state:
         st.session_state.chat_cid = None
         st.session_state.flash    = None
 
-        # Rerun into the main app
+        # 8) rerun into the app proper
         raise RerunException(rerun_data=None)
 
-    # If the button hasn’t been clicked yet, nothing else runs
+    # before the first click, stop here
     st.stop()
-
 
 
 
