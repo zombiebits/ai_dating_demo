@@ -34,13 +34,12 @@ confirmation_type = params.get("type", [""])[0] if "type" in params else ""
 error_code = params.get("error_code", [""])[0] if "error_code" in params else ""
 error_description = params.get("error_description", [""])[0] if "error_description" in params else ""
 
-# Handle email confirmation
+# Handle email confirmation (legacy support for existing link-based confirmations)
 if confirmation_type == "signup":
     access_token = params.get("access_token", [""])[0] if "access_token" in params else ""
     refresh_token = params.get("refresh_token", [""])[0] if "refresh_token" in params else ""
     
     if error_code:
-        # Handle confirmation errors (expired links, etc.)
         logger.error(f"Email confirmation error: {error_code} - {error_description}")
         if error_code == "signup_disabled":
             st.error("🚫 Account signup is currently disabled.")
@@ -52,49 +51,32 @@ if confirmation_type == "signup":
             st.session_state.show_resend = True
     elif access_token and refresh_token:
         try:
-            # Set the session with the tokens from the URL
             session_response = SB.auth.set_session(access_token, refresh_token)
             
-            # Get user info from the session
             if session_response and session_response.user:
                 user_meta = session_response.user
                 logger.info(f"Email confirmed for user: {user_meta.email}")
                 
-                # Check if this user already has a user row
                 existing_user = get_user_row(user_meta.id)
                 if not existing_user:
-                    # Look for pending signup
                     pending = get_pending_signup(user_meta.email)
                     if pending:
                         username = pending["username"]
                         logger.info(f"Creating user row for confirmed user: {user_meta.email} with username: {username}")
                         
-                        # Create the user row now that email is confirmed
                         create_user_row(user_meta.id, username)
-                        
-                        # Mark invite as claimed
-                        SRS.table("invitees")\
-                           .update({"claimed": True})\
-                           .eq("email", user_meta.email)\
-                           .execute()
-                        
-                        # Clean up pending signup
+                        SRS.table("invitees").update({"claimed": True}).eq("email", user_meta.email).execute()
                         cleanup_pending_signup(user_meta.email)
                         
                         st.success("✅ Your email has been confirmed! You can now sign in below.")
                     else:
-                        # Fallback to user metadata if pending signup not found
                         username = user_meta.user_metadata.get("username", f"user_{user_meta.id[:8]}")
                         create_user_row(user_meta.id, username)
-                        SRS.table("invitees")\
-                           .update({"claimed": True})\
-                           .eq("email", user_meta.email)\
-                           .execute()
+                        SRS.table("invitees").update({"claimed": True}).eq("email", user_meta.email).execute()
                         st.success("✅ Your email has been confirmed! You can now sign in below.")
                 else:
                     st.info("✅ Your email is already confirmed. You can sign in below.")
                 
-                # Clear the URL parameters to clean up the URL
                 if st.button("Continue to Sign In"):
                     st.query_params.clear()
                     st.rerun()
@@ -107,32 +89,6 @@ if confirmation_type == "signup":
             st.error(f"❌ Email confirmation error: {str(e)}")
     else:
         st.error("❌ Invalid confirmation link.")
-        
-# Also check for fragment parameters (alternative method)
-elif st.query_params.get("access_token"):
-    # Handle the case where tokens come as query parameters instead of fragments
-    access_token = params.get("access_token", [""])[0] if "access_token" in params else ""
-    refresh_token = params.get("refresh_token", [""])[0] if "refresh_token" in params else ""
-    
-    if access_token and refresh_token:
-        try:
-            session_response = SB.auth.set_session(access_token, refresh_token)
-            if session_response and session_response.user:
-                user_meta = session_response.user
-                existing_user = get_user_row(user_meta.id)
-                if not existing_user:
-                    pending = get_pending_signup(user_meta.email)
-                    if pending:
-                        username = pending["username"]
-                        create_user_row(user_meta.id, username)
-                        SRS.table("invitees").update({"claimed": True}).eq("email", user_meta.email).execute()
-                        cleanup_pending_signup(user_meta.email)
-                st.success("✅ Your email has been confirmed! You can now sign in below.")
-                if st.button("Continue to Sign In"):
-                    st.query_params.clear()
-                    st.rerun()
-        except Exception as e:
-            st.error(f"❌ Email confirmation error: {str(e)}")
 
 # ─────────────────── STREAMLIT CONFIG ──────────────────────────────
 st.set_page_config(
@@ -200,7 +156,6 @@ def get_user_row(auth_uid: str) -> dict | None:
 
 def create_pending_signup(email: str, username: str, auth_uid: str = None) -> bool:
     try:
-        # Clean up any existing pending signups for this email first
         cleanup_pending_signup(email)
         
         SRS.table("pending_signups").insert({
@@ -248,12 +203,7 @@ def cleanup_expired_signups():
         logger.error(f"Failed to cleanup expired signups: {str(e)}")
 
 def cleanup_unconfirmed_user(email: str) -> bool:
-    """
-    Clean up unconfirmed users from Supabase Auth.
-    This requires admin privileges.
-    """
     try:
-        # First check if there's an unconfirmed user
         users_response = SRS.auth.admin.list_users()
         if users_response and users_response.users:
             for user in users_response.users:
@@ -261,11 +211,8 @@ def cleanup_unconfirmed_user(email: str) -> bool:
                     not getattr(user, 'email_confirmed_at', None) and 
                     not getattr(user, 'confirmed_at', None)):
                     
-                    # Delete the unconfirmed user
                     SRS.auth.admin.delete_user(user.id)
                     logger.info(f"Cleaned up unconfirmed user: {email}")
-                    
-                    # Also cleanup any pending signup
                     cleanup_pending_signup(email)
                     return True
         return False
@@ -274,9 +221,6 @@ def cleanup_unconfirmed_user(email: str) -> bool:
         return False
 
 def check_user_status(email: str) -> dict:
-    """
-    Check the status of a user across all systems
-    """
     status = {
         "auth_user_exists": False,
         "auth_user_confirmed": False,
@@ -286,7 +230,6 @@ def check_user_status(email: str) -> dict:
     }
     
     try:
-        # Check auth users
         users_response = SRS.auth.admin.list_users()
         if users_response and users_response.users:
             for user in users_response.users:
@@ -296,16 +239,13 @@ def check_user_status(email: str) -> dict:
                         getattr(user, 'email_confirmed_at', None) or 
                         getattr(user, 'confirmed_at', None)
                     )
-                    # Check if user row exists
                     user_row = get_user_row(user.id)
                     status["user_row_exists"] = bool(user_row)
                     break
         
-        # Check pending signups
         pending = get_pending_signup(email)
         status["pending_signup_exists"] = bool(pending)
         
-        # Check invite status
         invite = SRS.table("invitees").select("claimed").eq("email", email).execute().data
         if invite:
             status["invite_claimed"] = invite[0]["claimed"]
@@ -315,27 +255,65 @@ def check_user_status(email: str) -> dict:
         logger.error(f"Failed to check user status: {str(e)}")
         return status
 
-def resend_confirmation_email(email: str) -> bool:
+def verify_otp(email: str, token: str) -> tuple[bool, str]:
+    """Verify OTP token and handle user creation"""
     try:
-        # Check if there's a pending signup
+        result = SB.auth.verify_otp({
+            "email": email,
+            "token": token,
+            "type": "signup"
+        })
+        
+        if result.user:
+            logger.info(f"OTP verified for: {email}")
+            
+            existing_user = get_user_row(result.user.id)
+            if not existing_user:
+                pending = get_pending_signup(email)
+                if pending:
+                    username = pending["username"]
+                    create_user_row(result.user.id, username)
+                    SRS.table("invitees").update({"claimed": True}).eq("email", email).execute()
+                    cleanup_pending_signup(email)
+                    return True, "Email verified! You can now sign in."
+                else:
+                    username = result.user.user_metadata.get("username", f"user_{result.user.id[:8]}")
+                    create_user_row(result.user.id, username)
+                    SRS.table("invitees").update({"claimed": True}).eq("email", email).execute()
+                    return True, "Email verified! You can now sign in."
+            else:
+                return True, "Email already verified! You can sign in."
+        else:
+            return False, "Invalid verification code."
+            
+    except Exception as e:
+        error_msg = str(e).lower()
+        logger.error(f"OTP verification error for {email}: {str(e)}")
+        
+        if "expired" in error_msg or "invalid" in error_msg:
+            return False, "Code expired or invalid. Please request a new one."
+        else:
+            return False, f"Verification failed: {str(e)}"
+
+def resend_otp(email: str) -> bool:
+    """Resend OTP code"""
+    try:
         pending = get_pending_signup(email)
         if not pending:
-            logger.warning(f"No pending signup found for resend: {email}")
+            logger.warning(f"No pending signup found for OTP resend: {email}")
             return False
         
-        # Try to resend confirmation
         SB.auth.resend(type="signup", email=email)
         
-        # Update the pending signup expiry
         SRS.table("pending_signups")\
            .update({"expires_at": (datetime.now(timezone.utc) + timedelta(hours=CONFIRMATION_EXPIRY_HOURS)).isoformat()})\
            .eq("email", email)\
            .execute()
         
-        logger.info(f"Resent confirmation email to: {email}")
+        logger.info(f"Resent OTP to: {email}")
         return True
     except Exception as e:
-        logger.error(f"Failed to resend confirmation email: {str(e)}")
+        logger.error(f"Failed to resend OTP: {str(e)}")
         return False
 
 def collection_set(user_id: str) -> set[str]:
@@ -353,7 +331,7 @@ def buy(user: dict, comp: dict):
                .execute().data
     if owned:
         return False, "Already owned"
-    # debit & record
+    
     SRS.table("users").update({"tokens": user["tokens"] - price})\
        .eq("id", user["id"]).execute()
     SRS.table("collection").insert({
@@ -386,13 +364,11 @@ if st.session_state.get("show_admin", False):
     st.sidebar.markdown("---")
     st.sidebar.subheader("🔧 Admin Tools")
     
-    # User status checker
     check_email = st.sidebar.text_input("Check user status:", key="admin_check_email")
     if st.sidebar.button("Check Status") and check_email:
         status = check_user_status(check_email)
         st.sidebar.json(status)
     
-    # Cleanup unconfirmed user
     cleanup_email = st.sidebar.text_input("Cleanup unconfirmed user:", key="admin_cleanup_email")
     if st.sidebar.button("⚠️ Cleanup User") and cleanup_email:
         if cleanup_unconfirmed_user(cleanup_email):
@@ -400,50 +376,70 @@ if st.session_state.get("show_admin", False):
         else:
             st.sidebar.error("❌ Cleanup failed")
     
-    # View pending signups
     if st.sidebar.button("View Pending Signups"):
         pending = SRS.table("pending_signups").select("*").execute().data
         st.sidebar.json(pending)
 
-# Clean up expired signups on app start
 cleanup_expired_signups()
 
 if st.sidebar.button("🧪 Test Email"):
     try:
-        # This tests if Supabase email is working
         SB.auth.reset_password_email("test@example.com")
         st.sidebar.success("Email system working!")
     except Exception as e:
         st.sidebar.error(f"Email system broken: {str(e)}")
 
-# ─────────────────── EMAIL RESEND INTERFACE ────────────────────────
-if st.session_state.get("show_resend", False):
-    st.warning("⏰ Your confirmation link has expired or failed.")
+# ─────────────────── OTP VERIFICATION INTERFACE ─────────────────────────
+if st.session_state.get("show_otp", False):
+    st.title("📧 Check Your Email!")
     
-    with st.expander("🔄 Resend Confirmation Email", expanded=True):
-        resend_email = st.text_input("Enter your email to resend confirmation:", key="resend_email")
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            if st.button("📧 Resend Email", key="resend_btn"):
-                if resend_email:
-                    if resend_confirmation_email(resend_email):
-                        st.success("✅ Confirmation email resent! Check your inbox.")
-                        st.session_state.show_resend = False
-                        st.rerun()
-                    else:
-                        st.error("❌ Failed to resend email. Please check the email address or contact support.")
+    email = st.session_state.get("otp_email", "")
+    st.success(f"✅ We sent a 6-digit code to **{email}**")
+    st.info("💡 Check your inbox and spam folder for the verification code")
+    
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        otp_code = st.text_input(
+            "Enter 6-digit code:", 
+            max_chars=6, 
+            key="otp_input",
+            placeholder="123456"
+        )
+    
+    with col2:
+        if st.button("Verify ✅", key="verify_otp"):
+            if otp_code and len(otp_code) == 6:
+                success, message = verify_otp(email, otp_code)
+                if success:
+                    st.success(f"🎉 {message}")
+                    st.session_state.show_otp = False
+                    st.session_state.otp_email = None
+                    time.sleep(2)
+                    st.rerun()
                 else:
-                    st.warning("Please enter your email address.")
-        
-        with col2:
-            if st.button("❌ Cancel", key="cancel_resend"):
-                st.session_state.show_resend = False
-                st.rerun()
+                    st.error(f"❌ {message}")
+            else:
+                st.warning("Please enter a 6-digit code.")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("📧 Resend Code", key="resend_otp"):
+            if resend_otp(email):
+                st.success("✅ New code sent!")
+            else:
+                st.error("❌ Failed to resend code. Please try again.")
+    
+    with col2:
+        if st.button("❌ Cancel", key="cancel_otp"):
+            st.session_state.show_otp = False
+            st.session_state.otp_email = None
+            cleanup_pending_signup(email)
+            st.rerun()
+    
+    st.stop()
 
 # ─────────────────── LOGIN / SIGN‑UP ───────────────────────────────
 if "user" not in st.session_state:
-    # Logo & tagline
     if Path(LOGO).is_file():
         st.image(LOGO, width=380)
         st.markdown(
@@ -459,7 +455,6 @@ if "user" not in st.session_state:
     if mode == "Sign up":
         uname = st.text_input("Choose a username", max_chars=20, key="login_uname")
         
-        # Show username availability check
         if uname:
             existing_user = SRS.table("users").select("username").eq("username", uname).execute().data
             pending_user = SRS.table("pending_signups").select("username").eq("username", uname).execute().data
@@ -472,12 +467,10 @@ if "user" not in st.session_state:
     pwd = st.text_input("Password", type="password", key="login_pwd")
 
     if st.button("Go ➜", key="login_go"):
-        # 1) Basic validation
         if not email or not pwd or (mode=="Sign up" and not uname):
             st.warning("Fill all required fields.")
             st.stop()
 
-        # 2) Must be on invite‑list
         try:
             invite = SRS.table("invitees")\
                         .select("claimed")\
@@ -492,23 +485,20 @@ if "user" not in st.session_state:
             st.error("❌ System error. Please try again.")
             st.stop()
 
-        # ─── SIGN UP ─────────────────────────────
+        # ─── SIGN UP WITH OTP ─────────────────────────────
         if mode == "Sign up":
-            # 1) ensure they haven't claimed yet
             if invite[0]["claimed"]:
                 st.error("🚫 This email has already been used.")
                 st.stop()
 
-            # 2) Check user status
             user_status = check_user_status(email)
             logger.info(f"User status for {email}: {user_status}")
             
-            # 3) If there's an unconfirmed auth user, clean it up
             if user_status["auth_user_exists"] and not user_status["auth_user_confirmed"]:
                 st.warning("🔄 Found previous unconfirmed signup. Cleaning up...")
                 if cleanup_unconfirmed_user(email):
                     st.success("✅ Cleaned up previous signup. Proceeding with new signup.")
-                    time.sleep(1)  # Give it a moment
+                    time.sleep(1)
                 else:
                     st.error("❌ Failed to cleanup previous signup. Please contact support.")
                     st.stop()
@@ -516,7 +506,6 @@ if "user" not in st.session_state:
                 st.error("🚫 This email is already registered and confirmed. Please sign in instead.")
                 st.stop()
 
-            # 4) Check username availability one more time
             existing_user = SRS.table("users").select("username").eq("username", uname).execute().data
             pending_user = SRS.table("pending_signups").select("username").eq("username", uname).execute().data
             
@@ -524,52 +513,30 @@ if "user" not in st.session_state:
                 st.error(f"❌ Username '{uname}' is already taken. Please choose another.")
                 st.stop()
 
-            # 5) Create pending signup record first
             if not create_pending_signup(email, uname):
                 st.error("❌ Failed to process signup. Please try again.")
                 st.stop()
 
-            # 6) call GoTrue sign_up with proper redirect URL
             try:
-                # Get the current app URL for redirect
-                streamlit_url = "https://ai-matchmaker-demo.streamlit.app/"  # Change this to your actual Streamlit URL
-                
                 res = SB.auth.sign_up({
                     "email": email, 
                     "password": pwd,
                     "options": {
-                        "data": {
-                            "username": uname  # Backup storage in user metadata
-                        },
-                        "emailRedirectTo": streamlit_url
+                        "data": {"username": uname}
                     }
                 })
-                user_obj = res.user
                 
-                if user_obj:
-                    # Update pending signup with auth_uid
+                if res.user:
                     SRS.table("pending_signups")\
-                       .update({"auth_uid": user_obj.id})\
+                       .update({"auth_uid": res.user.id})\
                        .eq("email", email)\
                        .execute()
                     
-                    logger.info(f"Signup initiated for: {email} with username: {uname}")
+                    logger.info(f"OTP signup initiated for: {email} with username: {uname}")
                     
-                    # 7) let the user know to check their inbox
-                    st.success("✅ Check your inbox for the confirmation link! You must confirm your email before you can sign in.")
-                    st.info("💡 After clicking the confirmation link, come back here and sign in with your credentials.")
-                    st.info("⏰ The confirmation link will expire in 24 hours.")
-                    
-                    # Show debug info in development
-                    with st.expander("🔧 Debug Info (Development Only)", expanded=False):
-                        st.json({
-                            "email": email,
-                            "auth_uid": user_obj.id,
-                            "signup_time": datetime.now().isoformat(),
-                            "status": "email_sent"
-                        })
-                    
-                    st.stop()
+                    st.session_state.show_otp = True
+                    st.session_state.otp_email = email
+                    st.rerun()
                 else:
                     cleanup_pending_signup(email)
                     st.error("❌ Failed to create account. Please try again.")
@@ -578,7 +545,7 @@ if "user" not in st.session_state:
             except Exception as e:
                 cleanup_pending_signup(email)
                 error_msg = str(e)
-                logger.error(f"Signup error for {email}: {error_msg}")
+                logger.error(f"OTP signup error for {email}: {error_msg}")
                 
                 if "already registered" in error_msg.lower():
                     st.error("🚫 This email is already registered. Please sign in instead.")
@@ -599,8 +566,9 @@ if "user" not in st.session_state:
             if "invalid_credentials" in error_msg.lower():
                 st.error("🚫 Invalid email or password.")
             elif "email_not_confirmed" in error_msg.lower():
-                st.error("📬 Please confirm your email before signing in. Check your inbox for the confirmation link.")
-                st.session_state.show_resend = True
+                st.error("📬 Please confirm your email before signing in. Check your inbox for the verification code.")
+                st.session_state.show_otp = True
+                st.session_state.otp_email = email
                 st.rerun()
             elif "too_many_requests" in error_msg.lower():
                 st.error("⏰ Too many login attempts. Please wait a few minutes and try again.")
@@ -611,14 +579,13 @@ if "user" not in st.session_state:
         sess      = resp.session
         user_meta = resp.user
 
-        # Check if email is confirmed
         if not getattr(user_meta, "email_confirmed_at", None) and not getattr(user_meta, "confirmed_at", None):
             logger.warning(f"Unconfirmed email sign-in attempt: {email}")
-            st.error("📬 Please confirm your email before continuing. Check your inbox for the confirmation link.")
-            st.session_state.show_resend = True
+            st.error("📬 Please confirm your email before continuing. Check your inbox for the verification code.")
+            st.session_state.show_otp = True
+            st.session_state.otp_email = email
             st.rerun()
 
-        # Check if user row exists (should exist after email confirmation)
         user = get_user_row(user_meta.id)
         if not user:
             logger.error(f"No user row found for confirmed user: {email}")
@@ -628,7 +595,6 @@ if "user" not in st.session_state:
         user = apply_daily_airdrop(user)
         logger.info(f"Successful sign-in for: {email}")
 
-        # bootstrap session
         st.session_state.user_jwt = sess.access_token
         SB.postgrest.headers["Authorization"] = f"Bearer {sess.access_token}"
         st.session_state.user     = user
@@ -639,6 +605,8 @@ if "user" not in st.session_state:
         st.session_state.chat_cid = None
         st.session_state.flash    = None
         st.session_state.show_resend = False
+        st.session_state.show_otp = False
+        st.session_state.otp_email = None
 
         raise RerunException()
 
@@ -647,7 +615,8 @@ if "user" not in st.session_state:
 # ─────────────────── ENSURE STATE KEYS ────────────────────────────
 for k,v in {
     "spent":0, "matches":[], "hist":{},
-    "page":"Find matches", "chat_cid":None, "flash":None, "show_resend":False
+    "page":"Find matches", "chat_cid":None, "flash":None, 
+    "show_resend":False, "show_otp":False, "otp_email":None
 }.items():
     st.session_state.setdefault(k, v)
 
