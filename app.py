@@ -30,14 +30,14 @@ if "user_jwt" in st.session_state:
 
 # ────────── EMAIL CONFIRMATION & ERROR HANDLING ─────────────
 params = st.query_params
-confirmation_type = params.get("type", [""])[0]
-error_code = params.get("error_code", [""])[0]
-error_description = params.get("error_description", [""])[0]
+confirmation_type = params.get("type", [""])[0] if "type" in params else ""
+error_code = params.get("error_code", [""])[0] if "error_code" in params else ""
+error_description = params.get("error_description", [""])[0] if "error_description" in params else ""
 
 # Handle email confirmation
 if confirmation_type == "signup":
-    access_token = params.get("access_token", [""])[0]
-    refresh_token = params.get("refresh_token", [""])[0]
+    access_token = params.get("access_token", [""])[0] if "access_token" in params else ""
+    refresh_token = params.get("refresh_token", [""])[0] if "refresh_token" in params else ""
     
     if error_code:
         # Handle confirmation errors (expired links, etc.)
@@ -53,12 +53,11 @@ if confirmation_type == "signup":
     elif access_token and refresh_token:
         try:
             # Set the session with the tokens from the URL
-            SB.auth.set_session(access_token, refresh_token)
+            session_response = SB.auth.set_session(access_token, refresh_token)
             
-            # Get user info
-            user_resp = SB.auth.get_user()
-            if user_resp and user_resp.user:
-                user_meta = user_resp.user
+            # Get user info from the session
+            if session_response and session_response.user:
+                user_meta = session_response.user
                 logger.info(f"Email confirmed for user: {user_meta.email}")
                 
                 # Check if this user already has a user row
@@ -95,8 +94,10 @@ if confirmation_type == "signup":
                 else:
                     st.info("✅ Your email is already confirmed. You can sign in below.")
                 
-                # Clear the URL parameters
-                st.query_params.clear()
+                # Clear the URL parameters to clean up the URL
+                if st.button("Continue to Sign In"):
+                    st.query_params.clear()
+                    st.rerun()
                 
             else:
                 logger.error("Failed to get user info during email confirmation")
@@ -106,6 +107,32 @@ if confirmation_type == "signup":
             st.error(f"❌ Email confirmation error: {str(e)}")
     else:
         st.error("❌ Invalid confirmation link.")
+        
+# Also check for fragment parameters (alternative method)
+elif st.query_params.get("access_token"):
+    # Handle the case where tokens come as query parameters instead of fragments
+    access_token = params.get("access_token", [""])[0] if "access_token" in params else ""
+    refresh_token = params.get("refresh_token", [""])[0] if "refresh_token" in params else ""
+    
+    if access_token and refresh_token:
+        try:
+            session_response = SB.auth.set_session(access_token, refresh_token)
+            if session_response and session_response.user:
+                user_meta = session_response.user
+                existing_user = get_user_row(user_meta.id)
+                if not existing_user:
+                    pending = get_pending_signup(user_meta.email)
+                    if pending:
+                        username = pending["username"]
+                        create_user_row(user_meta.id, username)
+                        SRS.table("invitees").update({"claimed": True}).eq("email", user_meta.email).execute()
+                        cleanup_pending_signup(user_meta.email)
+                st.success("✅ Your email has been confirmed! You can now sign in below.")
+                if st.button("Continue to Sign In"):
+                    st.query_params.clear()
+                    st.rerun()
+        except Exception as e:
+            st.error(f"❌ Email confirmation error: {str(e)}")
 
 # ─────────────────── STREAMLIT CONFIG ──────────────────────────────
 st.set_page_config(
@@ -382,15 +409,19 @@ if "user" not in st.session_state:
                 st.error("❌ Failed to process signup. Please try again.")
                 st.stop()
 
-            # 4) call GoTrue sign_up - DON'T create user row yet
+            # 4) call GoTrue sign_up with proper redirect URL - DON'T create user row yet
             try:
+                # Get the current app URL for redirect
+                streamlit_url = "https://ai-matchmaker-demo.streamlit.app/"  # Change this to your actual Streamlit URL
+                
                 res = SB.auth.sign_up({
                     "email": email, 
                     "password": pwd,
                     "options": {
                         "data": {
                             "username": uname  # Backup storage in user metadata
-                        }
+                        },
+                        "emailRedirectTo": streamlit_url
                     }
                 })
                 user_obj = res.user
