@@ -3,7 +3,6 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import streamlit as st
-from streamlit.runtime.scriptrunner import RerunException
 from openai import OpenAI, OpenAIError, RateLimitError
 from dotenv import load_dotenv
 from supabase import create_client
@@ -63,11 +62,11 @@ def profile_upsert(auth_uid: str, username: str) -> dict:
     else:
         try:
             user = tbl.insert({
-                        "id":       auth_uid,
-                        "auth_uid": auth_uid,
-                        "username": username,
-                        "tokens":   1000
-                    }).execute().data[0]
+                "id":       auth_uid,
+                "auth_uid": auth_uid,
+                "username": username,
+                "tokens":   1000
+            }).execute().data[0]
         except APIError as e:
             if "duplicate key" in str(e):
                 raise ValueError("username_taken")
@@ -77,11 +76,11 @@ def profile_upsert(auth_uid: str, username: str) -> dict:
     last = datetime.fromisoformat(last.replace("Z", "+00:00"))
     if datetime.now(timezone.utc) - last >= timedelta(hours=24):
         user = tbl.update({
-                    "tokens":       user["tokens"] + DAILY_AIRDROP,
-                    "last_airdrop": datetime.now(timezone.utc).isoformat()
-                })\
-                .eq("auth_uid", auth_uid)\
-                .execute().data[0]
+            "tokens":       user["tokens"] + DAILY_AIRDROP,
+            "last_airdrop": datetime.now(timezone.utc).isoformat()
+        })\
+        .eq("auth_uid", auth_uid)\
+        .execute().data[0]
     return user
 
 def collection_set(user_id: str) -> set[str]:
@@ -126,7 +125,7 @@ if "user" not in st.session_state:
         mode  = st.radio("Choose", ["Sign in","Sign up"], horizontal=True)
         uname = st.text_input("Username", max_chars=20)
         pwd   = st.text_input("Password", type="password")
-        go    = st.form_submit_button("Go ➜")
+        go    = st.form_submit_button("Go ➜")
 
     if not go:
         st.stop()
@@ -152,7 +151,6 @@ if "user" not in st.session_state:
              else getattr(sess, "access_token", None))
     if not token:
         st.error("Couldn’t find access token."); st.stop()
-
     st.session_state.user_jwt = token
     SB.postgrest.headers["Authorization"] = f"Bearer {token}"
 
@@ -169,7 +167,7 @@ if "user" not in st.session_state:
     st.session_state.chat_cid = None
     st.session_state.flash    = None
 
-    raise RerunException(rerun_data=None)
+    st.experimental_rerun()
 
 # ─────────────────── ENSURE STATE KEYS ────────────────────────────
 st.session_state.setdefault("spent",    0)
@@ -212,37 +210,26 @@ st.session_state.page = page
 
 # ─────────────────── FIND MATCHES ────────────────────────────────
 if page == "Find matches":
-    # show our flash banner immediately when you bond
     if st.session_state.flash:
         st.success(st.session_state.flash)
         st.session_state.flash = None
 
     st.image("assets/bondcosts.png", width=380)
 
-    hobby = st.selectbox("Pick a hobby",
-        ["space","foodie","gaming","music","art","sports","reading",
-         "travel","gardening","coding"])
-    trait = st.selectbox("Pick a trait",
-        ["curious","adventurous","night‑owl","chill","analytical",
-         "energetic","humorous","kind","bold","creative"])
-    vibe  = st.selectbox("Pick a vibe",
-        ["witty","caring","mysterious","romantic","sarcastic",
-         "intellectual","playful","stoic","optimistic","pragmatic"])
-    scene = st.selectbox("Pick a scene",
-        ["beach","forest","cafe","space‑station","cyberpunk‑city",
-         "medieval‑castle","mountain","underwater","neon‑disco",
-         "cozy‑library"])
+    hobby = st.selectbox("Pick a hobby",   ["space","foodie","gaming","music","art","sports","reading","travel","gardening","coding"])
+    trait = st.selectbox("Pick a trait",   ["curious","adventurous","night‑owl","chill","analytical","energetic","humorous","kind","bold","creative"])
+    vibe  = st.selectbox("Pick a vibe",    ["witty","caring","mysterious","romantic","sarcastic","intellectual","playful","stoic","optimistic","pragmatic"])
+    scene = st.selectbox("Pick a scene",   ["beach","forest","cafe","space‑station","cyberpunk‑city","medieval‑castle","mountain","underwater","neon‑disco","cozy‑library"])
 
     if st.button("Show matches"):
         st.session_state.matches = (
-           [c for c in COMPANIONS if all(tag in c["tags"]
-            for tag in (hobby, trait, vibe, scene))]
+           [c for c in COMPANIONS if all(tag in c["tags"] for tag in (hobby, trait, vibe, scene))]
            or random.sample(COMPANIONS, 5)
         )
 
     for c in st.session_state.matches:
         rarity, clr = c.get("rarity","Common"), CLR[c.get("rarity","Common")]
-        c1,c2,c3 = st.columns([1,5,2])
+        c1,c2,c3    = st.columns([1,5,2])
         c1.image(c.get("photo",PLACEHOLDER), width=90)
         c2.markdown(
           f"<span style='background:{clr};color:black;padding:2px 6px;"
@@ -257,18 +244,17 @@ if page == "Find matches":
             if c3.button("💬 Chat", key=f"chat-{c['id']}"):
                 st.session_state.page     = "Chat"
                 st.session_state.chat_cid = c["id"]
-                raise RerunException(rerun_data=None)
+                st.experimental_rerun()
         else:
             if c3.button("💖 Bond", key=f"bond-{c['id']}"):
                 ok, new = buy(user, c)
                 if ok:
-                    st.session_state.user  = new
+                    st.session_state.user = new
                     colset.add(c["id"])
-                    # set a flash so that “Bonded!” shows on this same screen
                     st.session_state.flash = f"Bonded with {c['name']}!"
                 else:
                     st.warning(new)
-                raise RerunException(rerun_data=None)
+                st.experimental_rerun()
 
 # ─────────────────── CHAT ────────────────────────────────────────
 elif page == "Chat":
@@ -279,14 +265,14 @@ elif page == "Chat":
     if not colset:
         st.info("Bond first!"); st.stop()
 
-    options = [CID2COMP[i]["name"] for i in colset]
+    opts = [CID2COMP[i]["name"] for i in colset]
     if st.session_state.chat_cid:
         default = CID2COMP[st.session_state.chat_cid]["name"]
-        sel = st.selectbox("Choose companion", options, index=options.index(default))
+        sel = st.selectbox("Choose companion", opts, index=opts.index(default))
     else:
-        sel = st.selectbox("Choose companion", options)
+        sel = st.selectbox("Choose companion", opts)
 
-    cid = next(k for k,v in CID2COMP.items() if v["name"] == sel)
+    cid = next(k for k,v in CID2COMP.items() if v["name"]==sel)
     st.session_state.chat_cid = cid
 
     if cid not in st.session_state.hist:
@@ -296,8 +282,7 @@ elif page == "Chat":
                   .eq("companion_id", cid)
                   .order("created_at")
                   .execute().data)
-        base = [{"role":"system","content":
-                 f"You are {CID2COMP[cid]['name']}. {CID2COMP[cid]['bio']} Speak PG‑13."}]
+        base = [{"role":"system","content": f"You are {CID2COMP[cid]['name']}. {CID2COMP[cid]['bio']} Speak PG‑13."}]
         st.session_state.hist[cid] = base + [{"role":r["role"],"content":r["content"]} for r in rows]
 
     hist = st.session_state.hist[cid]
@@ -322,14 +307,11 @@ elif page == "Chat":
     if ui:
         hist.append({"role":"user","content":ui})
         try:
-            resp = OA.chat.completions.create(model="gpt-4o-mini",
-                                              messages=hist,
-                                              max_tokens=120)
+            resp  = OA.chat.completions.create(model="gpt-4o-mini", messages=hist, max_tokens=120)
             reply = resp.choices[0].message.content
             st.session_state.spent += resp.usage.prompt_tokens + resp.usage.completion_tokens
             hist.append({"role":"assistant","content":reply})
             st.chat_message("assistant").write(reply)
-
             SRS.table("messages").insert({
                 "user_id":      user["id"],
                 "companion_id": cid,
@@ -354,11 +336,11 @@ elif page == "My Collection":
     if not colset:
         st.info("No Bonds yet.")
     for cid in sorted(colset):
-        c   = CID2COMP[cid]
-        rar = c.get("rarity","Common"); clr = CLR[rar]
-        col1, col2 = st.columns([1,5])
-        col1.image(c.get("photo",PLACEHOLDER), width=80)
-        col2.markdown(
+        c = CID2COMP[cid]
+        rar,clr = c.get("rarity","Common"), CLR[c.get("rarity","Common")]
+        a,b = st.columns([1,5])
+        a.image(c.get("photo",PLACEHOLDER), width=80)
+        b.markdown(
           f"<span style='background:{clr};color:black;padding:2px 6px;"
           f"border-radius:4px;font-size:0.75rem'>{rar}</span> "
           f"**{c['name']}**  \n"
