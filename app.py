@@ -1,4 +1,4 @@
-import os, json, random
+import os, json, random, logging
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -9,6 +9,17 @@ from dotenv import load_dotenv
 from supabase import create_client
 from postgrest.exceptions import APIError
 
+# ─────────────────── LOGGING SETUP ─────────────────────────────────
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('bondigo_auth.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
 # ─────────────────── ENVIRONMENT & CLIENTS ─────────────────────────
 load_dotenv()
 SB  = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
@@ -17,10 +28,84 @@ OA  = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 if "user_jwt" in st.session_state:
     SB.postgrest.headers["Authorization"] = f"Bearer {st.session_state.user_jwt}"
 
-# ────────── OPTIONAL EMAIL‑CONFIRM BANNER ─────────────
+# ────────── EMAIL CONFIRMATION & ERROR HANDLING ─────────────
 params = st.query_params
-if params.get("type", [""])[0] == "signup":
-    st.success("✅ Your email has been confirmed! Please sign in below.")
+confirmation_type = params.get("type", [""])[0]
+error_code = params.get("error_code", [""])[0]
+error_description = params.get("error_description", [""])[0]
+
+# Handle email confirmation
+if confirmation_type == "signup":
+    access_token = params.get("access_token", [""])[0]
+    refresh_token = params.get("refresh_token", [""])[0]
+    
+    if error_code:
+        # Handle confirmation errors (expired links, etc.)
+        logger.error(f"Email confirmation error: {error_code} - {error_description}")
+        if error_code == "signup_disabled":
+            st.error("🚫 Account signup is currently disabled.")
+        elif "expired" in error_description.lower():
+            st.error("⏰ Your confirmation link has expired. Please request a new one below.")
+            st.session_state.show_resend = True
+        else:
+            st.error(f"❌ Email confirmation failed: {error_description}")
+            st.session_state.show_resend = True
+    elif access_token and refresh_token:
+        try:
+            # Set the session with the tokens from the URL
+            SB.auth.set_session(access_token, refresh_token)
+            
+            # Get user info
+            user_resp = SB.auth.get_user()
+            if user_resp and user_resp.user:
+                user_meta = user_resp.user
+                logger.info(f"Email confirmed for user: {user_meta.email}")
+                
+                # Check if this user already has a user row
+                existing_user = get_user_row(user_meta.id)
+                if not existing_user:
+                    # Look for pending signup
+                    pending = get_pending_signup(user_meta.email)
+                    if pending:
+                        username = pending["username"]
+                        logger.info(f"Creating user row for confirmed user: {user_meta.email} with username: {username}")
+                        
+                        # Create the user row now that email is confirmed
+                        create_user_row(user_meta.id, username)
+                        
+                        # Mark invite as claimed
+                        SRS.table("invitees")\
+                           .update({"claimed": True})\
+                           .eq("email", user_meta.email)\
+                           .execute()
+                        
+                        # Clean up pending signup
+                        cleanup_pending_signup(user_meta.email)
+                        
+                        st.success("✅ Your email has been confirmed! You can now sign in below.")
+                    else:
+                        # Fallback to user metadata if pending signup not found
+                        username = user_meta.user_metadata.get("username", f"user_{user_meta.id[:8]}")
+                        create_user_row(user_meta.id, username)
+                        SRS.table("invitees")\
+                           .update({"claimed": True})\
+                           .eq("email", user_meta.email)\
+                           .execute()
+                        st.success("✅ Your email has been confirmed! You can now sign in below.")
+                else:
+                    st.info("✅ Your email is already confirmed. You can sign in below.")
+                
+                # Clear the URL parameters
+                st.query_params.clear()
+                
+            else:
+                logger.error("Failed to get user info during email confirmation")
+                st.error("❌ Failed to confirm email. Please try again.")
+        except Exception as e:
+            logger.error(f"Email confirmation error: {str(e)}")
+            st.error(f"❌ Email confirmation error: {str(e)}")
+    else:
+        st.error("❌ Invalid confirmation link.")
 
 # ─────────────────── STREAMLIT CONFIG ──────────────────────────────
 st.set_page_config(
@@ -39,10 +124,11 @@ st.markdown("""<style>
 MAX_TOKENS    = 10_000
 DAILY_AIRDROP = 150
 COST          = {"Common":50,"Rare":200,"Legendary":700}
+CONFIRMATION_EXPIRY_HOURS = 24
 
 PLACEHOLDER = "assets/placeholder.png"
 LOGO        = "assets/bondigo_banner.png"
-TAGLINE     = "Talk the Lingo · Master the Bond · Dominate the Game"
+TAGLINE     = "Talk the Lingo · Master the Bond · Dominate the Game"
 CLR         = {"Common":"#bbb","Rare":"#57C7FF","Legendary":"#FFAA33"}
 
 # ─── load your companions.json from the same folder ───────────────
@@ -62,18 +148,100 @@ def apply_daily_airdrop(user: dict) -> dict:
     return user
 
 def create_user_row(auth_uid: str, username: str) -> dict:
-    return SRS.table("users").insert({
-        "id": auth_uid,
-        "auth_uid": auth_uid,
-        "username": username,
-        "tokens": 1000,
-        "last_airdrop": None
-    }).execute().data[0]
+    try:
+        result = SRS.table("users").insert({
+            "id": auth_uid,
+            "auth_uid": auth_uid,
+            "username": username,
+            "tokens": 1000,
+            "last_airdrop": None
+        }).execute()
+        logger.info(f"Created user row for: {auth_uid} with username: {username}")
+        return result.data[0]
+    except Exception as e:
+        logger.error(f"Failed to create user row: {str(e)}")
+        raise
 
 def get_user_row(auth_uid: str) -> dict | None:
-    rows = SRS.table("users").select("*")\
-              .eq("auth_uid", auth_uid).execute().data
-    return rows[0] if rows else None
+    try:
+        rows = SRS.table("users").select("*")\
+                  .eq("auth_uid", auth_uid).execute().data
+        return rows[0] if rows else None
+    except Exception as e:
+        logger.error(f"Failed to get user row: {str(e)}")
+        return None
+
+def create_pending_signup(email: str, username: str, auth_uid: str = None) -> bool:
+    try:
+        # Clean up any existing pending signups for this email first
+        cleanup_pending_signup(email)
+        
+        SRS.table("pending_signups").insert({
+            "email": email,
+            "username": username,
+            "auth_uid": auth_uid,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "expires_at": (datetime.now(timezone.utc) + timedelta(hours=CONFIRMATION_EXPIRY_HOURS)).isoformat()
+        }).execute()
+        logger.info(f"Created pending signup for: {email} with username: {username}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to create pending signup: {str(e)}")
+        return False
+
+def get_pending_signup(email: str) -> dict | None:
+    try:
+        rows = SRS.table("pending_signups").select("*")\
+                  .eq("email", email)\
+                  .gte("expires_at", datetime.now(timezone.utc).isoformat())\
+                  .order("created_at", desc=True)\
+                  .limit(1)\
+                  .execute().data
+        return rows[0] if rows else None
+    except Exception as e:
+        logger.error(f"Failed to get pending signup: {str(e)}")
+        return None
+
+def cleanup_pending_signup(email: str):
+    try:
+        SRS.table("pending_signups").delete().eq("email", email).execute()
+        logger.info(f"Cleaned up pending signup for: {email}")
+    except Exception as e:
+        logger.error(f"Failed to cleanup pending signup: {str(e)}")
+
+def cleanup_expired_signups():
+    try:
+        expired_count = SRS.table("pending_signups")\
+                           .delete()\
+                           .lt("expires_at", datetime.now(timezone.utc).isoformat())\
+                           .execute()
+        if expired_count.data:
+            logger.info(f"Cleaned up {len(expired_count.data)} expired pending signups")
+    except Exception as e:
+        logger.error(f"Failed to cleanup expired signups: {str(e)}")
+
+def resend_confirmation_email(email: str) -> bool:
+    try:
+        # Check if there's a pending signup
+        pending = get_pending_signup(email)
+        if not pending:
+            logger.warning(f"No pending signup found for resend: {email}")
+            return False
+        
+        # Try to resend confirmation
+        SB.auth.resend(type="signup", email=email)
+        
+        # Update the pending signup expiry
+        SRS.table("pending_signups")\
+           .update({"expires_at": (datetime.now(timezone.utc) + timedelta(hours=CONFIRMATION_EXPIRY_HOURS)).isoformat()})\
+           .eq("email", email)\
+           .execute()
+        
+        logger.info(f"Resent confirmation email to: {email}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to resend confirmation email: {str(e)}")
+        return False
 
 def collection_set(user_id: str) -> set[str]:
     rows = SRS.table("collection").select("companion_id")\
@@ -83,7 +251,7 @@ def collection_set(user_id: str) -> set[str]:
 def buy(user: dict, comp: dict):
     price = COST[comp.get("rarity","Common")]
     if price > user["tokens"]:
-        return False, "Not enough 💎"
+        return False, "Not enough 💎"
     owned = SRS.table("collection").select("companion_id")\
                .eq("user_id", user["id"])\
                .eq("companion_id", comp["id"])\
@@ -107,13 +275,41 @@ def bond_and_chat(cid: str, comp: dict):
         st.session_state.user     = new_user
         st.session_state.page     = "Chat"
         st.session_state.chat_cid = cid
-        st.session_state.flash    = f"Bonded with {comp['name']}!"
+        st.session_state.flash    = f"Bonded with {comp['name']}!"
     else:
         st.warning(new_user)
 
 def goto_chat(cid: str):
     st.session_state.page     = "Chat"
     st.session_state.chat_cid = cid
+
+# Clean up expired signups on app start
+cleanup_expired_signups()
+
+# ─────────────────── EMAIL RESEND INTERFACE ────────────────────────
+if st.session_state.get("show_resend", False):
+    st.warning("⏰ Your confirmation link has expired or failed.")
+    
+    with st.expander("🔄 Resend Confirmation Email", expanded=True):
+        resend_email = st.text_input("Enter your email to resend confirmation:", key="resend_email")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("📧 Resend Email", key="resend_btn"):
+                if resend_email:
+                    if resend_confirmation_email(resend_email):
+                        st.success("✅ Confirmation email resent! Check your inbox.")
+                        st.session_state.show_resend = False
+                        st.rerun()
+                    else:
+                        st.error("❌ Failed to resend email. Please check the email address or contact support.")
+                else:
+                    st.warning("Please enter your email address.")
+        
+        with col2:
+            if st.button("❌ Cancel", key="cancel_resend"):
+                st.session_state.show_resend = False
+                st.rerun()
 
 # ─────────────────── LOGIN / SIGN‑UP ───────────────────────────────
 if "user" not in st.session_state:
@@ -126,27 +322,44 @@ if "user" not in st.session_state:
             unsafe_allow_html=True,
         )
 
-    st.title("🔐 Sign in / Sign up to **BONDIGO**")
+    st.title("🔐 Sign in / Sign up to **BONDIGO**")
 
     email = st.text_input("Email", key="login_email")
     mode  = st.radio("Choose", ["Sign in","Sign up"], horizontal=True, key="login_mode")
     if mode == "Sign up":
         uname = st.text_input("Choose a username", max_chars=20, key="login_uname")
+        
+        # Show username availability check
+        if uname:
+            existing_user = SRS.table("users").select("username").eq("username", uname).execute().data
+            pending_user = SRS.table("pending_signups").select("username").eq("username", uname).execute().data
+            
+            if existing_user or pending_user:
+                st.error(f"❌ Username '{uname}' is already taken. Please choose another.")
+            else:
+                st.success(f"✅ Username '{uname}' is available!")
+    
     pwd = st.text_input("Password", type="password", key="login_pwd")
 
-    if st.button("Go ➜", key="login_go"):
+    if st.button("Go ➜", key="login_go"):
         # 1) Basic validation
         if not email or not pwd or (mode=="Sign up" and not uname):
             st.warning("Fill all required fields.")
             st.stop()
 
         # 2) Must be on invite‑list
-        invite = SRS.table("invitees")\
-                    .select("claimed")\
-                    .eq("email", email)\
-                    .execute().data
-        if not invite:
-            st.error("🚧 You’re not on the invite list.")
+        try:
+            invite = SRS.table("invitees")\
+                        .select("claimed")\
+                        .eq("email", email)\
+                        .execute().data
+            if not invite:
+                logger.warning(f"Unauthorized signup attempt: {email}")
+                st.error("🚧 You're not on the invite list.")
+                st.stop()
+        except Exception as e:
+            logger.error(f"Failed to check invite list: {str(e)}")
+            st.error("❌ System error. Please try again.")
             st.stop()
 
         # ─── SIGN UP ─────────────────────────────
@@ -156,46 +369,103 @@ if "user" not in st.session_state:
                 st.error("🚫 This email has already been used.")
                 st.stop()
 
-            # 2) call GoTrue sign_up and catch any failure
-            try:
-                res = SB.auth.sign_up({"email": email, "password": pwd})
-                user_obj = res.user
-            except Exception as e:
-                st.error(f"Sign-up error: {e}")
+            # 2) Check username availability one more time
+            existing_user = SRS.table("users").select("username").eq("username", uname).execute().data
+            pending_user = SRS.table("pending_signups").select("username").eq("username", uname).execute().data
+            
+            if existing_user or pending_user:
+                st.error(f"❌ Username '{uname}' is already taken. Please choose another.")
                 st.stop()
 
-            # 3) persist your own user-row right away
-            create_user_row(user_obj.id, uname)
+            # 3) Create pending signup record first
+            if not create_pending_signup(email, uname):
+                st.error("❌ Failed to process signup. Please try again.")
+                st.stop()
 
-            # 4) mark invite as claimed
-            SRS.table("invitees")\
-               .update({"claimed": True})\
-               .eq("email", email)\
-               .execute()
-
-            # 5) let the user know to check their inbox
-            st.success("✅ Check your inbox for the confirmation link!")
-            st.stop()
-
+            # 4) call GoTrue sign_up - DON'T create user row yet
+            try:
+                res = SB.auth.sign_up({
+                    "email": email, 
+                    "password": pwd,
+                    "options": {
+                        "data": {
+                            "username": uname  # Backup storage in user metadata
+                        }
+                    }
+                })
+                user_obj = res.user
+                
+                if user_obj:
+                    # Update pending signup with auth_uid
+                    SRS.table("pending_signups")\
+                       .update({"auth_uid": user_obj.id})\
+                       .eq("email", email)\
+                       .execute()
+                    
+                    logger.info(f"Signup initiated for: {email} with username: {uname}")
+                    
+                    # 5) let the user know to check their inbox
+                    st.success("✅ Check your inbox for the confirmation link! You must confirm your email before you can sign in.")
+                    st.info("💡 After clicking the confirmation link, come back here and sign in with your credentials.")
+                    st.info("⏰ The confirmation link will expire in 24 hours.")
+                    st.stop()
+                else:
+                    cleanup_pending_signup(email)
+                    st.error("❌ Failed to create account. Please try again.")
+                    st.stop()
+                    
+            except Exception as e:
+                cleanup_pending_signup(email)
+                error_msg = str(e)
+                logger.error(f"Signup error for {email}: {error_msg}")
+                
+                if "already registered" in error_msg.lower():
+                    st.error("🚫 This email is already registered. Please sign in instead.")
+                elif "weak password" in error_msg.lower():
+                    st.error("🔒 Password too weak. Please use a stronger password.")
+                else:
+                    st.error(f"❌ Sign-up error: {error_msg}")
+                st.stop()
 
         # ─── SIGN IN ─────────────────────────────
         try:
+            logger.info(f"Sign-in attempt for: {email}")
             resp = SB.auth.sign_in_with_password({"email": email, "password": pwd})
         except Exception as e:
-            st.error(f"Sign‑in error: {e}")
+            error_msg = str(e)
+            logger.warning(f"Sign-in failed for {email}: {error_msg}")
+            
+            if "invalid_credentials" in error_msg.lower():
+                st.error("🚫 Invalid email or password.")
+            elif "email_not_confirmed" in error_msg.lower():
+                st.error("📬 Please confirm your email before signing in. Check your inbox for the confirmation link.")
+                st.session_state.show_resend = True
+                st.rerun()
+            elif "too_many_requests" in error_msg.lower():
+                st.error("⏰ Too many login attempts. Please wait a few minutes and try again.")
+            else:
+                st.error(f"❌ Sign‑in error: {error_msg}")
             st.stop()
+            
         sess      = resp.session
         user_meta = resp.user
 
-        if not getattr(user_meta, "confirmed_at", None):
-            st.error("📬 Please confirm your email before continuing.")
-            st.stop()
+        # Check if email is confirmed
+        if not getattr(user_meta, "email_confirmed_at", None) and not getattr(user_meta, "confirmed_at", None):
+            logger.warning(f"Unconfirmed email sign-in attempt: {email}")
+            st.error("📬 Please confirm your email before continuing. Check your inbox for the confirmation link.")
+            st.session_state.show_resend = True
+            st.rerun()
 
+        # Check if user row exists (should exist after email confirmation)
         user = get_user_row(user_meta.id)
         if not user:
-            st.error("❌ No account found. Please Sign up first.")
+            logger.error(f"No user row found for confirmed user: {email}")
+            st.error("❌ Account setup incomplete. Please contact support.")
             st.stop()
+            
         user = apply_daily_airdrop(user)
+        logger.info(f"Successful sign-in for: {email}")
 
         # bootstrap session
         st.session_state.user_jwt = sess.access_token
@@ -207,6 +477,7 @@ if "user" not in st.session_state:
         st.session_state.page     = "Find matches"
         st.session_state.chat_cid = None
         st.session_state.flash    = None
+        st.session_state.show_resend = False
 
         raise RerunException()
 
@@ -215,7 +486,7 @@ if "user" not in st.session_state:
 # ─────────────────── ENSURE STATE KEYS ────────────────────────────
 for k,v in {
     "spent":0, "matches":[], "hist":{},
-    "page":"Find matches", "chat_cid":None, "flash":None
+    "page":"Find matches", "chat_cid":None, "flash":None, "show_resend":False
 }.items():
     st.session_state.setdefault(k, v)
 
@@ -233,9 +504,9 @@ if Path(LOGO).is_file():
 st.markdown(
     f"<span style='background:#f93656;padding:6px 12px;border-radius:8px;display:inline-block;"
     f"font-size:1.25rem;color:#000;font-weight:600;margin-right:8px;'>"
-    f"{user['username']}'s Wallet</span>"
+    f"{user['username']}'s Wallet</span>"
     f"<span style='background:#000;color:#57C784;padding:6px 12px;border-radius:8px;"
-    f"display:inline-block;font-size:1.25rem;'>{user['tokens']} 💎</span>",
+    f"display:inline-block;font-size:1.25rem;'>{user['tokens']} 💎</span>",
     unsafe_allow_html=True,
 )
 
@@ -275,15 +546,15 @@ if page == "Find matches":
         c2.markdown(
           f"<span style='background:{clr};color:black;padding:2px 6px;"
           f"border-radius:4px;font-size:0.75rem'>{rarity}</span> "
-          f"**{c['name']}** • {COST[rarity]} 💎  \n"
+          f"**{c['name']}** • {COST[rarity]} 💎  \n"
           f"<span class='match-bio'>{c['bio']}</span>",
           unsafe_allow_html=True,
         )
         if c["id"] in colset:
-            c3.button("💬 Chat", key=f"chat-{c['id']}",
+            c3.button("💬 Chat", key=f"chat-{c['id']}",
                       on_click=goto_chat, args=(c["id"],))
         else:
-            c3.button("💖 Bond", key=f"bond-{c['id']}",
+            c3.button("💖 Bond", key=f"bond-{c['id']}",
                       on_click=bond_and_chat, args=(c["id"],c))
 
 # ─────────────────── CHAT ────────────────────────────────────────
