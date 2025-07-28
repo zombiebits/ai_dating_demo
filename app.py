@@ -11,13 +11,13 @@ from postgrest.exceptions import APIError
 
 # ─────────────────── ENVIRONMENT & CLIENTS ─────────────────────────
 load_dotenv()
-SB  = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
-SRS = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_KEY"])
+SB  = create_client(os.environ["SUPABASE_URL"],   os.environ["SUPABASE_KEY"])
+SRS = create_client(os.environ["SUPABASE_URL"],   os.environ["SUPABASE_SERVICE_KEY"])
 OA  = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 if "user_jwt" in st.session_state:
     SB.postgrest.headers["Authorization"] = f"Bearer {st.session_state.user_jwt}"
 
-# ────────── OPTIONAL CONFIRM BANNER ─────────────
+# ────────── OPTIONAL EMAIL‑CONFIRM BANNER ─────────────
 params = st.query_params
 if params.get("confirmed", [""])[0] == "true":
     st.success("✅ Your email has been confirmed! Please sign in below.")
@@ -52,33 +52,28 @@ CID2COMP   = {c["id"]: c for c in COMPANIONS}
 
 # ─────────────────── HELPERS ───────────────────────────────────────
 def profile_upsert(auth_uid: str, username: str) -> dict:
+    """Fetch user; if first time, award initial tokens & possibly daily airdrop."""
     tbl = SRS.table("users")
     rows = tbl.select("*").eq("auth_uid", auth_uid).execute().data
     if rows:
         user = rows[0]
-        if user["username"] != username:
-            try:
-                user = tbl.update({"username": username})\
-                          .eq("auth_uid", auth_uid)\
-                          .execute().data[0]
-            except APIError:
-                pass
+        # daily airdrop check
+        last = user["last_airdrop"] or user["created_at"]
+        last = datetime.fromisoformat(last.replace("Z","+00:00"))
+        if datetime.now(timezone.utc) - last >= timedelta(hours=24):
+            user = tbl.update({
+                "tokens":       user["tokens"] + DAILY_AIRDROP,
+                "last_airdrop": datetime.now(timezone.utc).isoformat()
+            }).eq("auth_uid", auth_uid).execute().data[0]
     else:
+        # first‑time signup insertion
         user = tbl.insert({
-            "id":       auth_uid,
-            "auth_uid": auth_uid,
-            "username": username,
-            "tokens":   1000
+            "id":          auth_uid,
+            "auth_uid":    auth_uid,
+            "username":    username,
+            "tokens":      1000,
+            "last_airdrop": None
         }).execute().data[0]
-
-    # daily airdrop logic
-    last = user["last_airdrop"] or user["created_at"]
-    last = datetime.fromisoformat(last.replace("Z", "+00:00"))
-    if datetime.now(timezone.utc) - last >= timedelta(hours=24):
-        user = tbl.update({
-            "tokens":       user["tokens"] + DAILY_AIRDROP,
-            "last_airdrop": datetime.now(timezone.utc).isoformat()
-        }).eq("auth_uid", auth_uid).execute().data[0]
     return user
 
 def collection_set(user_id: str) -> set[str]:
@@ -99,6 +94,7 @@ def buy(user: dict, comp: dict):
               .execute().data
     if owned:
         return False, "Already owned"
+    # debit tokens & record ownership
     SRS.table("users").update({"tokens": user["tokens"] - price})\
        .eq("id", user["id"]).execute()
     SRS.table("collection").insert({
@@ -124,12 +120,12 @@ def goto_chat(cid: str):
 
 # ─────────────────── LOGIN / SIGN‑UP ───────────────────────────────
 if "user" not in st.session_state:
-     # Logo & tagline
+    # Logo & tagline
     if Path(LOGO).is_file():
         st.image(LOGO, width=380)
         st.markdown(
-            f"<p style='text-align:center;margin-top:-2px;font-size:1.05rem;"
-            f"color:#FFC8D8'>{TAGLINE}</p>",
+            f"<p style='text-align:center;margin-top:-2px;"
+            f"font-size:1.05rem;color:#FFC8D8'>{TAGLINE}</p>",
             unsafe_allow_html=True,
         )
 
@@ -141,12 +137,12 @@ if "user" not in st.session_state:
     pwd   = st.text_input("Password", type="password", key="login_pwd")
 
     if st.button("Go ➜", key="login_go"):
-        # 1) basic validation
+        # — Basic form validation —
         if not email or not uname or not pwd:
             st.warning("Fill all fields: email, username, and password.")
             st.stop()
 
-        # 2) lookup invitee
+        # — Lookup the invitee row —
         invite = (
             SRS.table("invitees")
                .select("email","claimed")
@@ -158,42 +154,71 @@ if "user" not in st.session_state:
             st.error("🚧 You’re not on the invite list.")
             st.stop()
 
-        # ── SIGN UP ───────────────────────────────
+        # ─── SIGN UP FLOW ─────────────────────
         if mode == "Sign up":
-            # if they've already used this invite to register, block
+            # block if already claimed
             if invite[0].get("claimed"):
                 st.error("🚫 This email has already been used.")
                 st.stop()
 
             try:
+                # create auth user & send confirmation email
                 SB.auth.sign_up({"email": email, "password": pwd})
-                # mark the invite as claimed
+
+                # record the user in your `users` table *now*,
+                # so that sign-in can later fetch them
+                user = profile_upsert(
+                    auth_uid=SB.auth.get_user(SB.auth.session.access_token).user.id,
+                    username=uname
+                )
+
+                # mark invite claimed
                 SRS.table("invitees")\
                    .update({"claimed": True})\
                    .eq("email", email)\
                    .execute()
+
                 st.success("✅ Check your inbox for the confirmation link!")
             except Exception as e:
                 st.error(f"Sign‑up error: {e}")
             st.stop()
 
-        # ── SIGN IN ───────────────────────────────
+        # ─── SIGN IN FLOW ─────────────────────
         try:
             sess = SB.auth.sign_in_with_password({"email": email, "password": pwd})
         except Exception as e:
             st.error(f"Sign‑in error: {e}")
             st.stop()
 
+        # ensure they clicked confirm
         user_meta = SB.auth.get_user(sess.session.access_token).user
-        if not user_meta.confirmed_at:
+        if not getattr(user_meta, "confirmed_at", None):
             st.error("📬 Please confirm your email before continuing.")
             st.stop()
 
-        # on success, bootstrap session…
+        # ensure they actually signed up (row exists)
+        rows = SRS.table("users")\
+                  .select("*")\
+                  .eq("auth_uid", user_meta.id)\
+                  .execute().data
+        if not rows:
+            st.error("❌ No account found. Please Sign up first.")
+            st.stop()
+
+        # ensure username matches
+        stored = rows[0]
+        if stored["username"] != uname:
+            st.error("❌ Username does not match your account.")
+            st.stop()
+
+        # award daily airdrop if due, grab fresh user
+        user = profile_upsert(user_meta.id, uname)
+
+        # set your session state
         token = sess.session.access_token
         st.session_state.user_jwt = token
         SB.postgrest.headers["Authorization"] = f"Bearer {token}"
-        st.session_state.user = profile_upsert(user_meta.id, uname)
+        st.session_state.user     = user
         st.session_state.spent    = 0
         st.session_state.matches  = []
         st.session_state.hist     = {}
@@ -201,8 +226,10 @@ if "user" not in st.session_state:
         st.session_state.chat_cid = None
         st.session_state.flash    = None
 
+        # finally, rerun into your main app
         raise RerunException(rerun_data=None)
 
+    # before any click, nothing else runs
     st.stop()
 
 # ─────────────────── ENSURE STATE KEYS ────────────────────────────
@@ -215,17 +242,12 @@ for k,v in {
 user   = st.session_state.user
 colset = collection_set(user["id"])
 
-# ─────────────────── HEADER & NAVIGATION & PAGES ─────────────────
-# (rest of your Find matches / Chat / My Collection logic here,
-#  unchanged from before)
-
-
-# ─────────────────── HEADER & BADGES ─────────────────────────────
+# ─────────────────── HEADER & NAVIGATION ─────────────────────────
 if Path(LOGO).is_file():
     st.image(LOGO, width=380)
     st.markdown(
-        f"<p style='text-align:center;margin-top:-2px;font-size:1.05rem;"
-        f"color:#FFC8D8'>{TAGLINE}</p>",
+        f"<p style='text-align:center;margin-top:-2px;"
+        f"font-size:1.05rem;color:#FFC8D8'>{TAGLINE}</p>",
         unsafe_allow_html=True,
     )
 
@@ -239,10 +261,12 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ─────────────────── IN‑PAGE NAVIGATION ──────────────────────────
 page = st.radio(
-    "", ["Find matches","Chat","My Collection"], key="page", horizontal=True
+    "", ["Find matches","Chat","My Collection"],
+    index=["Find matches","Chat","My Collection"].index(st.session_state.page),
+    key="page", horizontal=True
 )
+st.session_state.page = page
 
 # ─────────────────── FIND MATCHES ────────────────────────────────
 if page == "Find matches":
