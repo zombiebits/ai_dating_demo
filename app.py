@@ -125,7 +125,9 @@ def goto_chat(cid: str):
     st.session_state.chat_cid = cid
 
 # ─────────────────── LOGIN / SIGN‑UP ───────────────────────────────
+
 if "user" not in st.session_state:
+    # logo + tagline
     if Path(LOGO).is_file():
         st.image(LOGO, width=380)
         st.markdown(
@@ -135,50 +137,75 @@ if "user" not in st.session_state:
         )
 
     st.title("🔐 Sign in / Sign up to **BONDIGO**")
+
+    # —––– everything happens in here on one click
     with st.form("login_form"):
         mode = st.radio("Choose", ["Sign in","Sign up"], horizontal=True)
         uname = st.text_input("Username", max_chars=20)
         pwd   = st.text_input("Password", type="password")
         go    = st.form_submit_button("Go ➜")
-    if not go:
-        st.stop()
-    if not uname or not pwd:
-        st.warning("Fill both fields."); st.stop()
 
-    if mode == "Sign up":
-        conflict = SRS.table("users").select("id")\
-                      .eq("username", uname).execute().data
-        if conflict:
-            st.error("That username’s taken."); st.stop()
+        if go:
+            # validate
+            if not uname or not pwd:
+                st.warning("Fill both fields.")
+            else:
+                # check signup collision
+                if mode == "Sign up":
+                    conflict = (
+                        SRS.table("users")
+                           .select("id")
+                           .eq("username", uname)
+                           .execute()
+                           .data
+                    )
+                    if conflict:
+                        st.error("That username’s taken.")
+                        st.stop()
 
-    email = f"{uname.lower()}@bondigo.local"
-    try:
-        if mode == "Sign up":
-            SB.auth.sign_up({"email":email,"password":pwd})
-        sess = SB.auth.sign_in_with_password({"email":email,"password":pwd})
-    except Exception as e:
-        st.error(f"Auth error: {e}"); st.stop()
+                email = f"{uname.lower()}@bondigo.local"
+                try:
+                    if mode == "Sign up":
+                        SB.auth.sign_up({"email":email,"password":pwd})
+                    sess = SB.auth.sign_in_with_password({"email":email,"password":pwd})
+                except Exception as e:
+                    st.error(f"Auth error: {e}")
+                    st.stop()
 
-    token = getattr(sess.session, "access_token", None) if hasattr(sess, "session") else getattr(sess, "access_token", None)
-    if not token:
-        st.error("Couldn’t find access token."); st.stop()
-    st.session_state.user_jwt = token
-    SB.postgrest.headers["Authorization"] = f"Bearer {token}"
+                # grab token
+                token = (
+                    getattr(sess.session, "access_token", None)
+                    if hasattr(sess, "session")
+                    else getattr(sess, "access_token", None)
+                )
+                if not token:
+                    st.error("Couldn’t find access token.")
+                    st.stop()
 
-    try:
-        st.session_state.user = profile_upsert(sess.user.id, uname)
-    except ValueError:
-        st.error("Username conflict; try another."); SB.auth.sign_out(); st.stop()
+                # stash JWT & upsert profile
+                st.session_state.user_jwt = token
+                SB.postgrest.headers["Authorization"] = f"Bearer {token}"
+                try:
+                    st.session_state.user = profile_upsert(sess.user.id, uname)
+                except ValueError:
+                    st.error("Username conflict; try another.")
+                    SB.auth.sign_out()
+                    st.stop()
 
-    # bootstrap
-    st.session_state.spent    = 0
-    st.session_state.matches  = []
-    st.session_state.hist     = {}
-    st.session_state.page     = "Find matches"
-    st.session_state.chat_cid = None
-    st.session_state.flash    = None
+                # bootstrap the rest of your session_state
+                st.session_state.spent    = 0
+                st.session_state.matches  = []
+                st.session_state.hist     = {}
+                st.session_state.page     = "Find matches"
+                st.session_state.chat_cid = None
+                st.session_state.flash    = None
 
-    raise RerunException(rerun_data=None)
+                # rerun into the app proper
+                raise RerunException()
+
+    # until the form is submitted, nothing else runs
+    st.stop()
+
 
 # ─────────────────── ENSURE STATE KEYS ────────────────────────────
 for k,v in {
