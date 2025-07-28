@@ -19,10 +19,11 @@ if "user_jwt" in st.session_state:
     SB.postgrest.headers["Authorization"] = f"Bearer {st.session_state.user_jwt}"
 
 
-# right after your imports, before st.set_page_config()
-params = st.experimental_get_query_params()
-if params.get("type", [""])[0] == "signup":      # or whatever param Supabase uses
+# after
+params = st.query_params
+if params.get("type", [""])[0] == "signup":
     st.success("✅ Your email is confirmed! Go ahead and sign in below.")
+
 
 
 # ─────────────────── STREAMLIT CONFIG ──────────────────────────────
