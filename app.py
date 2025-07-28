@@ -18,6 +18,13 @@ OA  = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 if "user_jwt" in st.session_state:
     SB.postgrest.headers["Authorization"] = f"Bearer {st.session_state.user_jwt}"
 
+
+# right after your imports, before st.set_page_config()
+params = st.experimental_get_query_params()
+if params.get("type", [""])[0] == "signup":      # or whatever param Supabase uses
+    st.success("✅ Your email is confirmed! Go ahead and sign in below.")
+
+
 # ─────────────────── STREAMLIT CONFIG ──────────────────────────────
 st.set_page_config(
     page_title="BONDIGO",
