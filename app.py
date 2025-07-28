@@ -3,7 +3,6 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import streamlit as st
-from streamlit.runtime.scriptrunner import RerunException
 from openai import OpenAI, OpenAIError, RateLimitError
 from dotenv import load_dotenv
 from supabase import create_client
@@ -76,11 +75,11 @@ def profile_upsert(auth_uid: str, username: str) -> dict:
     last = datetime.fromisoformat(last.replace("Z", "+00:00"))
     if datetime.now(timezone.utc) - last >= timedelta(hours=24):
         user = tbl.update({
-            "tokens":       user["tokens"] + DAILY_AIRDROP,
-            "last_airdrop": datetime.now(timezone.utc).isoformat()
-        })\
-        .eq("auth_uid", auth_uid)\
-        .execute().data[0]
+                    "tokens":       user["tokens"] + DAILY_AIRDROP,
+                    "last_airdrop": datetime.now(timezone.utc).isoformat()
+                })\
+                .eq("auth_uid", auth_uid)\
+                .execute().data[0]
     return user
 
 def collection_set(user_id: str) -> set[str]:
@@ -101,13 +100,31 @@ def buy(user: dict, comp: dict):
                 .execute().data)
     if owned:
         return False, "Already owned"
+
     SRS.table("users").update({"tokens": user["tokens"] - price})\
        .eq("id", user["id"]).execute()
     SRS.table("collection").insert({
         "user_id":      user["id"],
         "companion_id": comp["id"]
     }).execute()
+
     return True, profile_upsert(user["auth_uid"], user["username"])
+
+# ─────────────────── CALLBACKS ────────────────────────────────────
+def bond_and_chat(cid: str, comp: dict):
+    ok, new_user = buy(st.session_state.user, comp)
+    if ok:
+        st.session_state.user      = new_user
+        # update collection cache
+        st.session_state.page     = "Chat"
+        st.session_state.chat_cid = cid
+        st.session_state.flash    = f"Bonded with {comp['name']}!"
+    else:
+        st.warning(new_user)
+
+def goto_chat(cid: str):
+    st.session_state.page     = "Chat"
+    st.session_state.chat_cid = cid
 
 # ─────────────────── LOGIN / SIGN‑UP ───────────────────────────────
 if "user" not in st.session_state:
@@ -144,9 +161,7 @@ if "user" not in st.session_state:
     except Exception as e:
         st.error(f"Auth error: {e}"); st.stop()
 
-    token = (getattr(sess.session, "access_token", None)
-             if hasattr(sess, "session")
-             else getattr(sess, "access_token", None))
+    token = getattr(sess.session, "access_token", None) if hasattr(sess, "session") else getattr(sess, "access_token", None)
     if not token:
         st.error("Couldn’t find access token."); st.stop()
     st.session_state.user_jwt = token
@@ -157,7 +172,7 @@ if "user" not in st.session_state:
     except ValueError:
         st.error("Username conflict; try another."); SB.auth.sign_out(); st.stop()
 
-    # bootstrap
+    # bootstrap session state
     st.session_state.spent    = 0
     st.session_state.matches  = []
     st.session_state.hist     = {}
@@ -165,7 +180,7 @@ if "user" not in st.session_state:
     st.session_state.chat_cid = None
     st.session_state.flash    = None
 
-    raise RerunException(rerun_data=None)
+    st.experimental_rerun()
 
 # ─────────────────── STATE ENSURE ─────────────────────────────────
 for k,v in {
@@ -216,16 +231,16 @@ if page == "Find matches":
     trait = st.selectbox("Pick a trait",   ["curious","adventurous","night‑owl","chill","analytical","energetic","humorous","kind","bold","creative"])
     vibe  = st.selectbox("Pick a vibe",    ["witty","caring","mysterious","romantic","sarcastic","intellectual","playful","stoic","optimistic","pragmatic"])
     scene = st.selectbox("Pick a scene",   ["beach","forest","cafe","space‑station","cyberpunk‑city","medieval‑castle","mountain","underwater","neon‑disco","cozy‑library"])
+
     if st.button("Show matches"):
         st.session_state.matches = (
-           [c for c in COMPANIONS
-              if all(tag in c["tags"] for tag in (hobby, trait, vibe, scene))]
+           [c for c in COMPANIONS if all(t in c["tags"] for t in (hobby, trait, vibe, scene))]
            or random.sample(COMPANIONS, 5)
         )
 
     for c in st.session_state.matches:
         rarity, clr = c.get("rarity","Common"), CLR[c.get("rarity","Common")]
-        c1,c2,c3 = st.columns([1,5,2])
+        c1,c2,c3    = st.columns([1,5,2])
         c1.image(c.get("photo",PLACEHOLDER), width=90)
         c2.markdown(
           f"<span style='background:{clr};color:black;padding:2px 6px;"
@@ -235,26 +250,22 @@ if page == "Find matches":
           unsafe_allow_html=True,
         )
 
-        # ← already bonded? jump straight to Chat with one click
         if c["id"] in colset:
-            if c3.button("💬 Chat", key=f"chat-{c['id']}"):
-                st.session_state.page     = "Chat"
-                st.session_state.chat_cid = c["id"]
-                raise RerunException(rerun_data=None)
-
-        # otherwise Bond → Chat in one click
+            # one‑click to chat
+            c3.button(
+                "💬 Chat",
+                key=f"chat-{c['id']}",
+                on_click=goto_chat,
+                args=(c["id"],)
+            )
         else:
-            if c3.button("💖 Bond", key=f"bond-{c['id']}"):
-                ok, new = buy(user, c)
-                if ok:
-                    st.session_state.user      = new
-                    colset.add(c["id"])
-                    st.session_state.page     = "Chat"
-                    st.session_state.chat_cid = c["id"]
-                    st.session_state.flash    = f"Bonded with {c['name']}!"
-                else:
-                    st.warning(new)
-                raise RerunException(rerun_data=None)
+            # one‑click to bond & then chat
+            c3.button(
+                "💖 Bond",
+                key=f"bond-{c['id']}",
+                on_click=bond_and_chat,
+                args=(c["id"], c)
+            )
 
 # ─────────────────── CHAT ────────────────────────────────────────
 elif page == "Chat":
@@ -268,9 +279,9 @@ elif page == "Chat":
     options = [CID2COMP[i]["name"] for i in colset]
     if st.session_state.chat_cid:
         default = CID2COMP[st.session_state.chat_cid]["name"]
-        sel = st.selectbox("Choose companion", options, index=options.index(default))
+        sel     = st.selectbox("Choose companion", options, index=options.index(default))
     else:
-        sel = st.selectbox("Choose companion", options)
+        sel     = st.selectbox("Choose companion", options)
 
     cid = next(k for k,v in CID2COMP.items() if v["name"] == sel)
     st.session_state.chat_cid = cid
@@ -308,7 +319,7 @@ elif page == "Chat":
     if user_input:
         hist.append({"role":"user","content":user_input})
         try:
-            resp = OA.chat.completions.create(
+            resp  = OA.chat.completions.create(
                 model="gpt-4o-mini", messages=hist, max_tokens=120
             )
             reply = resp.choices[0].message.content
