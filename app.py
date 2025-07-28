@@ -126,103 +126,102 @@ if "user" not in st.session_state:
             unsafe_allow_html=True,
         )
 
-    st.title("🔐 Sign in / Sign up to **BONDIGO**")
+        st.title("🔐 Sign in / Sign up to **BONDIGO**")
 
-    email = st.text_input("Email", key="login_email")
-    mode  = st.radio("Choose", ["Sign in","Sign up"], horizontal=True, key="login_mode")
-    uname = st.text_input("Username", max_chars=20, key="login_uname")
-    pwd   = st.text_input("Password", type="password", key="login_pwd")
+    
+        email = st.text_input("Email", key="login_email")
+        mode  = st.radio("Choose", ["Sign in","Sign up"], horizontal=True, key="login_mode")
+        uname = st.text_input("Username", max_chars=20, key="login_uname")
+        pwd   = st.text_input("Password", type="password", key="login_pwd")
 
-    if st.button("Go ➜", key="login_go"):
-        # 1) basic validation
-        if not email or not uname or not pwd:
-            st.warning("Fill all fields: email, username, and password.")
-            st.stop()
-
-        # 2) lookup invitee row
-        invite = (SRS.table("invitees")
-                     .select("email","claimed")
-                     .eq("email", email)
-                     .execute().data)
-        if not invite:
-            st.error("🚧 You’re not on the invite list.")
-            st.stop()
-
-        # ─── SIGN UP FLOW ─────────────────────────
-        if mode == "Sign up":
-            if invite[0].get("claimed"):
-                st.error("🚫 This email has already been used.")
+        if st.button("Go ➜", key="login_go"):
+            # 1) basic validation
+            if not email or not uname or not pwd:
+                st.warning("Fill all fields: email, username, and password.")
                 st.stop()
 
-            # call supabase
-            resp = SB.auth.sign_up({"email": email, "password": pwd})
-            if resp.get("error"):
-                st.error(f"Sign‑up error: {resp['error']['message']}")
+            # 2) lookup invitee row
+            invite = (SRS.table("invitees")
+                         .select("email","claimed")
+                         .eq("email", email)
+                         .execute().data)
+            if not invite:
+                st.error("🚧 You’re not on the invite list.")
                 st.stop()
 
-            # grab the newly‑created user & session
-            data    = resp["data"]
-            sess    = data.get("session")      # dict with access_token
-            user_obj= data.get("user")         # dict with id, email, confirmed_at etc.
+            # ─── SIGN UP FLOW ─────────────────────────
+            if mode == "Sign up":
+                if invite[0]["claimed"]:
+                    st.error("🚫 This email has already been used.")
+                    st.stop()
 
-            # immediately upsert into your users table
-            profile_upsert(auth_uid=user_obj["id"], username=uname)
+                # ===== here’s the fix: use resp.error, resp.session, resp.user =====
+                resp = SB.auth.sign_up({"email": email, "password": pwd})
+                if resp.error:
+                    st.error(f"Sign‑up error: {resp.error.message}")
+                    st.stop()
 
-            # mark invite claimed
-            SRS.table("invitees")\
-               .update({"claimed": True})\
-               .eq("email", email)\
-               .execute()
+                # pull back the new user/session
+                sess     = resp.session
+                user_obj = resp.user
 
-            st.success("✅ Check your inbox for the confirmation link!")
-            st.stop()
+                # record them in your users table immediately
+                profile_upsert(auth_uid=user_obj.id, username=uname)
 
-        # ─── SIGN IN FLOW ─────────────────────────
-        resp = SB.auth.sign_in_with_password({"email": email, "password": pwd})
-        if resp.get("error"):
-            st.error(f"Sign‑in error: {resp['error']['message']}")
-            st.stop()
+                # mark invite claimed
+                SRS.table("invitees")\
+                   .update({"claimed": True})\
+                   .eq("email", email)\
+                   .execute()
 
-        data     = resp["data"]
-        sess     = data.get("session")
-        user_obj = data.get("user")
+                st.success("✅ Check your inbox for the confirmation link!")
+                st.stop()
 
-        # require confirmed email
-        if not user_obj.get("confirmed_at"):
-            st.error("📬 Please confirm your email before continuing.")
-            st.stop()
+            # ─── SIGN IN FLOW ─────────────────────────
+            resp = SB.auth.sign_in_with_password({"email": email, "password": pwd})
+            if resp.error:
+                st.error(f"Sign‑in error: {resp.error.message}")
+                st.stop()
 
-        # ensure they actually signed up in your users table
-        rows = (SRS.table("users")
-                   .select("*")
-                   .eq("auth_uid", user_obj["id"])
-                   .execute().data)
-        if not rows:
-            st.error("❌ No account found. Please Sign up first.")
-            st.stop()
+            sess     = resp.session
+            user_obj = resp.user
 
-        # ensure correct username
-        if rows[0]["username"] != uname:
-            st.error("❌ Username does not match your account.")
-            st.stop()
+            # require confirmed email
+            if not user_obj.confirmed_at:
+                st.error("📬 Please confirm your email before continuing.")
+                st.stop()
 
-        # award daily‑airdrop
-        user = profile_upsert(user_obj["id"], uname)
+            # ensure they signed up in your users table
+            rows = (SRS.table("users")
+                       .select("*")
+                       .eq("auth_uid", user_obj.id)
+                       .execute().data)
+            if not rows:
+                st.error("❌ No account found. Please Sign up first.")
+                st.stop()
 
-        # set session & state
-        st.session_state.user_jwt = sess["access_token"]
-        SB.postgrest.headers["Authorization"] = f"Bearer {sess['access_token']}"
-        st.session_state.user     = user
-        st.session_state.spent    = 0
-        st.session_state.matches  = []
-        st.session_state.hist     = {}
-        st.session_state.page     = "Find matches"
-        st.session_state.chat_cid = None
-        st.session_state.flash    = None
+            # ensure correct username
+            if rows[0]["username"] != uname:
+                st.error("❌ Username does not match your account.")
+                st.stop()
 
-        raise RerunException(rerun_data=None)
+            # award daily‑airdrop
+            user = profile_upsert(user_obj.id, uname)
 
-    st.stop()
+            # set session & state
+            st.session_state.user_jwt = sess.access_token
+            SB.postgrest.headers["Authorization"] = f"Bearer {sess.access_token}"
+            st.session_state.user     = user
+            st.session_state.spent    = 0
+            st.session_state.matches  = []
+            st.session_state.hist     = {}
+            st.session_state.page     = "Find matches"
+            st.session_state.chat_cid = None
+            st.session_state.flash    = None
+
+            raise RerunException(rerun_data=None)
+
+        st.stop()
 
 # ─────────────────── AFTER LOGIN: ENSURE STATE KEYS ─────────────────
 for k,v in {
