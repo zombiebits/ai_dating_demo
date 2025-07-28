@@ -452,7 +452,7 @@ if "user" not in st.session_state:
             unsafe_allow_html=True,
         )
 
-    st.title("🔐 Sign in / Sign up to **BETA TEST GROUP**")
+    st.title("🔐 Sign in / Sign up to **BETA TEST**")
 
     email = st.text_input("Email", key="login_email")
     mode  = st.radio("Choose", ["Sign in","Sign up"], horizontal=True, key="login_mode")
