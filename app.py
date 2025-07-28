@@ -373,6 +373,29 @@ if st.sidebar.button("🧪 Test Email"):
     except Exception as e:
         st.sidebar.error(f"Email system broken: {str(e)}")
 
+        # Add this after your existing admin panel code:
+if st.session_state.get("show_admin", False):
+    # Your existing admin panel code...
+    
+    # ADD THIS NEW SECTION:
+    st.sidebar.markdown("### 📧 Email System Test")
+    
+    if st.sidebar.button("🧪 Test SendGrid Connection"):
+        try:
+            # Test password reset (should work with SendGrid)
+            result = SB.auth.reset_password_email("web34llc@gmail.com")
+            st.sidebar.success("✅ SendGrid test sent!")
+            st.sidebar.info("Check SendGrid activity feed now")
+        except Exception as e:
+            st.sidebar.error(f"❌ SendGrid test failed: {str(e)}")
+    
+    if st.sidebar.button("🔍 Check Email Settings"):
+        st.sidebar.json({
+            "smtp_enabled": "Should be using custom SMTP",
+            "issue": "Confirmation emails might use default system",
+            "solution": "Check Supabase email provider settings"
+        })
+
 # ─────────────────── EMAIL RESEND INTERFACE ────────────────────────
 if st.session_state.get("show_resend", False):
     st.warning("⏰ Your confirmation link has expired or failed.")
