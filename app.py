@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from supabase import create_client
 from postgrest.exceptions import APIError
 
-# ────────── ENVIRONMENT & CLIENTS ────────────────────
+# ─────────────────── ENVIRONMENT & CLIENTS ─────────────────────────
 load_dotenv()
 SB  = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
 SRS = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_KEY"])
@@ -17,13 +17,12 @@ OA  = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 if "user_jwt" in st.session_state:
     SB.postgrest.headers["Authorization"] = f"Bearer {st.session_state.user_jwt}"
 
-# ────────── OPTIONAL CONFIRMATION BANNER ─────────────
-# (You can leave this in place if you ever add a query‐param redirect later)
+# ────────── OPTIONAL CONFIRM BANNER ─────────────
 params = st.query_params
 if params.get("confirmed", [""])[0] == "true":
     st.success("✅ Your email has been confirmed! Please sign in below.")
 
-# ────────── STREAMLIT CONFIG ─────────────────────────
+# ─────────────────── STREAMLIT CONFIG ──────────────────────────────
 st.set_page_config(
     page_title="BONDIGO",
     page_icon="🩷",
@@ -38,19 +37,20 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# ────────── CONSTANTS & DATA ─────────────────────────
+# ─────────────────── CONSTANTS & DATA ─────────────────────────────
 MAX_TOKENS    = 10_000
 DAILY_AIRDROP = 150
 COST          = {"Common": 50, "Rare": 200, "Legendary": 700}
-PLACEHOLDER   = "assets/placeholder.png"
-LOGO          = "assets/bondigo_banner.png"
-TAGLINE       = "Talk the Lingo · Master the Bond · Dominate the Game"
-CLR           = {"Common":"#bbb","Rare":"#57C7FF","Legendary":"#FFAA33"}
+
+PLACEHOLDER = "assets/placeholder.png"
+LOGO        = "assets/bondigo_banner.png"
+TAGLINE     = "Talk the Lingo · Master the Bond · Dominate the Game"
+CLR         = {"Common":"#bbb","Rare":"#57C7FF","Legendary":"#FFAA33"}
 
 COMPANIONS = json.load(open("companions.json", encoding="utf-8-sig"))
 CID2COMP   = {c["id"]: c for c in COMPANIONS}
 
-# ────────── HELPERS ───────────────────────────────────
+# ─────────────────── HELPERS ───────────────────────────────────────
 def profile_upsert(auth_uid: str, username: str) -> dict:
     tbl = SRS.table("users")
     rows = tbl.select("*").eq("auth_uid", auth_uid).execute().data
@@ -64,34 +64,28 @@ def profile_upsert(auth_uid: str, username: str) -> dict:
             except APIError:
                 pass
     else:
-        try:
-            user = tbl.insert({
-                "id":       auth_uid,
-                "auth_uid": auth_uid,
-                "username": username,
-                "tokens":   1000
-            }).execute().data[0]
-        except APIError as e:
-            if "duplicate key" in str(e):
-                raise ValueError("username_taken")
-            raise
+        user = tbl.insert({
+            "id":       auth_uid,
+            "auth_uid": auth_uid,
+            "username": username,
+            "tokens":   1000
+        }).execute().data[0]
 
+    # daily airdrop logic
     last = user["last_airdrop"] or user["created_at"]
     last = datetime.fromisoformat(last.replace("Z", "+00:00"))
     if datetime.now(timezone.utc) - last >= timedelta(hours=24):
         user = tbl.update({
             "tokens":       user["tokens"] + DAILY_AIRDROP,
             "last_airdrop": datetime.now(timezone.utc).isoformat()
-        })\
-        .eq("auth_uid", auth_uid)\
-        .execute().data[0]
+        }).eq("auth_uid", auth_uid).execute().data[0]
     return user
 
 def collection_set(user_id: str) -> set[str]:
     rows = SRS.table("collection")\
-             .select("companion_id")\
-             .eq("user_id", user_id)\
-             .execute().data
+              .select("companion_id")\
+              .eq("user_id", user_id)\
+              .execute().data
     return {r["companion_id"] for r in rows}
 
 def buy(user: dict, comp: dict):
@@ -105,8 +99,7 @@ def buy(user: dict, comp: dict):
               .execute().data
     if owned:
         return False, "Already owned"
-    SRS.table("users")\
-       .update({"tokens": user["tokens"] - price})\
+    SRS.table("users").update({"tokens": user["tokens"] - price})\
        .eq("id", user["id"]).execute()
     SRS.table("collection").insert({
         "user_id":      user["id"],
@@ -114,14 +107,14 @@ def buy(user: dict, comp: dict):
     }).execute()
     return True, profile_upsert(user["auth_uid"], user["username"])
 
-# ────────── CALLBACKS ──────────────────────────────────
+# ─────────────────── CALLBACKS ────────────────────────────────────
 def bond_and_chat(cid: str, comp: dict):
     ok, new_user = buy(st.session_state.user, comp)
     if ok:
-        st.session_state.user      = new_user
-        st.session_state.page      = "Chat"
-        st.session_state.chat_cid  = cid
-        st.session_state.flash     = f"Bonded with {comp['name']}!"
+        st.session_state.user     = new_user
+        st.session_state.page     = "Chat"
+        st.session_state.chat_cid = cid
+        st.session_state.flash    = f"Bonded with {comp['name']}!"
     else:
         st.warning(new_user)
 
@@ -129,70 +122,77 @@ def goto_chat(cid: str):
     st.session_state.page     = "Chat"
     st.session_state.chat_cid = cid
 
-# ────────── LOGIN / SIGN‑UP ───────────────────────────
+# ─────────────────── LOGIN / SIGN‑UP ───────────────────────────────
 if "user" not in st.session_state:
     # Logo & tagline
     if Path(LOGO).is_file():
         st.image(LOGO, width=380)
         st.markdown(
-            f"<p style='text-align:center;margin-top:-2px;"
-            f"font-size:1.05rem;color:#FFC8D8'>{TAGLINE}</p>",
+            f"<p style='text-align:center;margin-top:-2px;font-size:1.05rem;"
+            f"color:#FFC8D8'>{TAGLINE}</p>",
             unsafe_allow_html=True,
         )
 
     st.title("🔐 Sign in / Sign up to **BONDIGO**")
 
+    # inputs
     email = st.text_input("Email", key="login_email")
     mode  = st.radio("Choose", ["Sign in","Sign up"], horizontal=True, key="login_mode")
     uname = st.text_input("Username", max_chars=20, key="login_uname")
     pwd   = st.text_input("Password", type="password", key="login_pwd")
 
     if st.button("Go ➜", key="login_go"):
+        # validation
         if not email or not uname or not pwd:
             st.warning("Fill all fields: email, username, and password.")
             st.stop()
 
-        allowed = SRS.table("invitees")\
-                     .select("email")\
-                     .eq("email", email)\
-                     .execute().data
-        if not allowed:
-            st.error("🚧 You’re not on the invite list. Join our waitlist at hello@yourdomain.com.")
+        # whitelist lookup
+        invite = SRS.table("invitees")\
+                    .select("email", "claimed")\
+                    .eq("email", email)\
+                    .execute().data
+        if not invite:
+            st.error("🚧 You’re not on the invite list.")
+            st.stop()
+        if invite[0].get("claimed"):
+            st.error("🚫 This email has already been used.")
             st.stop()
 
-        # ── SIGN UP ─────────────────────────────────
+        # SIGN UP
         if mode == "Sign up":
             try:
-                # back to plain sign_up call
                 SB.auth.sign_up({"email": email, "password": pwd})
+                # mark claimed
+                SRS.table("invitees")\
+                   .update({"claimed": True})\
+                   .eq("email", email)\
+                   .execute()
                 st.success("✅ Check your inbox for the confirmation link!")
             except Exception as e:
                 st.error(f"Sign‑up error: {e}")
             st.stop()
 
-        # ── SIGN IN ─────────────────────────────────
+        # SIGN IN
         try:
             sess = SB.auth.sign_in_with_password({"email": email, "password": pwd})
         except Exception as e:
             st.error(f"Sign‑in error: {e}")
             st.stop()
 
+        # require email confirmed
         user_meta = SB.auth.get_user(sess.session.access_token).user
         if not user_meta.confirmed_at:
             st.error("📬 Please confirm your email before continuing.")
             st.stop()
 
+        # store JWT & upsert profile
         token = sess.session.access_token
         st.session_state.user_jwt = token
         SB.postgrest.headers["Authorization"] = f"Bearer {token}"
+        st.session_state.user = profile_upsert(user_meta.id, uname)
 
-        try:
-            st.session_state.user = profile_upsert(user_meta.id, uname)
-        except ValueError:
-            st.error("Username conflict; pick another.")
-            SB.auth.sign_out()
-            st.stop()
-
+        # initialize session
         st.session_state.spent    = 0
         st.session_state.matches  = []
         st.session_state.hist     = {}
@@ -204,7 +204,6 @@ if "user" not in st.session_state:
 
     st.stop()
 
-
 # ─────────────────── ENSURE STATE KEYS ────────────────────────────
 for k,v in {
     "spent":0, "matches":[], "hist":{},
@@ -214,6 +213,11 @@ for k,v in {
 
 user   = st.session_state.user
 colset = collection_set(user["id"])
+
+# ─────────────────── HEADER & NAVIGATION & PAGES ─────────────────
+# (rest of your Find matches / Chat / My Collection logic here,
+#  unchanged from before)
+
 
 # ─────────────────── HEADER & BADGES ─────────────────────────────
 if Path(LOGO).is_file():
