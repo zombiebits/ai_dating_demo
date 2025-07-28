@@ -1,4 +1,4 @@
-import os, json, random, logging
+import os, json, random, logging, time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -247,6 +247,74 @@ def cleanup_expired_signups():
     except Exception as e:
         logger.error(f"Failed to cleanup expired signups: {str(e)}")
 
+def cleanup_unconfirmed_user(email: str) -> bool:
+    """
+    Clean up unconfirmed users from Supabase Auth.
+    This requires admin privileges.
+    """
+    try:
+        # First check if there's an unconfirmed user
+        users_response = SRS.auth.admin.list_users()
+        if users_response and users_response.users:
+            for user in users_response.users:
+                if (user.email == email and 
+                    not getattr(user, 'email_confirmed_at', None) and 
+                    not getattr(user, 'confirmed_at', None)):
+                    
+                    # Delete the unconfirmed user
+                    SRS.auth.admin.delete_user(user.id)
+                    logger.info(f"Cleaned up unconfirmed user: {email}")
+                    
+                    # Also cleanup any pending signup
+                    cleanup_pending_signup(email)
+                    return True
+        return False
+    except Exception as e:
+        logger.error(f"Failed to cleanup unconfirmed user: {str(e)}")
+        return False
+
+def check_user_status(email: str) -> dict:
+    """
+    Check the status of a user across all systems
+    """
+    status = {
+        "auth_user_exists": False,
+        "auth_user_confirmed": False,
+        "user_row_exists": False,
+        "pending_signup_exists": False,
+        "invite_claimed": False
+    }
+    
+    try:
+        # Check auth users
+        users_response = SRS.auth.admin.list_users()
+        if users_response and users_response.users:
+            for user in users_response.users:
+                if user.email == email:
+                    status["auth_user_exists"] = True
+                    status["auth_user_confirmed"] = bool(
+                        getattr(user, 'email_confirmed_at', None) or 
+                        getattr(user, 'confirmed_at', None)
+                    )
+                    # Check if user row exists
+                    user_row = get_user_row(user.id)
+                    status["user_row_exists"] = bool(user_row)
+                    break
+        
+        # Check pending signups
+        pending = get_pending_signup(email)
+        status["pending_signup_exists"] = bool(pending)
+        
+        # Check invite status
+        invite = SRS.table("invitees").select("claimed").eq("email", email).execute().data
+        if invite:
+            status["invite_claimed"] = invite[0]["claimed"]
+        
+        return status
+    except Exception as e:
+        logger.error(f"Failed to check user status: {str(e)}")
+        return status
+
 def resend_confirmation_email(email: str) -> bool:
     try:
         # Check if there's a pending signup
@@ -309,6 +377,33 @@ def bond_and_chat(cid: str, comp: dict):
 def goto_chat(cid: str):
     st.session_state.page     = "Chat"
     st.session_state.chat_cid = cid
+
+# ─────────────────── ADMIN PANEL (DEVELOPMENT ONLY) ─────────────
+if st.sidebar.button("🔧 Admin Panel (Dev Only)"):
+    st.session_state.show_admin = not st.session_state.get("show_admin", False)
+
+if st.session_state.get("show_admin", False):
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("🔧 Admin Tools")
+    
+    # User status checker
+    check_email = st.sidebar.text_input("Check user status:", key="admin_check_email")
+    if st.sidebar.button("Check Status") and check_email:
+        status = check_user_status(check_email)
+        st.sidebar.json(status)
+    
+    # Cleanup unconfirmed user
+    cleanup_email = st.sidebar.text_input("Cleanup unconfirmed user:", key="admin_cleanup_email")
+    if st.sidebar.button("⚠️ Cleanup User") and cleanup_email:
+        if cleanup_unconfirmed_user(cleanup_email):
+            st.sidebar.success("✅ User cleaned up")
+        else:
+            st.sidebar.error("❌ Cleanup failed")
+    
+    # View pending signups
+    if st.sidebar.button("View Pending Signups"):
+        pending = SRS.table("pending_signups").select("*").execute().data
+        st.sidebar.json(pending)
 
 # Clean up expired signups on app start
 cleanup_expired_signups()
@@ -396,7 +491,24 @@ if "user" not in st.session_state:
                 st.error("🚫 This email has already been used.")
                 st.stop()
 
-            # 2) Check username availability one more time
+            # 2) Check user status
+            user_status = check_user_status(email)
+            logger.info(f"User status for {email}: {user_status}")
+            
+            # 3) If there's an unconfirmed auth user, clean it up
+            if user_status["auth_user_exists"] and not user_status["auth_user_confirmed"]:
+                st.warning("🔄 Found previous unconfirmed signup. Cleaning up...")
+                if cleanup_unconfirmed_user(email):
+                    st.success("✅ Cleaned up previous signup. Proceeding with new signup.")
+                    time.sleep(1)  # Give it a moment
+                else:
+                    st.error("❌ Failed to cleanup previous signup. Please contact support.")
+                    st.stop()
+            elif user_status["auth_user_exists"] and user_status["auth_user_confirmed"]:
+                st.error("🚫 This email is already registered and confirmed. Please sign in instead.")
+                st.stop()
+
+            # 4) Check username availability one more time
             existing_user = SRS.table("users").select("username").eq("username", uname).execute().data
             pending_user = SRS.table("pending_signups").select("username").eq("username", uname).execute().data
             
@@ -404,15 +516,15 @@ if "user" not in st.session_state:
                 st.error(f"❌ Username '{uname}' is already taken. Please choose another.")
                 st.stop()
 
-            # 3) Create pending signup record first
+            # 5) Create pending signup record first
             if not create_pending_signup(email, uname):
                 st.error("❌ Failed to process signup. Please try again.")
                 st.stop()
 
-            # 4) call GoTrue sign_up with proper redirect URL - DON'T create user row yet
+            # 6) call GoTrue sign_up with proper redirect URL
             try:
                 # Get the current app URL for redirect
-                streamlit_url = "https://ai-matchmaker-demo.streamlit.app/"  # Change this to your actual Streamlit URL
+                streamlit_url = "http://localhost:8501"  # Change this to your actual Streamlit URL
                 
                 res = SB.auth.sign_up({
                     "email": email, 
@@ -435,10 +547,20 @@ if "user" not in st.session_state:
                     
                     logger.info(f"Signup initiated for: {email} with username: {uname}")
                     
-                    # 5) let the user know to check their inbox
+                    # 7) let the user know to check their inbox
                     st.success("✅ Check your inbox for the confirmation link! You must confirm your email before you can sign in.")
                     st.info("💡 After clicking the confirmation link, come back here and sign in with your credentials.")
                     st.info("⏰ The confirmation link will expire in 24 hours.")
+                    
+                    # Show debug info in development
+                    with st.expander("🔧 Debug Info (Development Only)", expanded=False):
+                        st.json({
+                            "email": email,
+                            "auth_uid": user_obj.id,
+                            "signup_time": datetime.now().isoformat(),
+                            "status": "email_sent"
+                        })
+                    
                     st.stop()
                 else:
                     cleanup_pending_signup(email)
