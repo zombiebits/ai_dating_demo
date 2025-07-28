@@ -18,12 +18,10 @@ OA  = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 if "user_jwt" in st.session_state:
     SB.postgrest.headers["Authorization"] = f"Bearer {st.session_state.user_jwt}"
 
-
+# show a banner if we were redirected after email confirmation
 params = st.query_params
 if params.get("confirmed", [""])[0] == "true":
     st.success("✅ Your email has been confirmed! Please sign in below.")
-
-
 
 # ─────────────────── STREAMLIT CONFIG ──────────────────────────────
 st.set_page_config(
@@ -131,31 +129,29 @@ def goto_chat(cid: str):
     st.session_state.page     = "Chat"
     st.session_state.chat_cid = cid
 
-# ─────────────────── LOGIN / SIGN‑UP (REPLACEMENT) ────────────────────────────
+# ─────────────────── LOGIN / SIGN‑UP ───────────────────────────────
 if "user" not in st.session_state:
-    # Logo & tagline (unchanged)
+    # Logo & tagline
     if Path(LOGO).is_file():
         st.image(LOGO, width=380)
         st.markdown(
-            f"<p style='text-align:center;margin-top:-2px;font-size:1.05rem;color:#FFC8D8'>{TAGLINE}</p>",
+            f"<p style='text-align:center;margin-top:-2px;font-size:1.05rem;"
+            f"color:#FFC8D8'>{TAGLINE}</p>",
             unsafe_allow_html=True,
         )
 
     st.title("🔐 Sign in / Sign up to **BONDIGO**")
 
-    # — User enters a real email address (instead of faked one)
-    email = st.text_input("Email", type="default", key="login_email")
+    email = st.text_input("Email", key="login_email")
     mode  = st.radio("Choose", ["Sign in","Sign up"], horizontal=True, key="login_mode")
     uname = st.text_input("Username", max_chars=20, key="login_uname")
     pwd   = st.text_input("Password", type="password", key="login_pwd")
 
     if st.button("Go ➜", key="login_go"):
-        # 1) basic validation
         if not email or not uname or not pwd:
             st.warning("Fill all fields: email, username, and password.")
             st.stop()
 
-        # 2) whitelist check
         allowed = (
             SRS.table("invitees")
                .select("email")
@@ -167,39 +163,35 @@ if "user" not in st.session_state:
             st.error("🚧 You’re not on the invite list. Join our waitlist at hello@yourdomain.com.")
             st.stop()
 
-        # 3) SIGN UP flow
+        # SIGN UP
         if mode == "Sign up":
-            # trigger Supabase’s email-confirm flow
             try:
                 confirm_url = "https://ai-matchmaker-demo.streamlit.app/?confirmed=true"
                 SB.auth.sign_up(
                     {"email": email, "password": pwd},
-                    {"redirect_to": confirm_url}
-)
+                    redirect_to=confirm_url
+                )
                 st.success("✅ Check your inbox for the confirmation link!")
             except Exception as e:
                 st.error(f"Sign‑up error: {e}")
             st.stop()
 
-        # 4) SIGN IN flow
+        # SIGN IN
         try:
             sess = SB.auth.sign_in_with_password({"email": email, "password": pwd})
         except Exception as e:
             st.error(f"Sign‑in error: {e}")
             st.stop()
 
-        # 5) ensure email confirmed
         user_meta = SB.auth.get_user(sess.session.access_token).user
         if not user_meta.confirmed_at:
             st.error("📬 Please confirm your email before continuing.")
             st.stop()
 
-        # 6) pull out the JWT and set headers
         token = sess.session.access_token
         st.session_state.user_jwt = token
         SB.postgrest.headers["Authorization"] = f"Bearer {token}"
 
-        # 7) upsert profile + bootstrap state (unchanged)
         try:
             st.session_state.user = profile_upsert(user_meta.id, uname)
         except ValueError:
@@ -214,13 +206,9 @@ if "user" not in st.session_state:
         st.session_state.chat_cid = None
         st.session_state.flash    = None
 
-        # 8) rerun into the app proper
         raise RerunException(rerun_data=None)
 
-    # before the first click, stop here
     st.stop()
-
-
 
 # ─────────────────── ENSURE STATE KEYS ────────────────────────────
 for k,v in {
@@ -252,12 +240,8 @@ st.markdown(
 )
 
 # ─────────────────── IN‑PAGE NAVIGATION ──────────────────────────
-# ←—— Here's the one tiny tweak: bind the radio directly to st.session_state["page"]
 page = st.radio(
-    "",
-    ["Find matches","Chat","My Collection"],
-    key="page",
-    horizontal=True
+    "", ["Find matches","Chat","My Collection"], key="page", horizontal=True
 )
 
 # ─────────────────── FIND MATCHES ────────────────────────────────
@@ -267,10 +251,10 @@ if page == "Find matches":
         st.session_state.flash = None
 
     st.image("assets/bondcosts.png", width=380)
-    hobby = st.selectbox("Pick a hobby",   ["space","foodie","gaming","music","art","sports","reading","travel","gardening","coding"])
-    trait = st.selectbox("Pick a trait",   ["curious","adventurous","night‑owl","chill","analytical","energetic","humorous","kind","bold","creative"])
-    vibe  = st.selectbox("Pick a vibe",    ["witty","caring","mysterious","romantic","sarcastic","intellectual","playful","stoic","optimistic","pragmatic"])
-    scene = st.selectbox("Pick a scene",   ["beach","forest","cafe","space‑station","cyberpunk‑city","medieval‑castle","mountain","underwater","neon‑disco","cozy‑library"])
+    hobby = st.selectbox("Pick a hobby", ["space","foodie","gaming","music","art","sports","reading","travel","gardening","coding"])
+    trait = st.selectbox("Pick a trait", ["curious","adventurous","night‑owl","chill","analytical","energetic","humorous","kind","bold","creative"])
+    vibe  = st.selectbox("Pick a vibe",  ["witty","caring","mysterious","romantic","sarcastic","intellectual","playful","stoic","optimistic","pragmatic"])
+    scene = st.selectbox("Pick a scene", ["beach","forest","cafe","space‑station","cyberpunk‑city","medieval‑castle","mountain","underwater","neon‑disco","cozy‑library"])
     if st.button("Show matches"):
         st.session_state.matches = (
            [c for c in COMPANIONS if all(t in c["tags"] for t in (hobby, trait, vibe, scene))]
@@ -290,19 +274,12 @@ if page == "Find matches":
         )
 
         if c["id"] in colset:
-            c3.button(
-                "💬 Chat",
-                key=f"chat-{c['id']}",
-                on_click=goto_chat,
-                args=(c["id"],)
-            )
+            c3.button("💬 Chat", key=f"chat-{c['id']}", on_click=goto_chat, args=(c["id"],))
         else:
-            c3.button(
-                "💖 Bond",
-                key=f"bond-{c['id']}",
-                on_click=bond_and_chat,
-                args=(c["id"], c)
-            )
+            c3.button("💖 Bond", key=f"bond-{c['id']}", on_click=bond_and_chat, args=(c["id"], c))
+
+# ─────────────────── CHAT & COLLECTION remain unchanged ───────────────────────
+
 
 # ─────────────────── CHAT ────────────────────────────────────────
 elif page == "Chat":
