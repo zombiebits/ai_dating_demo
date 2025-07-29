@@ -499,19 +499,53 @@ if st.session_state.get('show_admin', True):  # Set to True for development
             
             # Test 1: Direct SendGrid API test
             if st.button("🚀 Test Direct SendGrid API", key="test_direct_sendgrid"):
-                try:
-                    # Test if API key is working
-                    test_result = send_confirmation_email_direct("web34llc@gmail.com", "TestUser", "test-user-123")
-                    if test_result:
-                        st.success("✅ Direct SendGrid API working!")
+                    try:
+                        import sendgrid
+                        from sendgrid.helpers.mail import Mail
+                        
+                        api_key = os.environ.get('SENDGRID_API_KEY')
+                        st.info(f"Using API key: {api_key[:15]}..." if api_key else "No API key found")
+                        
+                        sg = sendgrid.SendGridAPIClient(api_key=api_key)
+                        
+                        # Simple test message
+                        message = Mail(
+                            from_email='web34llc@gmail.com',
+                            to_emails='web34llc@gmail.com',
+                            subject='SendGrid Test from BONDIGO',
+                            html_content='<p>This is a test email from your BONDIGO app!</p>'
+                        )
+                        
+                        response = sg.send(message)
+                        
+                        st.success(f"✅ SendGrid API Response: {response.status_code}")
                         st.info("📧 Check your email and SendGrid activity feed")
-                    else:
-                        st.error("❌ SendGrid API failed - check your API key in secrets")
-                        st.code("SENDGRID_API_KEY = 'SG.your_actual_key_here'")
-                except Exception as e:
-                    st.error(f"❌ SendGrid error: {str(e)}")
-                    if "api_key" in str(e).lower():
-                        st.warning("🔑 API key issue - check your Streamlit secrets")
+                        
+                        # Show response details
+                        with st.expander("Response Details"):
+                            st.json({
+                                "status_code": response.status_code,
+                                "headers": dict(response.headers) if hasattr(response, 'headers') else "No headers",
+                                "body": response.body.decode() if hasattr(response, 'body') and response.body else "No body"
+                            })
+                        
+                    except Exception as e:
+                        st.error(f"❌ SendGrid error: {str(e)}")
+                        
+                        # More detailed error information
+                        error_type = type(e).__name__
+                        st.code(f"Error type: {error_type}")
+                        
+                        if "401" in str(e) or "unauthorized" in str(e).lower():
+                            st.warning("🔑 API key authentication failed. Check your SendGrid API key permissions.")
+                            st.info("Make sure your API key has 'Mail Send' permissions in SendGrid dashboard.")
+                        elif "403" in str(e) or "forbidden" in str(e).lower():
+                            st.warning("🚫 Account verification may be required. Check your SendGrid account status.")
+                        elif "429" in str(e) or "rate" in str(e).lower():
+                            st.warning("⏰ Rate limit exceeded. Wait a few minutes and try again.")
+                        else:
+                            st.info("Debug info:")
+                            st.code(str(e))
             
             # Test 2: Check API key status
             if st.button("🔑 Check SendGrid API Key", key="check_api_key"):
@@ -533,15 +567,18 @@ if st.session_state.get('show_admin', True):  # Set to True for development
             cleanup_test_email = st.text_input("Email to completely clean:", key="cleanup_test_email", value="wakeyourmindup21@gmail.com")
             if st.button("🔥 Nuclear Cleanup User", key="nuclear_cleanup") and cleanup_test_email:
                 try:
-                    # Step 1: Delete from auth
+                    # Step 1: Delete from auth - FIXED VERSION
                     deleted_auth = False
                     users_response = SRS.auth.admin.list_users()
-                    if users_response and users_response.users:
-                        for user in users_response.users:
-                            if user.email == cleanup_test_email:
-                                SRS.auth.admin.delete_user(user.id)
-                                deleted_auth = True
-                                st.info(f"🗑️ Deleted auth user: {user.id}")
+                    
+                    # Handle the list format correctly
+                    users = users_response if isinstance(users_response, list) else []
+                    
+                    for user in users:
+                        if user.email == cleanup_test_email:
+                            SRS.auth.admin.delete_user(user.id)
+                            deleted_auth = True
+                            st.info(f"🗑️ Deleted auth user: {user.id}")
                     
                     # Step 2: Clean up all related data
                     cleanup_pending_signup(cleanup_test_email)
@@ -558,6 +595,8 @@ if st.session_state.get('show_admin', True):  # Set to True for development
                     
                 except Exception as e:
                     st.error(f"❌ Cleanup error: {str(e)}")
+                    st.info("Debug info:")
+                    st.code(f"Error type: {type(e)}\nError details: {str(e)}")
         
         with col4:
             # Test 4: List all auth users
