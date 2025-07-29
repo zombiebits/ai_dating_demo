@@ -417,7 +417,7 @@ if st.session_state.get("show_admin", False):
                     st.error(f"❌ SMTP test completely failed: {str(e)}")
                     st.info("This might actually be good - means Supabase can't send via default either")
             
-            # Test 2: Force test signup
+            # Test 2: Force test signup with better debugging
             test_email = st.text_input("Test signup email:", key="test_signup_email", value="web34llc+test@gmail.com")
             if st.button("🔄 Test Signup Email", key="test_signup") and test_email:
                 try:
@@ -440,9 +440,23 @@ if st.session_state.get("show_admin", False):
                             "email": test_email,
                             "auth_uid": result.user.id,
                             "time": datetime.now().isoformat(),
-                            "status": "confirmation_email_should_be_sent"
+                            "status": "confirmation_email_should_be_sent",
+                            "email_domain": test_email.split('@')[1],
+                            "note": "Real email domain - should reach SendGrid"
                         })
                         st.warning("⏰ Check SendGrid activity feed in 60 seconds")
+                        st.info("🔍 **Expected result:** GREEN 'Delivered' status in SendGrid (like password resets)")
+                        
+                        # Add troubleshooting steps
+                        with st.expander("🚨 If SendGrid shows NO activity (not even 'Not Delivered')"):
+                            st.markdown("""
+                            **This means Supabase is NOT using your SMTP for signup emails:**
+                            
+                            1. **Check email template** - complex templates cause fallback
+                            2. **Verify template variables** - wrong variables break emails  
+                            3. **Test with minimal template** - remove all styling
+                            4. **Contact Supabase support** - SMTP works for password reset but not signup
+                            """)
                     else:
                         st.error("❌ Test signup failed - no user returned")
                         
