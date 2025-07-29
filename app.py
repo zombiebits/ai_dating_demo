@@ -436,179 +436,82 @@ def goto_chat(cid: str):
 # Put this RIGHT AFTER your streamlit config and CSS, before the login section
 
 # ─────────────────── ADMIN PANEL (MAIN AREA) ─────────────
-# Show admin toggle button in main area instead of hidden sidebar
-if st.button("🔧 Toggle Admin Panel (Dev Only)", key="admin_toggle"):
-    st.session_state.show_admin = not st.session_state.get("show_admin", False)
-
-if st.session_state.get("show_admin", False):
-    st.markdown("---")
-    with st.expander("🔧 Admin Tools & Email Debugging", expanded=True):
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.subheader("📊 User Status Check")
-            check_email = st.text_input("Check user status:", key="admin_check_email")
-            if st.button("Check Status", key="check_status_btn") and check_email:
-                status = check_user_status(check_email)
-                st.json(status)
+with col2:
+            st.subheader("📧 Direct SendGrid Tests")
             
-            st.subheader("🧹 Cleanup Tools")
-            cleanup_email = st.text_input("Cleanup unconfirmed user:", key="admin_cleanup_email")
-            if st.button("⚠️ Cleanup User", key="cleanup_user_btn") and cleanup_email:
-                if cleanup_unconfirmed_user(cleanup_email):
-                    st.success("✅ User cleaned up")
-                else:
-                    st.error("❌ Cleanup failed")
-        
-        with col2:
-            st.subheader("📧 Email System Tests")
-            
-            # Enhanced SMTP Diagnosis
-            st.markdown("**🔍 SMTP Configuration Check:**")
-            smtp_issues = []
-            if st.button("🩺 Diagnose SMTP Issues", key="diagnose_smtp"):
-                st.json({
-                    "expected_smtp_host": "smtp.sendgrid.net",
-                    "expected_port": "587", 
-                    "expected_username": "apikey",
-                    "sender_email": "web34llc@gmail.com",
-                    "issue": "NO emails reaching SendGrid = SMTP not active",
-                    "solutions": [
-                        "1. Re-save SMTP settings in Supabase",
-                        "2. Check SendGrid API key is valid", 
-                        "3. Verify SMTP toggle is ON",
-                        "4. Contact Supabase support if settings correct"
-                    ]
-                })
-            
-            # Test 1: SendGrid SMTP test with better diagnostics
-            if st.button("🧪 Test Password Reset Email", key="test_smtp"):
+            # Test 1: Direct SendGrid API test
+            if st.button("🚀 Test Direct SendGrid API", key="test_direct_sendgrid"):
                 try:
-                    result = SB.auth.reset_password_email("web34llc@gmail.com")
-                    st.warning("⚠️ Supabase says email sent, but NO SendGrid activity!")
-                    st.error("🚫 **SMTP is NOT working** - emails going to default provider")
-                    with st.expander("🔧 SMTP Debug Analysis", expanded=True):
-                        st.markdown("""
-                        **Problem:** Supabase accepts the request but SendGrid shows no activity.
-                        
-                        **This means:**
-                        - ❌ Custom SMTP is NOT actually active
-                        - ❌ Emails going through Supabase default provider
-                        - ❌ Your SendGrid SMTP settings aren't working
-                        
-                        **Immediate fixes to try:**
-                        1. **Re-enter SMTP credentials** in Supabase dashboard
-                        2. **Toggle SMTP OFF then ON** again
-                        3. **Wait 5 minutes** after saving (propagation delay)
-                        4. **Check SendGrid API key** is still valid
-                        """)
+                    # Test if API key is working
+                    test_result = send_confirmation_email_direct("web34llc@gmail.com", "TestUser", "test-user-123")
+                    if test_result:
+                        st.success("✅ Direct SendGrid API working!")
+                        st.info("📧 Check your email and SendGrid activity feed")
+                    else:
+                        st.error("❌ SendGrid API failed - check your API key in secrets")
+                        st.code("SENDGRID_API_KEY = 'SG.your_actual_key_here'")
                 except Exception as e:
-                    st.error(f"❌ SMTP test completely failed: {str(e)}")
-                    st.info("This might actually be good - means Supabase can't send via default either")
+                    st.error(f"❌ SendGrid error: {str(e)}")
+                    if "api_key" in str(e).lower():
+                        st.warning("🔑 API key issue - check your Streamlit secrets")
             
-            # Test 2: Force test signup with better debugging
-            test_email = st.text_input("Test signup email:", key="test_signup_email", value="web34llc+test@gmail.com")
-            if st.button("🔄 Test Signup Email", key="test_signup") and test_email:
+            # Test 2: Check API key status
+            if st.button("🔑 Check SendGrid API Key", key="check_api_key"):
+                api_key = os.environ.get('SENDGRID_API_KEY')
+                if api_key:
+                    if api_key.startswith('SG.'):
+                        st.success(f"✅ API key found: {api_key[:10]}...")
+                    else:
+                        st.error("❌ API key format looks wrong (should start with 'SG.')")
+                else:
+                    st.error("❌ No SENDGRID_API_KEY found in environment")
+                    st.code("Add to Streamlit Secrets:\nSENDGRID_API_KEY = 'SG.your_key_here'")
+            
+            # Test 3: Full cleanup and test
+            st.markdown("**🧹 Complete User Cleanup:**")
+            cleanup_test_email = st.text_input("Email to completely clean:", key="cleanup_test_email", value="wakeyourmindup21@gmail.com")
+            if st.button("🔥 Nuclear Cleanup User", key="nuclear_cleanup") and cleanup_test_email:
                 try:
-                    # Cleanup first
-                    cleanup_unconfirmed_user(test_email)
+                    # Step 1: Delete from auth
+                    deleted_auth = False
+                    users_response = SRS.auth.admin.list_users()
+                    if users_response and users_response.users:
+                        for user in users_response.users:
+                            if user.email == cleanup_test_email:
+                                SRS.auth.admin.delete_user(user.id)
+                                deleted_auth = True
+                                st.info(f"🗑️ Deleted auth user: {user.id}")
                     
-                    # Create test signup
-                    result = SB.auth.sign_up({
-                        "email": test_email,
-                        "password": "TestPass123!",
-                        "options": {
-                            "data": {"username": f"test_{int(time.time())}"},
-                            "emailRedirectTo": "https://ai-matchmaker-demo.streamlit.app/"
-                        }
-                    })
+                    # Step 2: Clean up all related data
+                    cleanup_pending_signup(cleanup_test_email)
                     
-                    if result.user:
-                        st.success(f"✅ Test signup created!")
-                        st.json({
-                            "email": test_email,
-                            "auth_uid": result.user.id,
-                            "time": datetime.now().isoformat(),
-                            "status": "confirmation_email_should_be_sent",
-                            "email_domain": test_email.split('@')[1],
-                            "note": "Real email domain - should reach SendGrid"
-                        })
-                        st.warning("⏰ Check SendGrid activity feed in 60 seconds")
-                        st.info("🔍 **Expected result:** GREEN 'Delivered' status in SendGrid (like password resets)")
-                        
-                        # Add troubleshooting steps
-                        with st.expander("🚨 If SendGrid shows NO activity (not even 'Not Delivered')"):
-                            st.markdown("""
-                            **This means Supabase is NOT using your SMTP for signup emails:**
-                            
-                            1. **Check email template** - complex templates cause fallback
-                            2. **Verify template variables** - wrong variables break emails  
-                            3. **Test with minimal template** - remove all styling
-                            4. **Contact Supabase support** - SMTP works for password reset but not signup
-                            """)
+                    # Step 3: Reset invite status
+                    SRS.table("invitees").update({"claimed": False}).eq("email", cleanup_test_email).execute()
+                    
+                    if deleted_auth:
+                        st.success(f"✅ Completely cleaned up: {cleanup_test_email}")
                     else:
-                        st.error("❌ Test signup failed - no user returned")
+                        st.info(f"ℹ️ No auth user found for: {cleanup_test_email}")
                         
+                    st.info("🔄 Now try signing up again!")
+                    
                 except Exception as e:
-                    st.error(f"❌ Test signup error: {str(e)}")
+                    st.error(f"❌ Cleanup error: {str(e)}")
             
-            # Test 3: Check recent activity
-            if st.button("📋 Show Recent Signups", key="show_pending"):
-                pending = SRS.table("pending_signups").select("*").order("created_at", desc=True).limit(5).execute().data
-                if pending:
-                    st.json(pending)
-                else:
-                    st.info("No recent pending signups")
-        
-        st.markdown("---")
-        st.subheader("🔍 Email Delivery Diagnosis")
-        
-        col3, col4 = st.columns(2)
-        with col3:
-            st.markdown("""
-            **✅ What's Working:**
-            - SMTP configured in Supabase
-            - SendGrid API key active
-            - App shows signup success message
-            """)
-            
-        with col4:
-            st.markdown("""
-            **❌ What's Not Working:**
-            - No emails in SendGrid activity feed
-            - Confirmation emails not reaching users
-            - Possible Supabase fallback to default provider
-            """)
-        
-        if st.button("🔄 Refresh Page", key="refresh_page"):
-            st.rerun()
-
-    st.markdown("---")  # Separator between admin and main app
-# ─────────────────── EMAIL RESEND INTERFACE ────────────────────────
-if st.session_state.get("show_resend", False):
-    st.warning("⏰ Your confirmation link has expired or failed.")
-    
-    with st.expander("🔄 Resend Confirmation Email", expanded=True):
-        resend_email = st.text_input("Enter your email to resend confirmation:", key="resend_email")
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            if st.button("📧 Resend Email", key="resend_btn"):
-                if resend_email:
-                    if resend_confirmation_email(resend_email):
-                        st.success("✅ Confirmation email resent! Check your inbox.")
-                        st.session_state.show_resend = False
-                        st.rerun()
+            # Test 4: List all auth users
+            if st.button("👥 List All Auth Users", key="list_auth_users"):
+                try:
+                    users_response = SRS.auth.admin.list_users()
+                    if users_response and users_response.users:
+                        st.json([{
+                            "email": user.email,
+                            "id": user.id,
+                            "confirmed": bool(getattr(user, 'email_confirmed_at', None))
+                        } for user in users_response.users])
                     else:
-                        st.error("❌ Failed to resend email. Please check the email address or contact support.")
-                else:
-                    st.warning("Please enter your email address.")
-        
-        with col2:
-            if st.button("❌ Cancel", key="cancel_resend"):
-                st.session_state.show_resend = False
-                st.rerun()
-
+                        st.info("No auth users found")
+                except Exception as e:
+                    st.error(f"❌ Error listing users: {str(e)}")
 # ─────────────────── LOGIN / SIGN‑UP ───────────────────────────────
 if "user" not in st.session_state:
     if Path(LOGO).is_file():
