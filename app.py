@@ -374,14 +374,48 @@ if st.session_state.get("show_admin", False):
         with col2:
             st.subheader("📧 Email System Tests")
             
-            # Test 1: SendGrid SMTP test
-            if st.button("🧪 Test SendGrid SMTP", key="test_smtp"):
+            # Enhanced SMTP Diagnosis
+            st.markdown("**🔍 SMTP Configuration Check:**")
+            smtp_issues = []
+            if st.button("🩺 Diagnose SMTP Issues", key="diagnose_smtp"):
+                st.json({
+                    "expected_smtp_host": "smtp.sendgrid.net",
+                    "expected_port": "587", 
+                    "expected_username": "apikey",
+                    "sender_email": "web34llc@gmail.com",
+                    "issue": "NO emails reaching SendGrid = SMTP not active",
+                    "solutions": [
+                        "1. Re-save SMTP settings in Supabase",
+                        "2. Check SendGrid API key is valid", 
+                        "3. Verify SMTP toggle is ON",
+                        "4. Contact Supabase support if settings correct"
+                    ]
+                })
+            
+            # Test 1: SendGrid SMTP test with better diagnostics
+            if st.button("🧪 Test Password Reset Email", key="test_smtp"):
                 try:
                     result = SB.auth.reset_password_email("web34llc@gmail.com")
-                    st.success("✅ Password reset sent to SendGrid!")
-                    st.info("⏰ Check SendGrid activity feed in 30-60 seconds")
+                    st.warning("⚠️ Supabase says email sent, but NO SendGrid activity!")
+                    st.error("🚫 **SMTP is NOT working** - emails going to default provider")
+                    with st.expander("🔧 SMTP Debug Analysis", expanded=True):
+                        st.markdown("""
+                        **Problem:** Supabase accepts the request but SendGrid shows no activity.
+                        
+                        **This means:**
+                        - ❌ Custom SMTP is NOT actually active
+                        - ❌ Emails going through Supabase default provider
+                        - ❌ Your SendGrid SMTP settings aren't working
+                        
+                        **Immediate fixes to try:**
+                        1. **Re-enter SMTP credentials** in Supabase dashboard
+                        2. **Toggle SMTP OFF then ON** again
+                        3. **Wait 5 minutes** after saving (propagation delay)
+                        4. **Check SendGrid API key** is still valid
+                        """)
                 except Exception as e:
-                    st.error(f"❌ SMTP test failed: {str(e)}")
+                    st.error(f"❌ SMTP test completely failed: {str(e)}")
+                    st.info("This might actually be good - means Supabase can't send via default either")
             
             # Test 2: Force test signup
             test_email = st.text_input("Test signup email:", key="test_signup_email", value="test@example.com")
