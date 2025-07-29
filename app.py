@@ -196,39 +196,58 @@ def send_confirmation_email_direct(email: str, username: str, user_id: str) -> b
         # Create confirmation URL - user clicks this to confirm
         confirmation_url = f"https://ai-matchmaker-demo.streamlit.app/?confirm_email={user_id}&email={email}"
         
+        # More professional, less spammy email template
         html_content = f"""
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
-            <div style="background-color: white; padding: 30px; border-radius: 8px; text-align: center;">
-                <h1 style="color: #f93656; margin-bottom: 10px;">💖 Welcome to BONDIGO!</h1>
-                <p style="font-size: 16px; color: #333; margin-bottom: 20px;">
-                    Hi {username}! Thanks for signing up. Please confirm your email address:
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background-color: #ffffff; padding: 40px; border: 1px solid #e1e5e9; border-radius: 8px;">
+                <h1 style="color: #1a1a1a; font-size: 24px; margin-bottom: 16px; text-align: center;">Confirm Your Email Address</h1>
+                
+                <p style="color: #333333; font-size: 16px; line-height: 1.5; margin-bottom: 24px;">
+                    Hello {username},
                 </p>
-                <div style="margin: 30px 0;">
+                
+                <p style="color: #333333; font-size: 16px; line-height: 1.5; margin-bottom: 32px;">
+                    Thank you for creating your BONDIGO account. To complete your registration, please confirm your email address by clicking the button below:
+                </p>
+                
+                <div style="text-align: center; margin: 32px 0;">
                     <a href="{confirmation_url}" 
-                       style="background-color: #f93656; color: white; padding: 15px 30px; 
-                              text-decoration: none; border-radius: 8px; font-weight: bold; 
+                       style="background-color: #0066cc; color: #ffffff; padding: 12px 24px; 
+                              text-decoration: none; border-radius: 6px; font-weight: 500; 
                               display: inline-block; font-size: 16px;">
-                        Confirm Your Email ✨
+                        Confirm Email Address
                     </a>
                 </div>
-                <p style="color: #666; font-size: 14px; margin-top: 30px;">
-                    If the button doesn't work, copy this link:<br>
-                    <span style="color: #f93656; word-break: break-all;">{confirmation_url}</span>
+                
+                <p style="color: #666666; font-size: 14px; line-height: 1.4; margin-top: 32px;">
+                    If you're unable to click the button above, please copy and paste the following link into your browser:
                 </p>
-                <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
-                <p style="color: #999; font-size: 12px;">
-                    Talk the Lingo · Master the Bond · Dominate the Game
+                
+                <p style="color: #0066cc; font-size: 14px; word-break: break-all; background-color: #f8f9fa; padding: 12px; border-radius: 4px; margin: 16px 0;">
+                    {confirmation_url}
+                </p>
+                
+                <hr style="margin: 32px 0; border: none; border-top: 1px solid #e1e5e9;">
+                
+                <p style="color: #999999; font-size: 12px; text-align: center; margin: 0;">
+                    If you didn't create this account, please ignore this email.
                 </p>
             </div>
         </div>
         """
         
         message = Mail(
-            from_email='web34llc@gmail.com',
+            from_email=('web34llc@gmail.com', 'BONDIGO Team'),  # Add sender name
             to_emails=email,
-            subject='Welcome to BONDIGO! Confirm Your Email',
+            subject='Confirm your BONDIGO account',  # Less promotional subject
             html_content=html_content
         )
+        
+        # Add headers to improve deliverability
+        message.header = {
+            'List-Unsubscribe': '<mailto:unsubscribe@your-domain.com>',
+            'X-Entity-Ref-ID': f'account-confirmation-{user_id}'
+        }
         
         response = sg.send(message)
         logger.info(f"Direct SendGrid email sent to {email}, status: {response.status_code}")
