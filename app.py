@@ -418,7 +418,7 @@ if st.session_state.get("show_admin", False):
                     st.info("This might actually be good - means Supabase can't send via default either")
             
             # Test 2: Force test signup
-            test_email = st.text_input("Test signup email:", key="test_signup_email", value="test@example.com")
+            test_email = st.text_input("Test signup email:", key="test_signup_email", value="web34llc+test@gmail.com")
             if st.button("🔄 Test Signup Email", key="test_signup") and test_email:
                 try:
                     # Cleanup first
