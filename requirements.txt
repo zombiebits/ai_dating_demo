@@ -3,3 +3,4 @@ openai>=1.30
 python-dotenv
 supabase>=1.2.0
 PyJWT>=2.0.0
+sendgrid>=6.0.0

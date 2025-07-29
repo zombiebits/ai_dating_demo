@@ -8,6 +8,8 @@ from openai import OpenAI, OpenAIError, RateLimitError
 from dotenv import load_dotenv
 from supabase import create_client
 from postgrest.exceptions import APIError
+import sendgrid
+from sendgrid.helpers.mail import Mail
 
 st.session_state.show_admin = True
 
@@ -30,14 +32,53 @@ OA  = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 if "user_jwt" in st.session_state:
     SB.postgrest.headers["Authorization"] = f"Bearer {st.session_state.user_jwt}"
 
-# ────────── EMAIL CONFIRMATION & ERROR HANDLING ─────────────
+# ────────── CUSTOM EMAIL CONFIRMATION HANDLER ─────────────
 params = st.query_params
-confirmation_type = params.get("type", [""])[0] if "type" in params else ""
-error_code = params.get("error_code", [""])[0] if "error_code" in params else ""
-error_description = params.get("error_description", [""])[0] if "error_description" in params else ""
 
-# Handle email confirmation
-if confirmation_type == "signup":
+# Handle our custom email confirmation (direct SendGrid)
+if "confirm_email" in params:
+    user_id = params.get("confirm_email", [""])[0] if "confirm_email" in params else ""
+    email = params.get("email", [""])[0] if "email" in params else ""
+    
+    if user_id and email:
+        try:
+            # Confirm the user in Supabase Auth
+            SRS.auth.admin.update_user_by_id(user_id, {"email_confirm": True})
+            
+            # Check if user row exists, create if needed
+            existing_user = get_user_row(user_id)
+            if not existing_user:
+                pending = get_pending_signup(email)
+                if pending:
+                    username = pending["username"]
+                    logger.info(f"Creating user row for confirmed user: {email} with username: {username}")
+                    
+                    create_user_row(user_id, username)
+                    SRS.table("invitees").update({"claimed": True}).eq("email", email).execute()
+                    cleanup_pending_signup(email)
+                    
+                    st.success("✅ Your email has been confirmed! You can now sign in below.")
+                else:
+                    st.error("❌ Confirmation link expired or invalid.")
+            else:
+                st.info("✅ Your email is already confirmed. You can sign in below.")
+            
+            if st.button("Continue to Sign In"):
+                st.query_params.clear()
+                st.rerun()
+                
+        except Exception as e:
+            logger.error(f"Custom email confirmation error: {str(e)}")
+            st.error(f"❌ Email confirmation error: {str(e)}")
+    else:
+        st.error("❌ Invalid confirmation link.")
+
+# Keep original Supabase confirmation as fallback
+elif "type" in params and params["type"][0] == "signup":
+    confirmation_type = params.get("type", [""])[0] if "type" in params else ""
+    error_code = params.get("error_code", [""])[0] if "error_code" in params else ""
+    error_description = params.get("error_description", [""])[0] if "error_description" in params else ""
+
     access_token = params.get("access_token", [""])[0] if "access_token" in params else ""
     refresh_token = params.get("refresh_token", [""])[0] if "refresh_token" in params else ""
     
@@ -147,6 +188,56 @@ COMPANIONS = json.load(open(BASE / "companions.json", encoding="utf-8-sig"))
 CID2COMP   = {c["id"]: c for c in COMPANIONS}
 
 # ─────────────────── HELPERS ───────────────────────────────────────
+def send_confirmation_email_direct(email: str, username: str, user_id: str) -> bool:
+    """Send confirmation email directly via SendGrid API (bypass Supabase)"""
+    try:
+        sg = sendgrid.SendGridAPIClient(api_key=os.environ.get('SENDGRID_API_KEY'))
+        
+        # Create confirmation URL - user clicks this to confirm
+        confirmation_url = f"https://ai-matchmaker-demo.streamlit.app/?confirm_email={user_id}&email={email}"
+        
+        html_content = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+            <div style="background-color: white; padding: 30px; border-radius: 8px; text-align: center;">
+                <h1 style="color: #f93656; margin-bottom: 10px;">💖 Welcome to BONDIGO!</h1>
+                <p style="font-size: 16px; color: #333; margin-bottom: 20px;">
+                    Hi {username}! Thanks for signing up. Please confirm your email address:
+                </p>
+                <div style="margin: 30px 0;">
+                    <a href="{confirmation_url}" 
+                       style="background-color: #f93656; color: white; padding: 15px 30px; 
+                              text-decoration: none; border-radius: 8px; font-weight: bold; 
+                              display: inline-block; font-size: 16px;">
+                        Confirm Your Email ✨
+                    </a>
+                </div>
+                <p style="color: #666; font-size: 14px; margin-top: 30px;">
+                    If the button doesn't work, copy this link:<br>
+                    <span style="color: #f93656; word-break: break-all;">{confirmation_url}</span>
+                </p>
+                <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
+                <p style="color: #999; font-size: 12px;">
+                    Talk the Lingo · Master the Bond · Dominate the Game
+                </p>
+            </div>
+        </div>
+        """
+        
+        message = Mail(
+            from_email='web34llc@gmail.com',
+            to_emails=email,
+            subject='Welcome to BONDIGO! Confirm Your Email',
+            html_content=html_content
+        )
+        
+        response = sg.send(message)
+        logger.info(f"Direct SendGrid email sent to {email}, status: {response.status_code}")
+        return response.status_code == 202
+        
+    except Exception as e:
+        logger.error(f"Direct SendGrid email failed: {str(e)}")
+        return False
+
 def apply_daily_airdrop(user: dict) -> dict:
     last = user["last_airdrop"] or user["created_at"]
     last_dt = datetime.fromisoformat(last.replace("Z","+00:00"))
@@ -289,15 +380,13 @@ def resend_confirmation_email(email: str) -> bool:
             logger.warning(f"No pending signup found for resend: {email}")
             return False
         
-        SB.auth.resend(type="signup", email=email)
-        
-        SRS.table("pending_signups")\
-           .update({"expires_at": (datetime.now(timezone.utc) + timedelta(hours=CONFIRMATION_EXPIRY_HOURS)).isoformat()})\
-           .eq("email", email)\
-           .execute()
-        
-        logger.info(f"Resent confirmation email to: {email}")
-        return True
+        # Use direct SendGrid for resend
+        if pending.get("auth_uid"):
+            return send_confirmation_email_direct(email, pending["username"], pending["auth_uid"])
+        else:
+            logger.error(f"No auth_uid found for pending signup: {email}")
+            return False
+            
     except Exception as e:
         logger.error(f"Failed to resend confirmation email: {str(e)}")
         return False
@@ -567,7 +656,7 @@ if "user" not in st.session_state:
             st.error("❌ System error. Please try again.")
             st.stop()
 
-        # ─── SIGN UP WITH WORKING EMAIL CONFIRMATION ─────────────────────────────
+        # ─── SIGN UP WITH DIRECT SENDGRID EMAIL ─────────────────────────────
         if mode == "Sign up":
             if invite[0]["claimed"]:
                 st.error("🚫 This email has already been used.")
@@ -599,53 +688,51 @@ if "user" not in st.session_state:
                 st.error("❌ Failed to process signup. Please try again.")
                 st.stop()
 
-            # Use the WORKING link-based confirmation with SendGrid
+            # Create user in Supabase Auth WITHOUT email confirmation
             try:
                 res = SB.auth.sign_up({
                     "email": email, 
                     "password": pwd,
                     "options": {
-                        "data": {"username": uname},
-                        "emailRedirectTo": "https://ai-matchmaker-demo.streamlit.app/"
+                        "data": {"username": uname}
+                        # NO emailRedirectTo - we handle emails ourselves
                     }
                 })
                 
                 if res.user:
+                    # Store the auth_uid for later confirmation
                     SRS.table("pending_signups")\
                        .update({"auth_uid": res.user.id})\
                        .eq("email", email)\
                        .execute()
                     
-                    logger.info(f"Link-based signup initiated for: {email} with username: {uname}")
-                    
-                    # Enhanced success message with better guidance
-                    st.success("✅ Check your email for the confirmation link!")
-                    
-                    st.info("📧 **Where to look for your email:**")
-                    st.markdown("""
-                    - 📥 **Primary inbox** (Gmail main tab)
-                    - 🎯 **Promotions tab** (most likely location)  
-                    - 🚫 **Spam folder** (check here too)
-                    - 📱 **Mobile app notifications**
-                    """)
-                    
-                    st.warning("🔍 **Search your email** for 'BONDIGO' or 'Welcome to BONDIGO' if you can't find it!")
-                    
-                    st.info("💡 After clicking the confirmation link, come back here and sign in with your credentials.")
-                    
-                    # Show helpful debug info
-                    with st.expander("🔧 Troubleshooting Info", expanded=False):
-                        st.json({
-                            "email": email,
-                            "auth_uid": res.user.id,
-                            "signup_time": datetime.now().isoformat(),
-                            "status": "confirmation_email_sent_via_sendgrid",
-                            "note": "Email should appear in SendGrid activity feed"
-                        })
-                        st.markdown("**If no email arrives in 5 minutes:**")
-                        st.markdown("1. Check SendGrid activity feed")
-                        st.markdown("2. Try the 'Resend Email' option below")
-                        st.markdown("3. Contact support if still having issues")
+                    # Send confirmation email directly via SendGrid
+                    if send_confirmation_email_direct(email, uname, res.user.id):
+                        logger.info(f"Direct SendGrid signup email sent to: {email}")
+                        
+                        st.success("✅ Account created! Check your email for confirmation link.")
+                        st.info("📧 **Email sent directly via SendGrid** (bypassing Supabase)")
+                        
+                        st.markdown("""
+                        **Where to look for your email:**
+                        - 📥 **Primary inbox** (Gmail main tab)
+                        - 🎯 **Promotions tab** (most likely location)  
+                        - 🚫 **Spam folder** (check here too)
+                        - 🔍 **Search** for "BONDIGO" if you can't find it
+                        """)
+                        
+                        with st.expander("🔧 Technical Details", expanded=False):
+                            st.json({
+                                "email": email,
+                                "auth_uid": res.user.id,
+                                "signup_time": datetime.now().isoformat(),
+                                "email_method": "direct_sendgrid_api",
+                                "status": "reliable_delivery_expected"
+                            })
+                        
+                    else:
+                        st.error("❌ Account created but email failed to send. Please contact support.")
+                        st.info("You can try signing up again or contact support for manual confirmation.")
                     
                     st.stop()
                 else:
@@ -656,7 +743,7 @@ if "user" not in st.session_state:
             except Exception as e:
                 cleanup_pending_signup(email)
                 error_msg = str(e)
-                logger.error(f"Link-based signup error for {email}: {error_msg}")
+                logger.error(f"Direct SendGrid signup error for {email}: {error_msg}")
                 
                 if "already registered" in error_msg.lower():
                     st.error("🚫 This email is already registered. Please sign in instead.")
