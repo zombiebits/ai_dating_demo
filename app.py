@@ -9,6 +9,8 @@ from dotenv import load_dotenv
 from supabase import create_client
 from postgrest.exceptions import APIError
 
+st.session_state.show_admin = True
+
 # ─────────────────── LOGGING SETUP ─────────────────────────────────
 logging.basicConfig(
     level=logging.INFO,
