@@ -545,16 +545,34 @@ if st.session_state.get('show_admin', True):  # Set to True for development
             if st.button("👥 List All Auth Users", key="list_auth_users"):
                 try:
                     users_response = SRS.auth.admin.list_users()
-                    if users_response and users_response.users:
-                        st.json([{
-                            "email": user.email,
-                            "id": user.id,
-                            "confirmed": bool(getattr(user, 'email_confirmed_at', None))
-                        } for user in users_response.users])
+                    st.info(f"Raw response type: {type(users_response)}")
+                    st.json({"raw_response": str(users_response)})
+        
+                    # Try different ways to access users
+                    if hasattr(users_response, 'users'):
+                        users = users_response.users
+                    elif isinstance(users_response, list):
+                        users = users_response
+                    elif hasattr(users_response, 'data'):
+                        users = users_response.data
                     else:
-                        st.info("No auth users found")
+                        st.error("Unknown response format")
+                        st.json(dir(users_response))
+                        users = []
+                    
+                    if users:
+                        st.json([{
+                            "email": getattr(user, 'email', 'No email'),
+                            "id": getattr(user, 'id', 'No id'), 
+                            "confirmed": bool(getattr(user, 'email_confirmed_at', None) or getattr(user, 'confirmed_at', None))
+                        } for user in users])
+                    else:
+                        st.info("No auth users found or unable to parse response")
+                        
                 except Exception as e:
                     st.error(f"❌ Error listing users: {str(e)}")
+                    st.info("This might be a Supabase API version difference")
+
             
             # Resend confirmation email test
             st.markdown("**📨 Resend Confirmation:**")
