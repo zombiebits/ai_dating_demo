@@ -435,8 +435,47 @@ def goto_chat(cid: str):
 # Replace your existing admin panel code with this version that works in main area
 # Put this RIGHT AFTER your streamlit config and CSS, before the login section
 
-# ─────────────────── ADMIN PANEL (MAIN AREA) ─────────────
-with col2:
+# ─────────────────── ADMIN PANEL (BEFORE LOGIN) ─────────────
+# Place this RIGHT AFTER your CSS styling and BEFORE the login section
+# This allows testing email functionality without being logged in
+
+if st.session_state.get('show_admin', True):  # Set to True for development
+    with st.expander("🔧 Admin Panel - Email Testing (Development)", expanded=False):
+        # Create proper column layout
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("📊 User Status Check")
+            
+            check_email = st.text_input("Check user status:", key="check_user_email")
+            if st.button("🔍 Check Status", key="check_status") and check_email:
+                try:
+                    status = check_user_status(check_email)
+                    st.json(status)
+                    
+                    # Show pending signup info
+                    pending = get_pending_signup(check_email)
+                    if pending:
+                        st.info("📋 Pending signup found:")
+                        st.json({
+                            "username": pending["username"],
+                            "created_at": pending["created_at"],
+                            "expires_at": pending["expires_at"],
+                            "auth_uid": pending.get("auth_uid", "Not set")
+                        })
+                        
+                except Exception as e:
+                    st.error(f"❌ Error checking status: {str(e)}")
+            
+            # Cleanup expired signups
+            if st.button("🧹 Cleanup Expired Signups", key="cleanup_expired"):
+                try:
+                    cleanup_expired_signups()
+                    st.success("✅ Cleanup completed")
+                except Exception as e:
+                    st.error(f"❌ Cleanup error: {str(e)}")
+
+        with col2:
             st.subheader("📧 Direct SendGrid Tests")
             
             # Test 1: Direct SendGrid API test
@@ -466,8 +505,11 @@ with col2:
                 else:
                     st.error("❌ No SENDGRID_API_KEY found in environment")
                     st.code("Add to Streamlit Secrets:\nSENDGRID_API_KEY = 'SG.your_key_here'")
-            
-            # Test 3: Full cleanup and test
+        
+        # Additional row for more tests
+        col3, col4 = st.columns(2)
+        
+        with col3:
             st.markdown("**🧹 Complete User Cleanup:**")
             cleanup_test_email = st.text_input("Email to completely clean:", key="cleanup_test_email", value="wakeyourmindup21@gmail.com")
             if st.button("🔥 Nuclear Cleanup User", key="nuclear_cleanup") and cleanup_test_email:
@@ -497,7 +539,8 @@ with col2:
                     
                 except Exception as e:
                     st.error(f"❌ Cleanup error: {str(e)}")
-            
+        
+        with col4:
             # Test 4: List all auth users
             if st.button("👥 List All Auth Users", key="list_auth_users"):
                 try:
@@ -512,6 +555,20 @@ with col2:
                         st.info("No auth users found")
                 except Exception as e:
                     st.error(f"❌ Error listing users: {str(e)}")
+            
+            # Resend confirmation email test
+            st.markdown("**📨 Resend Confirmation:**")
+            resend_email = st.text_input("Email to resend:", key="resend_email")
+            if st.button("📤 Resend", key="resend_confirm") and resend_email:
+                try:
+                    if resend_confirmation_email(resend_email):
+                        st.success("✅ Confirmation email resent!")
+                    else:
+                        st.error("❌ Failed to resend confirmation email")
+                except Exception as e:
+                    st.error(f"❌ Resend error: {str(e)}")
+
+    st.markdown("---")  # Add a separator before login section
 # ─────────────────── LOGIN / SIGN‑UP ───────────────────────────────
 if "user" not in st.session_state:
     if Path(LOGO).is_file():
