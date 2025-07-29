@@ -343,61 +343,110 @@ def goto_chat(cid: str):
     st.session_state.chat_cid = cid
 
 # ─────────────────── ADMIN PANEL (DEVELOPMENT ONLY) ─────────────
-if st.sidebar.button("🔧 Admin Panel (Dev Only)"):
+# Replace your existing admin panel code with this version that works in main area
+# Put this RIGHT AFTER your streamlit config and CSS, before the login section
+
+# ─────────────────── ADMIN PANEL (MAIN AREA) ─────────────
+# Show admin toggle button in main area instead of hidden sidebar
+if st.button("🔧 Toggle Admin Panel (Dev Only)", key="admin_toggle"):
     st.session_state.show_admin = not st.session_state.get("show_admin", False)
 
 if st.session_state.get("show_admin", False):
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("🔧 Admin Tools")
-    
-    check_email = st.sidebar.text_input("Check user status:", key="admin_check_email")
-    if st.sidebar.button("Check Status") and check_email:
-        status = check_user_status(check_email)
-        st.sidebar.json(status)
-    
-    cleanup_email = st.sidebar.text_input("Cleanup unconfirmed user:", key="admin_cleanup_email")
-    if st.sidebar.button("⚠️ Cleanup User") and cleanup_email:
-        if cleanup_unconfirmed_user(cleanup_email):
-            st.sidebar.success("✅ User cleaned up")
-        else:
-            st.sidebar.error("❌ Cleanup failed")
-    
-    if st.sidebar.button("View Pending Signups"):
-        pending = SRS.table("pending_signups").select("*").execute().data
-        st.sidebar.json(pending)
+    st.markdown("---")
+    with st.expander("🔧 Admin Tools & Email Debugging", expanded=True):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("📊 User Status Check")
+            check_email = st.text_input("Check user status:", key="admin_check_email")
+            if st.button("Check Status", key="check_status_btn") and check_email:
+                status = check_user_status(check_email)
+                st.json(status)
+            
+            st.subheader("🧹 Cleanup Tools")
+            cleanup_email = st.text_input("Cleanup unconfirmed user:", key="admin_cleanup_email")
+            if st.button("⚠️ Cleanup User", key="cleanup_user_btn") and cleanup_email:
+                if cleanup_unconfirmed_user(cleanup_email):
+                    st.success("✅ User cleaned up")
+                else:
+                    st.error("❌ Cleanup failed")
+        
+        with col2:
+            st.subheader("📧 Email System Tests")
+            
+            # Test 1: SendGrid SMTP test
+            if st.button("🧪 Test SendGrid SMTP", key="test_smtp"):
+                try:
+                    result = SB.auth.reset_password_email("web34llc@gmail.com")
+                    st.success("✅ Password reset sent to SendGrid!")
+                    st.info("⏰ Check SendGrid activity feed in 30-60 seconds")
+                except Exception as e:
+                    st.error(f"❌ SMTP test failed: {str(e)}")
+            
+            # Test 2: Force test signup
+            test_email = st.text_input("Test signup email:", key="test_signup_email", value="test@example.com")
+            if st.button("🔄 Test Signup Email", key="test_signup") and test_email:
+                try:
+                    # Cleanup first
+                    cleanup_unconfirmed_user(test_email)
+                    
+                    # Create test signup
+                    result = SB.auth.sign_up({
+                        "email": test_email,
+                        "password": "TestPass123!",
+                        "options": {
+                            "data": {"username": f"test_{int(time.time())}"},
+                            "emailRedirectTo": "https://ai-matchmaker-demo.streamlit.app/"
+                        }
+                    })
+                    
+                    if result.user:
+                        st.success(f"✅ Test signup created!")
+                        st.json({
+                            "email": test_email,
+                            "auth_uid": result.user.id,
+                            "time": datetime.now().isoformat(),
+                            "status": "confirmation_email_should_be_sent"
+                        })
+                        st.warning("⏰ Check SendGrid activity feed in 60 seconds")
+                    else:
+                        st.error("❌ Test signup failed - no user returned")
+                        
+                except Exception as e:
+                    st.error(f"❌ Test signup error: {str(e)}")
+            
+            # Test 3: Check recent activity
+            if st.button("📋 Show Recent Signups", key="show_pending"):
+                pending = SRS.table("pending_signups").select("*").order("created_at", desc=True).limit(5).execute().data
+                if pending:
+                    st.json(pending)
+                else:
+                    st.info("No recent pending signups")
+        
+        st.markdown("---")
+        st.subheader("🔍 Email Delivery Diagnosis")
+        
+        col3, col4 = st.columns(2)
+        with col3:
+            st.markdown("""
+            **✅ What's Working:**
+            - SMTP configured in Supabase
+            - SendGrid API key active
+            - App shows signup success message
+            """)
+            
+        with col4:
+            st.markdown("""
+            **❌ What's Not Working:**
+            - No emails in SendGrid activity feed
+            - Confirmation emails not reaching users
+            - Possible Supabase fallback to default provider
+            """)
+        
+        if st.button("🔄 Refresh Page", key="refresh_page"):
+            st.rerun()
 
-cleanup_expired_signups()
-
-if st.sidebar.button("🧪 Test Email"):
-    try:
-        SB.auth.reset_password_email("test@example.com")
-        st.sidebar.success("Email system working!")
-    except Exception as e:
-        st.sidebar.error(f"Email system broken: {str(e)}")
-
-        # Add this after your existing admin panel code:
-if st.session_state.get("show_admin", False):
-    # Your existing admin panel code...
-    
-    # ADD THIS NEW SECTION:
-    st.sidebar.markdown("### 📧 Email System Test")
-    
-    if st.sidebar.button("🧪 Test SendGrid Connection"):
-        try:
-            # Test password reset (should work with SendGrid)
-            result = SB.auth.reset_password_email("web34llc@gmail.com")
-            st.sidebar.success("✅ SendGrid test sent!")
-            st.sidebar.info("Check SendGrid activity feed now")
-        except Exception as e:
-            st.sidebar.error(f"❌ SendGrid test failed: {str(e)}")
-    
-    if st.sidebar.button("🔍 Check Email Settings"):
-        st.sidebar.json({
-            "smtp_enabled": "Should be using custom SMTP",
-            "issue": "Confirmation emails might use default system",
-            "solution": "Check Supabase email provider settings"
-        })
-
+    st.markdown("---")  # Separator between admin and main app
 # ─────────────────── EMAIL RESEND INTERFACE ────────────────────────
 if st.session_state.get("show_resend", False):
     st.warning("⏰ Your confirmation link has expired or failed.")
