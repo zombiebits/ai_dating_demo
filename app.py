@@ -32,18 +32,29 @@ OA  = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 if "user_jwt" in st.session_state:
     SB.postgrest.headers["Authorization"] = f"Bearer {st.session_state.user_jwt}"
 
+
 # ────────── CUSTOM EMAIL CONFIRMATION HANDLER ─────────────
 params = st.query_params
 
 # Handle our custom email confirmation (direct SendGrid)
 if "confirm_email" in params:
-    user_id = params.get("confirm_email", [""])[0] if "confirm_email" in params else ""
-    email = params.get("email", [""])[0] if "email" in params else ""
+    # Fix parameter parsing - get the actual values, not lists
+    user_id = params.get("confirm_email", "")
+    email = params.get("email", "")
+    
+    # Handle both list and string formats from query params
+    if isinstance(user_id, list):
+        user_id = user_id[0] if user_id else ""
+    if isinstance(email, list):
+        email = email[0] if email else ""
+    
+    logger.info(f"Email confirmation attempt: user_id={user_id}, email={email}")
     
     if user_id and email:
         try:
             # Confirm the user in Supabase Auth
             SRS.auth.admin.update_user_by_id(user_id, {"email_confirm": True})
+            logger.info(f"Successfully confirmed user in Supabase Auth: {user_id}")
             
             # Check if user row exists, create if needed
             existing_user = get_user_row(user_id)
@@ -59,8 +70,10 @@ if "confirm_email" in params:
                     
                     st.success("✅ Your email has been confirmed! You can now sign in below.")
                 else:
+                    logger.warning(f"No pending signup found for confirmed email: {email}")
                     st.error("❌ Confirmation link expired or invalid.")
             else:
+                logger.info(f"User row already exists for: {user_id}")
                 st.info("✅ Your email is already confirmed. You can sign in below.")
             
             if st.button("Continue to Sign In"):
@@ -70,17 +83,48 @@ if "confirm_email" in params:
         except Exception as e:
             logger.error(f"Custom email confirmation error: {str(e)}")
             st.error(f"❌ Email confirmation error: {str(e)}")
+            
+            # Show debug info
+            with st.expander("🔧 Debug Info", expanded=True):
+                st.json({
+                    "user_id": user_id,
+                    "email": email,
+                    "error": str(e),
+                    "error_type": type(e).__name__
+                })
     else:
-        st.error("❌ Invalid confirmation link.")
+        logger.error(f"Invalid confirmation parameters: user_id={user_id}, email={email}")
+        st.error("❌ Invalid confirmation link - missing parameters.")
+        
+        # Show debug info for troubleshooting
+        with st.expander("🔧 Debug Info", expanded=True):
+            st.json({
+                "user_id": user_id,
+                "email": email,
+                "all_params": dict(params)
+            })
 
 # Keep original Supabase confirmation as fallback
-elif "type" in params and params["type"][0] == "signup":
-    confirmation_type = params.get("type", [""])[0] if "type" in params else ""
-    error_code = params.get("error_code", [""])[0] if "error_code" in params else ""
-    error_description = params.get("error_description", [""])[0] if "error_description" in params else ""
+elif "type" in params and params.get("type") and (isinstance(params["type"], list) and params["type"][0] == "signup" or params["type"] == "signup"):
+    confirmation_type = params.get("type")
+    if isinstance(confirmation_type, list):
+        confirmation_type = confirmation_type[0] if confirmation_type else ""
+    
+    error_code = params.get("error_code")
+    if isinstance(error_code, list):
+        error_code = error_code[0] if error_code else ""
+    
+    error_description = params.get("error_description")
+    if isinstance(error_description, list):
+        error_description = error_description[0] if error_description else ""
 
-    access_token = params.get("access_token", [""])[0] if "access_token" in params else ""
-    refresh_token = params.get("refresh_token", [""])[0] if "refresh_token" in params else ""
+    access_token = params.get("access_token")
+    if isinstance(access_token, list):
+        access_token = access_token[0] if access_token else ""
+    
+    refresh_token = params.get("refresh_token")
+    if isinstance(refresh_token, list):
+        refresh_token = refresh_token[0] if refresh_token else ""
     
     if error_code:
         logger.error(f"Email confirmation error: {error_code} - {error_description}")
@@ -135,8 +179,13 @@ elif "type" in params and params["type"][0] == "signup":
 
 # Also check for fragment parameters (alternative method)
 elif st.query_params.get("access_token"):
-    access_token = params.get("access_token", [""])[0] if "access_token" in params else ""
-    refresh_token = params.get("refresh_token", [""])[0] if "refresh_token" in params else ""
+    access_token = params.get("access_token")
+    if isinstance(access_token, list):
+        access_token = access_token[0] if access_token else ""
+    
+    refresh_token = params.get("refresh_token")
+    if isinstance(refresh_token, list):
+        refresh_token = refresh_token[0] if refresh_token else ""
     
     if access_token and refresh_token:
         try:
