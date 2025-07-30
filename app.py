@@ -996,17 +996,20 @@ if "page" not in st.session_state:
 if "button_clicked" not in st.session_state:
     st.session_state.button_clicked = False
 
+# Store the current page before radio
+previous_page = st.session_state.page
+
 page = st.radio(
     "", ["Find matches","Chat","My Collection"],
     index=["Find matches","Chat","My Collection"].index(st.session_state.page),
     key="page_nav", horizontal=True
 )
 
-# Update session state only if different AND clear conflicts
-if page != st.session_state.page:
+# Only update if RADIO actually changed (not other interactions)
+if page != previous_page:
     st.session_state.page = page
     st.session_state.button_clicked = False  # Reset button state
-    # Clear chat-specific state when leaving chat
+    # Clear chat-specific state when leaving chat via RADIO only
     if page != "Chat":
         st.session_state.chat_cid = None
 
