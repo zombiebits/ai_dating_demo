@@ -1095,15 +1095,29 @@ elif page == "My Collection":
     colset = collection_set(user["id"])
     if not colset:
         st.info("No Bonds yet.")
-    for cid in sorted(colset):
-        c   = CID2COMP[cid]
-        rar = c.get("rarity","Common"); clr = CLR[rar]
-        col1, col2 = st.columns([1,5])
-        col1.image(c.get("photo",PLACEHOLDER), width=80)
-        col2.markdown(
-          f"<span style='background:{clr};color:black;padding:2px 6px;"
-          f"border-radius:4px;font-size:0.75rem'>{rar}</span> "
-          f"**{c['name']}**  \n"
-          f"<span style='font-size:0.85rem'>{c['bio']}</span>",
-          unsafe_allow_html=True,
-        )
+    else:
+        for cid in sorted(colset):
+            c   = CID2COMP[cid]
+            rar = c.get("rarity","Common"); clr = CLR[rar]
+            
+            # Create columns: image, info, chat button
+            col1, col2, col3 = st.columns([1, 4, 1])
+            
+            with col1:
+                col1.image(c.get("photo",PLACEHOLDER), width=80)
+            
+            with col2:
+                col2.markdown(
+                  f"<span style='background:{clr};color:black;padding:2px 6px;"
+                  f"border-radius:4px;font-size:0.75rem'>{rar}</span> "
+                  f"**{c['name']}**  \n"
+                  f"<span style='font-size:0.85rem'>{c['bio']}</span>",
+                  unsafe_allow_html=True,
+                )
+            
+            with col3:
+                # Chat button for each character
+                if col3.button("💬 Chat", key=f"collection_chat_{cid}", use_container_width=True):
+                    st.session_state.page = "Chat"
+                    st.session_state.chat_cid = cid
+                    st.rerun()
