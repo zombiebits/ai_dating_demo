@@ -708,12 +708,40 @@ if DEV_MODE:
                     st.error(f"❌ Resend error: {str(e)}")
 
     st.markdown("---")  # Add a separator before login section
-# ─────────────────── PERSISTENT LOGIN CHECK (MOVED TO TOP) ───────────────────
+# ─────────────────── PERSISTENT LOGIN CHECK (ROBUST VERSION) ───────────────────
 # Check for auto-login from successful sign-in
-if "user" not in st.session_state and "auto_login" in st.query_params:
-    user_id = st.query_params.get("auto_login")
-    if isinstance(user_id, list):
-        user_id = user_id[0] if user_id else ""
+if "user" not in st.session_state:
+    # Check URL parameter first
+    user_id = None
+    if "auto_login" in st.query_params:
+        user_id = st.query_params.get("auto_login")
+        if isinstance(user_id, list):
+            user_id = user_id[0] if user_id else ""
+    
+    # Also check for stored session ID using JavaScript
+    if not user_id:
+        # Use HTML/JavaScript to check sessionStorage
+        session_check = st.empty()
+        with session_check.container():
+            st.markdown("""
+            <script>
+            const storedUserId = sessionStorage.getItem('bondigo_user_id');
+            if (storedUserId) {
+                // Set URL parameter if we have stored user ID
+                const url = new URL(window.location);
+                url.searchParams.set('stored_login', storedUserId);
+                window.location.href = url.toString();
+            }
+            </script>
+            """, unsafe_allow_html=True)
+        
+        # Check for the stored_login parameter
+        if "stored_login" in st.query_params:
+            user_id = st.query_params.get("stored_login")
+            if isinstance(user_id, list):
+                user_id = user_id[0] if user_id else ""
+            # Clear the temporary parameter
+            st.query_params.clear()
     
     if user_id:
         try:
@@ -731,12 +759,24 @@ if "user" not in st.session_state and "auto_login" in st.query_params:
                 st.session_state.flash = None
                 st.session_state.show_resend = False
                 
-                # Clear the auto_login parameter and rerun
+                # Store in sessionStorage for future refreshes
+                st.markdown(f"""
+                <script>
+                sessionStorage.setItem('bondigo_user_id', '{user_id}');
+                </script>
+                """, unsafe_allow_html=True)
+                
+                # Clear URL parameters and rerun
                 st.query_params.clear()
                 st.rerun()
         except Exception as e:
-            # If auto-login fails, just continue to normal login
+            # If auto-login fails, clear storage and continue to normal login
             logger.warning(f"Auto-login failed for {user_id}: {str(e)}")
+            st.markdown("""
+            <script>
+            sessionStorage.removeItem('bondigo_user_id');
+            </script>
+            """, unsafe_allow_html=True)
             st.query_params.clear()
 
 # ─────────────────── LOGIN / SIGN‑UP ───────────────────────────────
@@ -980,8 +1020,14 @@ if "user" not in st.session_state:
         st.session_state.flash    = None
         st.session_state.show_resend = False
 
-        # Set auto-login parameter for session persistence
+        # Store session in both URL and sessionStorage for persistence
         st.query_params["auto_login"] = user["auth_uid"]
+        st.markdown(f"""
+        <script>
+        sessionStorage.setItem('bondigo_user_id', '{user["auth_uid"]}');
+        </script>
+        """, unsafe_allow_html=True)
+        
         st.rerun()
 
     st.stop()
