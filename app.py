@@ -11,7 +11,11 @@ from postgrest.exceptions import APIError
 import sendgrid
 from sendgrid.helpers.mail import Mail
 
-st.session_state.show_admin = True
+# ─────────────────── DEVELOPMENT MODE TOGGLE ─────────────────────
+# Set to False for production, True for development
+DEV_MODE = os.environ.get('DEV_MODE', 'False').lower() == 'true'
+
+
 
 # ─────────────────── LOGGING SETUP ─────────────────────────────────
 logging.basicConfig(
@@ -507,7 +511,7 @@ def goto_chat(cid: str):
 # Place this RIGHT AFTER your CSS styling and BEFORE the login section
 # This allows testing email functionality without being logged in
 
-if st.session_state.get('show_admin', True):  # Set to True for development
+if DEV_MODE:
     with st.expander("🔧 Admin Panel - Email Testing (Development)", expanded=False):
         # Create proper column layout
         col1, col2 = st.columns(2)
