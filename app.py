@@ -501,16 +501,27 @@ elif "type" in params and params.get("type"):
 def bond_and_chat(cid: str, comp: dict):
     ok, new_user = buy(st.session_state.user, comp)
     if ok:
-        st.session_state.user     = new_user
-        st.session_state.page     = "Chat"
+        # Update user first
+        st.session_state.user = new_user
+        
+        # Clear any existing page state conflicts
+        st.session_state.page = "Chat"
         st.session_state.chat_cid = cid
-        st.session_state.flash    = f"Bonded with {comp['name']}!"
+        st.session_state.flash = f"Bonded with {comp['name']}!"
+        
+        # Force immediate rerun to prevent state conflicts
+        st.rerun()
     else:
         st.warning(new_user)
 
 def goto_chat(cid: str):
-    st.session_state.page     = "Chat"
+    # Clear any conflicting state
+    st.session_state.page = "Chat"
     st.session_state.chat_cid = cid
+    st.session_state.flash = None  # Clear any old flash messages
+    
+    # Force immediate rerun
+    st.rerun()
 
 # ─────────────────── ADMIN PANEL (DEVELOPMENT ONLY) ─────────────
 # Replace your existing admin panel code with this version that works in main area
@@ -980,15 +991,23 @@ st.markdown(
 if "page" not in st.session_state:
     st.session_state.page = "Find matches"
 
+# Clear any lingering button states that might interfere
+if "button_clicked" not in st.session_state:
+    st.session_state.button_clicked = False
+
 page = st.radio(
     "", ["Find matches","Chat","My Collection"],
     index=["Find matches","Chat","My Collection"].index(st.session_state.page),
-    key="page_nav", horizontal=True  # Changed key to avoid conflict
+    key="page_nav", horizontal=True
 )
 
-# Update session state only if different
+# Update session state only if different AND clear conflicts
 if page != st.session_state.page:
     st.session_state.page = page
+    st.session_state.button_clicked = False  # Reset button state
+    # Clear chat-specific state when leaving chat
+    if page != "Chat":
+        st.session_state.chat_cid = None
 
 
 # ─────────────────── FIND MATCHES ────────────────────────────────
@@ -1007,11 +1026,14 @@ if page == "Find matches":
     scene = st.selectbox("Pick a scene",   ["beach","forest","cafe","space‑station",
                    "cyberpunk‑city","medieval‑castle","mountain","underwater",
                    "neon‑disco","cozy‑library"])
+    
     if st.button("Show matches"):
         st.session_state.matches = (
            [c for c in COMPANIONS if all(t in c["tags"] for t in (hobby,trait,vibe,scene))]
            or random.sample(COMPANIONS, 5)
         )
+        # Clear any button conflicts
+        st.session_state.button_clicked = False
 
     for c in st.session_state.matches:
         rarity, clr = c.get("rarity","Common"), CLR[c.get("rarity","Common")]
@@ -1024,12 +1046,22 @@ if page == "Find matches":
           f"<span class='match-bio'>{c['bio']}</span>",
           unsafe_allow_html=True,
         )
+        
+        # Enhanced button handling with unique keys and disabled state
         if c["id"] in colset:
-            c3.button("💬 Chat", key=f"chat-{c['id']}",
-                      on_click=goto_chat, args=(c["id"],))
+            if c3.button("💬 Chat", 
+                        key=f"chat-{c['id']}", 
+                        disabled=st.session_state.get('button_clicked', False),
+                        use_container_width=True):
+                st.session_state.button_clicked = True
+                goto_chat(c["id"])
         else:
-            c3.button("💖 Bond", key=f"bond-{c['id']}",
-                      on_click=bond_and_chat, args=(c["id"],c))
+            if c3.button("💖 Bond", 
+                        key=f"bond-{c['id']}", 
+                        disabled=st.session_state.get('button_clicked', False),
+                        use_container_width=True):
+                st.session_state.button_clicked = True
+                bond_and_chat(c["id"], c)
 
 # ─────────────────── CHAT ────────────────────────────────────────
 elif page == "Chat":
@@ -1140,8 +1172,29 @@ elif page == "My Collection":
                 )
             
             with col3:
-                # Chat button for each character
-                if col3.button("💬 Chat", key=f"collection_chat_{cid}", use_container_width=True):
-                    st.session_state.page = "Chat"
-                    st.session_state.chat_cid = cid
-                    st.rerun()
+                # Enhanced chat button with disabled state
+                if col3.button("💬 Chat", 
+                              key=f"collection_chat_{cid}", 
+                              disabled=st.session_state.get('button_clicked', False),
+                              use_container_width=True):
+                    st.session_state.button_clicked = True
+                    goto_chat(cid)
+
+# 🔧 PUT DEBUG PANEL HERE (after ALL page sections):
+if DEV_MODE:
+    with st.expander("🔧 Debug: Navigation State", expanded=False):
+        st.json({
+            "page": st.session_state.page,
+            "chat_cid": st.session_state.get('chat_cid'),
+            "button_clicked": st.session_state.get('button_clicked', False),
+            "flash": st.session_state.get('flash'),
+            "collection_size": len(colset) if 'colset' in locals() else 0
+        })
+
+# Reset button state after page loads to re-enable buttons
+if st.session_state.get('button_clicked', False):
+    st.session_state.button_clicked = False
+
+    # Reset button state after page loads
+if st.session_state.get('button_clicked', False):
+    st.session_state.button_clicked = False
