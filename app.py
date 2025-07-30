@@ -985,15 +985,15 @@ st.markdown(
 if "page" not in st.session_state:
     st.session_state.page = "Find matches"
 
+# Get current radio selection
 page = st.radio(
     "", ["Find matches","Chat","My Collection"],
     index=["Find matches","Chat","My Collection"].index(st.session_state.page),
     key="page_nav", horizontal=True
 )
 
-# Only update if radio actually changed
-if page != st.session_state.page:
-    st.session_state.page = page
+# Update session state when radio changes
+st.session_state.page = page
 
 
 
