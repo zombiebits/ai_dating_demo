@@ -1192,8 +1192,8 @@ if DEV_MODE:
             "collection_size": len(colset) if 'colset' in locals() else 0
         })
 
-# Reset button state ONLY for navigation buttons, not chat interactions
-# Only reset if we're not in the middle of a chat interaction
+# Simple approach: Reset button state ONLY when page loads completely
+# and ONLY if we're not on the Chat page
 if (st.session_state.get('button_clicked', False) and 
-    not st.session_state.get('_chat_processing', False)):
+    st.session_state.page != "Chat"):
     st.session_state.button_clicked = False
