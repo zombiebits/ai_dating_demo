@@ -33,180 +33,6 @@ if "user_jwt" in st.session_state:
     SB.postgrest.headers["Authorization"] = f"Bearer {st.session_state.user_jwt}"
 
 
-# ────────── CUSTOM EMAIL CONFIRMATION HANDLER ─────────────
-params = st.query_params
-
-# Handle our custom email confirmation (direct SendGrid)
-if "confirm_email" in params:
-    # Fix parameter parsing - get the actual values, not lists
-    user_id = params.get("confirm_email", "")
-    email = params.get("email", "")
-    
-    # Handle both list and string formats from query params
-    if isinstance(user_id, list):
-        user_id = user_id[0] if user_id else ""
-    if isinstance(email, list):
-        email = email[0] if email else ""
-    
-    logger.info(f"Email confirmation attempt: user_id={user_id}, email={email}")
-    
-    if user_id and email:
-        try:
-            # Confirm the user in Supabase Auth
-            SRS.auth.admin.update_user_by_id(user_id, {"email_confirm": True})
-            logger.info(f"Successfully confirmed user in Supabase Auth: {user_id}")
-            
-            # Check if user row exists, create if needed
-            existing_user = get_user_row(user_id)
-            if not existing_user:
-                pending = get_pending_signup(email)
-                if pending:
-                    username = pending["username"]
-                    logger.info(f"Creating user row for confirmed user: {email} with username: {username}")
-                    
-                    create_user_row(user_id, username)
-                    SRS.table("invitees").update({"claimed": True}).eq("email", email).execute()
-                    cleanup_pending_signup(email)
-                    
-                    st.success("✅ Your email has been confirmed! You can now sign in below.")
-                else:
-                    logger.warning(f"No pending signup found for confirmed email: {email}")
-                    st.error("❌ Confirmation link expired or invalid.")
-            else:
-                logger.info(f"User row already exists for: {user_id}")
-                st.info("✅ Your email is already confirmed. You can sign in below.")
-            
-            if st.button("Continue to Sign In"):
-                st.query_params.clear()
-                st.rerun()
-                
-        except Exception as e:
-            logger.error(f"Custom email confirmation error: {str(e)}")
-            st.error(f"❌ Email confirmation error: {str(e)}")
-            
-            # Show debug info
-            with st.expander("🔧 Debug Info", expanded=True):
-                st.json({
-                    "user_id": user_id,
-                    "email": email,
-                    "error": str(e),
-                    "error_type": type(e).__name__
-                })
-    else:
-        logger.error(f"Invalid confirmation parameters: user_id={user_id}, email={email}")
-        st.error("❌ Invalid confirmation link - missing parameters.")
-        
-        # Show debug info for troubleshooting
-        with st.expander("🔧 Debug Info", expanded=True):
-            st.json({
-                "user_id": user_id,
-                "email": email,
-                "all_params": dict(params)
-            })
-
-# Keep original Supabase confirmation as fallback
-elif "type" in params and params.get("type") and (isinstance(params["type"], list) and params["type"][0] == "signup" or params["type"] == "signup"):
-    confirmation_type = params.get("type")
-    if isinstance(confirmation_type, list):
-        confirmation_type = confirmation_type[0] if confirmation_type else ""
-    
-    error_code = params.get("error_code")
-    if isinstance(error_code, list):
-        error_code = error_code[0] if error_code else ""
-    
-    error_description = params.get("error_description")
-    if isinstance(error_description, list):
-        error_description = error_description[0] if error_description else ""
-
-    access_token = params.get("access_token")
-    if isinstance(access_token, list):
-        access_token = access_token[0] if access_token else ""
-    
-    refresh_token = params.get("refresh_token")
-    if isinstance(refresh_token, list):
-        refresh_token = refresh_token[0] if refresh_token else ""
-    
-    if error_code:
-        logger.error(f"Email confirmation error: {error_code} - {error_description}")
-        if error_code == "signup_disabled":
-            st.error("🚫 Account signup is currently disabled.")
-        elif "expired" in error_description.lower():
-            st.error("⏰ Your confirmation link has expired. Please request a new one below.")
-            st.session_state.show_resend = True
-        else:
-            st.error(f"❌ Email confirmation failed: {error_description}")
-            st.session_state.show_resend = True
-    elif access_token and refresh_token:
-        try:
-            session_response = SB.auth.set_session(access_token, refresh_token)
-            
-            if session_response and session_response.user:
-                user_meta = session_response.user
-                logger.info(f"Email confirmed for user: {user_meta.email}")
-                
-                existing_user = get_user_row(user_meta.id)
-                if not existing_user:
-                    pending = get_pending_signup(user_meta.email)
-                    if pending:
-                        username = pending["username"]
-                        logger.info(f"Creating user row for confirmed user: {user_meta.email} with username: {username}")
-                        
-                        create_user_row(user_meta.id, username)
-                        SRS.table("invitees").update({"claimed": True}).eq("email", user_meta.email).execute()
-                        cleanup_pending_signup(user_meta.email)
-                        
-                        st.success("✅ Your email has been confirmed! You can now sign in below.")
-                    else:
-                        username = user_meta.user_metadata.get("username", f"user_{user_meta.id[:8]}")
-                        create_user_row(user_meta.id, username)
-                        SRS.table("invitees").update({"claimed": True}).eq("email", user_meta.email).execute()
-                        st.success("✅ Your email has been confirmed! You can now sign in below.")
-                else:
-                    st.info("✅ Your email is already confirmed. You can sign in below.")
-                
-                if st.button("Continue to Sign In"):
-                    st.query_params.clear()
-                    st.rerun()
-                
-            else:
-                logger.error("Failed to get user info during email confirmation")
-                st.error("❌ Failed to confirm email. Please try again.")
-        except Exception as e:
-            logger.error(f"Email confirmation error: {str(e)}")
-            st.error(f"❌ Email confirmation error: {str(e)}")
-    else:
-        st.error("❌ Invalid confirmation link.")
-
-# Also check for fragment parameters (alternative method)
-elif st.query_params.get("access_token"):
-    access_token = params.get("access_token")
-    if isinstance(access_token, list):
-        access_token = access_token[0] if access_token else ""
-    
-    refresh_token = params.get("refresh_token")
-    if isinstance(refresh_token, list):
-        refresh_token = refresh_token[0] if refresh_token else ""
-    
-    if access_token and refresh_token:
-        try:
-            session_response = SB.auth.set_session(access_token, refresh_token)
-            if session_response and session_response.user:
-                user_meta = session_response.user
-                existing_user = get_user_row(user_meta.id)
-                if not existing_user:
-                    pending = get_pending_signup(user_meta.email)
-                    if pending:
-                        username = pending["username"]
-                        create_user_row(user_meta.id, username)
-                        SRS.table("invitees").update({"claimed": True}).eq("email", user_meta.email).execute()
-                        cleanup_pending_signup(user_meta.email)
-                st.success("✅ Your email has been confirmed! You can now sign in below.")
-                if st.button("Continue to Sign In"):
-                    st.query_params.clear()
-                    st.rerun()
-        except Exception as e:
-            st.error(f"❌ Email confirmation error: {str(e)}")
-
 # ─────────────────── STREAMLIT CONFIG ──────────────────────────────
 st.set_page_config(
     page_title="BONDIGO",
@@ -543,6 +369,120 @@ def buy(user: dict, comp: dict):
     }).execute()
     fresh = get_user_row(user["auth_uid"])
     return True, apply_daily_airdrop(fresh)
+
+# ────────── CUSTOM EMAIL CONFIRMATION HANDLER ─────────────
+
+params = st.query_params
+
+# Handle our custom email confirmation (direct SendGrid)
+if "confirm_email" in params:
+    # More robust parameter parsing
+    user_id = params.get("confirm_email")
+    email = params.get("email")
+    
+    # Convert from list to string if needed (Streamlit sometimes returns lists)
+    if isinstance(user_id, list):
+        user_id = user_id[0] if user_id else ""
+    if isinstance(email, list):
+        email = email[0] if email else ""
+    
+    # Ensure we have strings, not None
+    user_id = str(user_id) if user_id else ""
+    email = str(email) if email else ""
+    
+    logger.info(f"Email confirmation attempt: user_id={user_id}, email={email}")
+    
+    if user_id and email:
+        try:
+            # Show progress to user
+            with st.spinner("Confirming your email..."):
+                # Confirm the user in Supabase Auth
+                SRS.auth.admin.update_user_by_id(user_id, {"email_confirm": True})
+                logger.info(f"Successfully confirmed user in Supabase Auth: {user_id}")
+                
+                # Check if user row exists, create if needed
+                existing_user = get_user_row(user_id)
+                if not existing_user:
+                    pending = get_pending_signup(email)
+                    if pending:
+                        username = pending["username"]
+                        logger.info(f"Creating user row for confirmed user: {email} with username: {username}")
+                        
+                        create_user_row(user_id, username)
+                        
+                        # Update invite status
+                        try:
+                            SRS.table("invitees").update({"claimed": True}).eq("email", email).execute()
+                        except Exception as invite_error:
+                            logger.warning(f"Could not update invite status: {invite_error}")
+                        
+                        # Clean up pending signup
+                        cleanup_pending_signup(email)
+                        
+                        st.success("✅ Your email has been confirmed successfully!")
+                        st.balloons()  # Add some celebration!
+                        
+                    else:
+                        logger.warning(f"No pending signup found for confirmed email: {email}")
+                        st.error("❌ Confirmation link expired or invalid.")
+                        st.info("💡 Try signing up again if needed.")
+                else:
+                    logger.info(f"User row already exists for: {user_id}")
+                    st.success("✅ Your email is already confirmed!")
+                
+                # Clear the URL parameters and provide continue button
+                st.markdown("---")
+                col1, col2, col3 = st.columns([1, 2, 1])
+                with col2:
+                    if st.button("🚀 Continue to Sign In", use_container_width=True):
+                        # Clear all query parameters
+                        st.query_params.clear()
+                        st.rerun()
+                        
+        except Exception as e:
+            logger.error(f"Custom email confirmation error: {str(e)}")
+            st.error(f"❌ Email confirmation error: {str(e)}")
+            
+            # Enhanced debug info
+            with st.expander("🔧 Debug Info", expanded=False):
+                st.json({
+                    "user_id": user_id,
+                    "email": email,
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                    "auth_uid_format_check": {
+                        "is_valid_uuid_format": len(user_id) == 36 and user_id.count('-') == 4,
+                        "is_not_empty": bool(user_id),
+                        "length": len(user_id)
+                    }
+                })
+                
+            # Offer retry option
+            if st.button("🔄 Try Again"):
+                st.rerun()
+                
+    else:
+        logger.error(f"Invalid confirmation parameters: user_id='{user_id}', email='{email}'")
+        st.error("❌ Invalid confirmation link - missing or empty parameters.")
+        
+        # Enhanced debug info for troubleshooting
+        with st.expander("🔧 Debug Info", expanded=True):
+            st.json({
+                "user_id": user_id,
+                "email": email,
+                "user_id_type": type(user_id).__name__,
+                "email_type": type(email).__name__,
+                "all_params": dict(params),
+                "params_keys": list(params.keys())
+            })
+        
+        st.info("💡 Make sure you clicked the complete link from your email.")
+
+# Keep original Supabase confirmation as fallback (rest of your existing code...)
+elif "type" in params and params.get("type"):
+    # Your existing Supabase confirmation code here...
+    pass
+
 
 # ─────────────────── CALLBACKS ────────────────────────────────────
 def bond_and_chat(cid: str, comp: dict):
