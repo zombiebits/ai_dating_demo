@@ -957,7 +957,7 @@ page = st.radio(
     index=["Find matches","Chat","My Collection"].index(st.session_state.page),
     key="page", horizontal=True
 )
-st.session_state.page = page
+
 
 # ─────────────────── FIND MATCHES ────────────────────────────────
 if page == "Find matches":
