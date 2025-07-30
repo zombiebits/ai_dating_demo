@@ -267,11 +267,8 @@ def send_confirmation_email_direct(email: str, username: str, user_id: str) -> b
                 html_content=html_content
             )
             
-            # Add headers to improve deliverability
-            message.header = {
-                'List-Unsubscribe': '<mailto:unsubscribe@your-domain.com>',
-                'X-Entity-Ref-ID': f'account-confirmation-{user_id}'
-            }
+            # REMOVED THE PROBLEMATIC HEADERS - they were causing the error
+            # message.header = {...}  # <-- This was the problem!
             
             logger.info("Mail object created successfully")
             st.info("✅ Mail object created")
