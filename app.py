@@ -1007,7 +1007,7 @@ with col2:
         st.rerun()
 
 with col3:
-    if st.button("📚 My Collection", 
+    if st.button("🤖 My Collection", 
                 key="nav_collection", 
                 use_container_width=True,
                 type="primary" if st.session_state.page == "My Collection" else "secondary"):
