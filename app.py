@@ -982,13 +982,10 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ─────────────────── NAVIGATION (BULLETPROOF VERSION) ────────────────────
+# ─────────────────── NAVIGATION (WORKING VERSION) ────────────────────
 # Initialize page if not set
 if "page" not in st.session_state:
     st.session_state.page = "Find matches"
-
-# Create a unique key that changes when page changes programmatically
-nav_key = f"page_nav_{st.session_state.page}"
 
 # Get the current index for the radio
 try:
@@ -997,18 +994,26 @@ except ValueError:
     current_index = 0
     st.session_state.page = "Find matches"
 
-# Radio button with dynamic key
+# Radio button that follows session state
 page = st.radio(
     "", ["Find matches","Chat","My Collection"],
     index=current_index,
-    key=nav_key, 
+    key="page_nav", 
     horizontal=True
 )
 
-# Only update session state if the radio actually changed the value
-# This prevents conflicts when buttons change the page
-if page != st.session_state.page:
+# ONLY update session state when user actually clicks the radio
+# Check if this is a user click vs. programmatic change
+if 'last_radio_value' not in st.session_state:
+    st.session_state.last_radio_value = page
+
+if page != st.session_state.last_radio_value:
+    # User clicked radio - update both
     st.session_state.page = page
+    st.session_state.last_radio_value = page
+elif st.session_state.page != st.session_state.last_radio_value:
+    # Programmatic change - update tracking
+    st.session_state.last_radio_value = st.session_state.page
 
 
 
