@@ -1094,6 +1094,27 @@ elif st.session_state.page == "Chat":
         
         st.markdown("---")
 
+        # Clear history button
+        col_clear1, col_clear2, col_clear3 = st.columns([1, 1, 1])
+        with col_clear2:
+            if st.button("🗑️ Clear History", key=f"clear_history_{cid}", type="secondary"):
+                # Clear from database
+                try:
+                    SRS.table("messages").delete().eq("user_id", user["id"]).eq("companion_id", cid).execute()
+                    # Clear from session state
+                    if cid in st.session_state.hist:
+                        # Keep only the system message
+                        base = [{"role":"system","content":
+                                f"You are {CID2COMP[cid]['name']}. {CID2COMP[cid]['bio']} Speak PG‑13."}]
+                        st.session_state.hist[cid] = base
+                    st.success("💫 Chat history cleared!")
+                    st.rerun()
+                except Exception as e:
+                    logger.error(f"Failed to clear history: {str(e)}")
+                    st.error("❌ Failed to clear history. Please try again.")
+
+        st.markdown("---")  # Keep this separator  
+
         hist = st.session_state.hist.get(cid)
         if hist is None:
             rows = (SRS.table("messages")
