@@ -75,27 +75,28 @@ def send_confirmation_email_direct(email: str, username: str, user_id: str) -> b
         api_key = os.environ.get('SENDGRID_API_KEY')
         if not api_key:
             logger.error("No SENDGRID_API_KEY found in environment")
-            st.error("🔑 No SendGrid API key found")
+            # Only show user-friendly error, not technical details
+            if DEV_MODE:
+                st.error("🔑 No SendGrid API key found")
             return False
         
+        # Log technical details but don't show to users
         logger.info(f"API key found: {api_key[:15]}...")
-        st.info(f"✅ API key found: {api_key[:15]}...")
         
         try:
             sg = sendgrid.SendGridAPIClient(api_key=api_key)
             logger.info("SendGrid client created successfully")
-            st.info("✅ SendGrid client created")
         except Exception as e:
             logger.error(f"Failed to create SendGrid client: {str(e)}")
-            st.error(f"❌ SendGrid client error: {str(e)}")
+            if DEV_MODE:
+                st.error(f"❌ SendGrid client error: {str(e)}")
             return False
         
         # Create confirmation URL - user clicks this to confirm
         confirmation_url = f"https://ai-matchmaker-demo.streamlit.app/?confirm_email={user_id}&email={email}"
         logger.info(f"Confirmation URL created: {confirmation_url}")
-        st.info("✅ Confirmation URL created")
         
-        # More professional, less spammy email template
+        # Professional email template (same as before)
         html_content = f"""
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
             <div style="background-color: #ffffff; padding: 40px; border: 1px solid #e1e5e9; border-radius: 8px;">
@@ -136,64 +137,59 @@ def send_confirmation_email_direct(email: str, username: str, user_id: str) -> b
         """
         
         logger.info("HTML content created")
-        st.info("✅ HTML content created")
         
         try:
             message = Mail(
-                from_email=('web34llc@gmail.com', 'BONDIGO Team'),  # Add sender name
+                from_email=('web34llc@gmail.com', 'BONDIGO Team'),
                 to_emails=email,
-                subject='Confirm your BONDIGO account',  # Less promotional subject
+                subject='Confirm your BONDIGO account',
                 html_content=html_content
             )
             
-            # REMOVED THE PROBLEMATIC HEADERS - they were causing the error
-            # message.header = {...}  # <-- This was the problem!
-            
             logger.info("Mail object created successfully")
-            st.info("✅ Mail object created")
         except Exception as e:
             logger.error(f"Failed to create Mail object: {str(e)}")
-            st.error(f"❌ Mail object error: {str(e)}")
+            if DEV_MODE:
+                st.error(f"❌ Mail object error: {str(e)}")
             return False
         
         try:
             response = sg.send(message)
             logger.info(f"SendGrid response: status={response.status_code}")
-            st.info(f"📤 SendGrid response: {response.status_code}")
             
             if hasattr(response, 'body') and response.body:
                 logger.info(f"Response body: {response.body}")
-                st.code(f"Response body: {response.body}")
             
             success = response.status_code == 202
             logger.info(f"Email send result: {success}")
             
-            if success:
-                st.success("✅ Email sent successfully!")
-            else:
-                st.error(f"❌ Unexpected status code: {response.status_code}")
-            
+            # Don't show technical details to regular users
             return success
             
         except Exception as e:
             logger.error(f"SendGrid send failed: {str(e)}")
-            st.error(f"❌ SendGrid send error: {str(e)}")
             
-            # Show more error details
-            error_str = str(e)
-            if "401" in error_str:
-                st.error("🔑 API key authentication failed")
-            elif "403" in error_str:
-                st.error("🚫 Forbidden - check account verification")
-            elif "429" in error_str:
-                st.error("⏰ Rate limit exceeded")
+            # Only show technical errors in dev mode
+            if DEV_MODE:
+                st.error(f"❌ SendGrid send error: {str(e)}")
+                error_str = str(e)
+                if "401" in error_str:
+                    st.error("🔑 API key authentication failed")
+                elif "403" in error_str:
+                    st.error("🚫 Forbidden - check account verification")
+                elif "429" in error_str:
+                    st.error("⏰ Rate limit exceeded")
             
             return False
         
     except Exception as e:
         logger.error(f"Direct SendGrid email failed: {str(e)}")
         logger.error(f"Error type: {type(e).__name__}")
-        st.error(f"❌ Unexpected error: {str(e)}")
+        
+        # Only show technical errors in dev mode
+        if DEV_MODE:
+            st.error(f"❌ Unexpected error: {str(e)}")
+        
         return False
 
 def apply_daily_airdrop(user: dict) -> dict:
@@ -802,6 +798,8 @@ if "user" not in st.session_state:
                     except Exception as e:
                         logger.error(f"Failed to update pending signup: {str(e)}")
                     
+                    # Replace the incomplete signup section (around line 686 after "# Send confirmation email directly via SendGrid") with this:
+
                     # Send confirmation email directly via SendGrid
                     try:
                         email_sent = send_confirmation_email_direct(email, uname, res.user.id)
@@ -811,7 +809,6 @@ if "user" not in st.session_state:
                             logger.info(f"Direct SendGrid signup email sent to: {email}")
                             
                             st.success("✅ Account created! Check your email for confirmation link.")
-                            st.info("📧 **Email sent directly via SendGrid** (bypassing Supabase)")
                             
                             st.markdown("""
                             **Where to look for your email:**
@@ -821,40 +818,43 @@ if "user" not in st.session_state:
                             - 🔍 **Search** for "BONDIGO" if you can't find it
                             """)
                             
-                            with st.expander("🔧 Technical Details", expanded=False):
-                                st.json({
-                                    "email": email,
-                                    "auth_uid": res.user.id,
-                                    "signup_time": datetime.now().isoformat(),
-                                    "email_method": "direct_sendgrid_api",
-                                    "status": "email_sent_successfully"
-                                })
+                            # Only show technical details in dev mode
+                            if DEV_MODE:
+                                with st.expander("🔧 Technical Details", expanded=False):
+                                    st.json({
+                                        "email": email,
+                                        "auth_uid": res.user.id,
+                                        "signup_time": datetime.now().isoformat(),
+                                        "email_method": "direct_sendgrid_api",
+                                        "status": "email_sent_successfully"
+                                    })
                             
                         else:
-                            # More detailed error for email failure
+                            # Show user-friendly error message
                             st.error("❌ Account created but email failed to send.")
-                            
-                            # Show what we tried
-                            with st.expander("🔧 Debug Info", expanded=True):
-                                st.json({
-                                    "email": email,
-                                    "username": uname,
-                                    "auth_uid": res.user.id,
-                                    "sendgrid_api_key_present": bool(os.environ.get('SENDGRID_API_KEY')),
-                                    "error": "send_confirmation_email_direct returned False"
-                                })
-                            
                             st.info("**Options:**")
-                            st.markdown("- Try the 📤 Resend button in the admin panel above")
                             st.markdown("- Contact support for manual confirmation")
                             st.markdown("- Try signing up again")
+                            
+                            # Only show debug info in dev mode
+                            if DEV_MODE:
+                                with st.expander("🔧 Debug Info", expanded=True):
+                                    st.json({
+                                        "email": email,
+                                        "username": uname,
+                                        "auth_uid": res.user.id,
+                                        "sendgrid_api_key_present": bool(os.environ.get('SENDGRID_API_KEY')),
+                                        "error": "send_confirmation_email_direct returned False"
+                                    })
                         
                     except Exception as e:
                         logger.error(f"Email sending exception: {str(e)}")
-                        st.error(f"❌ Account created but email error: {str(e)}")
+                        st.error("❌ Account created but email failed to send. Please contact support.")
                         
-                        with st.expander("🔧 Debug Info", expanded=True):
-                            st.code(f"Error type: {type(e).__name__}\nError details: {str(e)}")
+                        # Only show technical details in dev mode
+                        if DEV_MODE:
+                            with st.expander("🔧 Debug Info", expanded=True):
+                                st.code(f"Error type: {type(e).__name__}\nError details: {str(e)}")
                     
                     st.stop()
                 else:
@@ -874,6 +874,9 @@ if "user" not in st.session_state:
                 else:
                     st.error(f"❌ Sign-up error: {error_msg}")
                 st.stop()
+
+           
+
 
         # ─── SIGN IN ─────────────────────────────
         try:
