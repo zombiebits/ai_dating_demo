@@ -498,7 +498,7 @@ elif "type" in params and params.get("type"):
     pass
 
 
-# ─────────────────── CALLBACKS ────────────────────────────────────
+# ─────────────────── CALLBACKS (FINAL VERSION) ────────────────────────────────────
 def bond_and_chat(cid: str, comp: dict):
     ok, new_user = buy(st.session_state.user, comp)
     if ok:
@@ -506,7 +506,7 @@ def bond_and_chat(cid: str, comp: dict):
         st.session_state.page = "Chat"
         st.session_state.chat_cid = cid
         st.session_state.flash = f"Bonded with {comp['name']}!"
-        # Force immediate rerun now that navigation is fixed
+        # Use st.switch_page() or rerun AFTER setting everything
         st.rerun()
     else:
         st.warning(new_user)
@@ -515,7 +515,7 @@ def goto_chat(cid: str):
     st.session_state.page = "Chat"
     st.session_state.chat_cid = cid
     st.session_state.flash = None
-    # Force immediate rerun now that navigation is fixed
+    # Use st.switch_page() or rerun AFTER setting everything
     st.rerun()
 
 # ─────────────────── ADMIN PANEL (DEVELOPMENT ONLY) ─────────────
@@ -982,20 +982,33 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ─────────────────── NAVIGATION (SIMPLE VERSION) ────────────────────
+# ─────────────────── NAVIGATION (BULLETPROOF VERSION) ────────────────────
 # Initialize page if not set
 if "page" not in st.session_state:
     st.session_state.page = "Find matches"
 
-# Get current radio selection
+# Create a unique key that changes when page changes programmatically
+nav_key = f"page_nav_{st.session_state.page}"
+
+# Get the current index for the radio
+try:
+    current_index = ["Find matches","Chat","My Collection"].index(st.session_state.page)
+except ValueError:
+    current_index = 0
+    st.session_state.page = "Find matches"
+
+# Radio button with dynamic key
 page = st.radio(
     "", ["Find matches","Chat","My Collection"],
-    index=["Find matches","Chat","My Collection"].index(st.session_state.page),
-    key="page_nav", horizontal=True
+    index=current_index,
+    key=nav_key, 
+    horizontal=True
 )
 
-# Update session state when radio changes
-st.session_state.page = page
+# Only update session state if the radio actually changed the value
+# This prevents conflicts when buttons change the page
+if page != st.session_state.page:
+    st.session_state.page = page
 
 
 
