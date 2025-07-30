@@ -13,7 +13,7 @@ from sendgrid.helpers.mail import Mail
 
 # ─────────────────── DEVELOPMENT MODE TOGGLE ─────────────────────
 # Set to False for production, True for development
-DEV_MODE = os.environ.get('DEV_MODE', 'False').lower() == 'true'
+DEV_MODE = os.environ.get('DEV_MODE', 'True').lower() == 'true'
 
 
 
