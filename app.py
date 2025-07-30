@@ -1120,6 +1120,9 @@ elif page == "Chat":
 
     user_input = st.chat_input("Say something…")
     if user_input:
+        # Show user message immediately
+        st.chat_message("user").write(user_input)
+        
         hist.append({"role":"user","content":user_input})
         try:
             resp  = OA.chat.completions.create(
@@ -1192,8 +1195,3 @@ if DEV_MODE:
             "collection_size": len(colset) if 'colset' in locals() else 0
         })
 
-# Simple approach: Reset button state ONLY when page loads completely
-# and ONLY if we're not on the Chat page
-if (st.session_state.get('button_clicked', False) and 
-    st.session_state.page != "Chat"):
-    st.session_state.button_clicked = False
