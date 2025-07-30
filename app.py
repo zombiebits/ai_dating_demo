@@ -982,38 +982,37 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ─────────────────── NAVIGATION (WORKING VERSION) ────────────────────
+# ─────────────────── NAVIGATION (BUTTON-BASED - BULLETPROOF) ────────────────────
 # Initialize page if not set
 if "page" not in st.session_state:
     st.session_state.page = "Find matches"
 
-# Get the current index for the radio
-try:
-    current_index = ["Find matches","Chat","My Collection"].index(st.session_state.page)
-except ValueError:
-    current_index = 0
-    st.session_state.page = "Find matches"
+# Create navigation buttons in columns
+col1, col2, col3 = st.columns(3)
 
-# Radio button that follows session state
-page = st.radio(
-    "", ["Find matches","Chat","My Collection"],
-    index=current_index,
-    key="page_nav", 
-    horizontal=True
-)
+with col1:
+    if st.button("🔍 Find matches", 
+                key="nav_find", 
+                use_container_width=True,
+                type="primary" if st.session_state.page == "Find matches" else "secondary"):
+        st.session_state.page = "Find matches"
+        st.rerun()
 
-# ONLY update session state when user actually clicks the radio
-# Check if this is a user click vs. programmatic change
-if 'last_radio_value' not in st.session_state:
-    st.session_state.last_radio_value = page
+with col2:
+    if st.button("💬 Chat", 
+                key="nav_chat", 
+                use_container_width=True,
+                type="primary" if st.session_state.page == "Chat" else "secondary"):
+        st.session_state.page = "Chat"
+        st.rerun()
 
-if page != st.session_state.last_radio_value:
-    # User clicked radio - update both
-    st.session_state.page = page
-    st.session_state.last_radio_value = page
-elif st.session_state.page != st.session_state.last_radio_value:
-    # Programmatic change - update tracking
-    st.session_state.last_radio_value = st.session_state.page
+with col3:
+    if st.button("📚 My Collection", 
+                key="nav_collection", 
+                use_container_width=True,
+                type="primary" if st.session_state.page == "My Collection" else "secondary"):
+        st.session_state.page = "My Collection"
+        st.rerun()
 
 
 
