@@ -920,7 +920,7 @@ if "user" not in st.session_state:
         st.session_state.flash    = None
         st.session_state.show_resend = False
 
-        raise RerunException()
+        st.rerun()
 
     st.stop()
 
