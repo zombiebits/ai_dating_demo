@@ -708,11 +708,7 @@ if DEV_MODE:
                     st.error(f"❌ Resend error: {str(e)}")
 
     st.markdown("---")  # Add a separator before login section
-
-# ─────────────────── PERSISTENT LOGIN FIX ───────────────────────────────
-# Add this RIGHT AFTER your existing login section (after st.stop())
-# and BEFORE the state setup section
-
+# ─────────────────── PERSISTENT LOGIN CHECK (MOVED TO TOP) ───────────────────
 # Check for auto-login from successful sign-in
 if "user" not in st.session_state and "auto_login" in st.query_params:
     user_id = st.query_params.get("auto_login")
