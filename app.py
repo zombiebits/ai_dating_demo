@@ -502,35 +502,22 @@ elif "type" in params and params.get("type"):
 def bond_and_chat(cid: str, comp: dict):
     ok, new_user = buy(st.session_state.user, comp)
     if ok:
-        # Update user first
         st.session_state.user = new_user
-        
-        # Clear any existing page state conflicts
         st.session_state.page = "Chat"
         st.session_state.chat_cid = cid
         st.session_state.flash = f"Bonded with {comp['name']}!"
-        
-        # Force immediate rerun to prevent state conflicts
         st.rerun()
     else:
         st.warning(new_user)
 
 def goto_chat(cid: str):
-    # Clear any conflicting state
     st.session_state.page = "Chat"
     st.session_state.chat_cid = cid
-    st.session_state.flash = None  # Clear any old flash messages
-    
-    # Force immediate rerun
+    st.session_state.flash = None
     st.rerun()
 
 # ─────────────────── ADMIN PANEL (DEVELOPMENT ONLY) ─────────────
-# Replace your existing admin panel code with this version that works in main area
-# Put this RIGHT AFTER your streamlit config and CSS, before the login section
-
-# ─────────────────── ADMIN PANEL (BEFORE LOGIN) ─────────────
-# Place this RIGHT AFTER your CSS styling and BEFORE the login section
-# This allows testing email functionality without being logged in
+# PUT THIS RIGHT AFTER YOUR CALLBACKS AND BEFORE THE LOGIN SECTION
 
 if DEV_MODE:
     with st.expander("🔧 Admin Panel - Email Testing (Development)", expanded=False):
@@ -719,7 +706,10 @@ if DEV_MODE:
                     st.error(f"❌ Resend error: {str(e)}")
 
     st.markdown("---")  # Add a separator before login section
+
 # ─────────────────── LOGIN / SIGN‑UP ───────────────────────────────
+# PUT THIS IMMEDIATELY AFTER THE ADMIN PANEL
+
 if "user" not in st.session_state:
     if Path(LOGO).is_file():
         st.image(LOGO, width=380)
@@ -960,10 +950,12 @@ if "user" not in st.session_state:
 
     st.stop()
 
-# ─────────────────── ENSURE STATE KEYS ────────────────────────────
+# ─────────────────── ENSURE STATE KEYS & VARIABLES ────────────────────────────
+# PUT THIS RIGHT AFTER THE LOGIN SECTION AND BEFORE THE NAVIGATION
+
 for k,v in {
     "spent":0, "matches":[], "hist":{},
-    "page":"Find matches", "chat_cid":None, "flash":None, 
+    "chat_cid":None, "flash":None, 
     "show_resend":False
 }.items():
     st.session_state.setdefault(k, v)
@@ -988,6 +980,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# ─────────────────── NAVIGATION (SIMPLE VERSION) ────────────────────
 # Initialize page if not set
 if "page" not in st.session_state:
     st.session_state.page = "Find matches"
@@ -998,12 +991,41 @@ page = st.radio(
     key="page_nav", horizontal=True
 )
 
-# Simple update - just sync the state
-st.session_state.page = page
+# Only update if radio actually changed
+if page != st.session_state.page:
+    st.session_state.page = page
 
+
+# ─────────────────── ENSURE STATE KEYS & VARIABLES ────────────────────────────
+for k,v in {
+    "spent":0, "matches":[], "hist":{},
+    "chat_cid":None, "flash":None, 
+    "show_resend":False
+}.items():
+    st.session_state.setdefault(k, v)
+
+user   = st.session_state.user
+colset = collection_set(user["id"])
+
+# ─────────────────── APP HEADER & NAVIGATION ────────────────────
+if Path(LOGO).is_file():
+    st.image(LOGO, width=380)
+    st.markdown(
+        f"<p style='text-align:center;margin-top:-2px;font-size:1.05rem;"
+        f"color:#FFC8D8'>{TAGLINE}</p>",
+        unsafe_allow_html=True,
+    )
+st.markdown(
+    f"<span style='background:#f93656;padding:6px 12px;border-radius:8px;display:inline-block;"
+    f"font-size:1.25rem;color:#000;font-weight:600;margin-right:8px;'>"
+    f"{user['username']}'s Wallet</span>"
+    f"<span style='background:#000;color:#57C784;padding:6px 12px;border-radius:8px;"
+    f"display:inline-block;font-size:1.25rem;'>{user['tokens']} 💎</span>",
+    unsafe_allow_html=True,
+)
 
 # ─────────────────── FIND MATCHES ────────────────────────────────
-if page == "Find matches":
+if st.session_state.page == "Find matches":
     if st.session_state.flash:
         st.success(st.session_state.flash)
         st.session_state.flash = None
@@ -1024,8 +1046,6 @@ if page == "Find matches":
            [c for c in COMPANIONS if all(t in c["tags"] for t in (hobby,trait,vibe,scene))]
            or random.sample(COMPANIONS, 5)
         )
-        # Clear any button conflicts
-        st.session_state.button_clicked = False
 
     for c in st.session_state.matches:
         rarity, clr = c.get("rarity","Common"), CLR[c.get("rarity","Common")]
@@ -1039,109 +1059,101 @@ if page == "Find matches":
           unsafe_allow_html=True,
         )
         
-        # Enhanced button handling with unique keys and disabled state
+        # Simple buttons - no disabled state
         if c["id"] in colset:
-            if c3.button("💬 Chat", 
-                        key=f"chat-{c['id']}", 
-                        disabled=st.session_state.get('button_clicked', False),
-                        use_container_width=True):
-                st.session_state.button_clicked = True
+            if c3.button("💬 Chat", key=f"chat-{c['id']}", use_container_width=True):
                 goto_chat(c["id"])
         else:
-            if c3.button("💖 Bond", 
-                        key=f"bond-{c['id']}", 
-                        disabled=st.session_state.get('button_clicked', False),
-                        use_container_width=True):
-                st.session_state.button_clicked = True
+            if c3.button("💖 Bond", key=f"bond-{c['id']}", use_container_width=True):
                 bond_and_chat(c["id"], c)
 
 # ─────────────────── CHAT ────────────────────────────────────────
-elif page == "Chat":
+elif st.session_state.page == "Chat":
     if st.session_state.flash:
         st.success(st.session_state.flash)
         st.session_state.flash = None
     if not colset:
-        st.info("Bond first!"); st.stop()
+        st.info("Bond first!")
+    else:
+        options = [CID2COMP[i]["name"] for i in colset]
+        default = CID2COMP.get(st.session_state.chat_cid, {}).get("name")
+        sel     = st.selectbox("Choose companion", options,
+                    index=options.index(default) if default else 0)
+        cid = next(k for k,v in CID2COMP.items() if v["name"]==sel)
+        st.session_state.chat_cid = cid
 
-    options = [CID2COMP[i]["name"] for i in colset]
-    default = CID2COMP.get(st.session_state.chat_cid, {}).get("name")
-    sel     = st.selectbox("Choose companion", options,
-                index=options.index(default) if default else 0)
-    cid = next(k for k,v in CID2COMP.items() if v["name"]==sel)
-    st.session_state.chat_cid = cid
-
-    # GET COMPANION INFO
-    comp = CID2COMP[cid]
-    
-    # DISPLAY COMPANION HEADER WITH PHOTO
-    col1, col2 = st.columns([1, 4])
-    with col1:
-        st.image(comp.get("photo", PLACEHOLDER), width=100)
-    with col2:
-        rarity = comp.get("rarity", "Common")
-        clr = CLR[rarity]
-        st.markdown(
-            f"<span style='background:{clr};color:black;padding:2px 6px;"
-            f"border-radius:4px;font-size:0.75rem'>{rarity}</span> "
-            f"**{comp['name']}**",
-            unsafe_allow_html=True,
-        )
-        st.markdown(f"*{comp['bio']}*")
-    
-    st.markdown("---")
-
-    hist = st.session_state.hist.get(cid)
-    if hist is None:
-        rows = (SRS.table("messages")
-                  .select("role,content,created_at")
-                  .eq("user_id", user["id"])
-                  .eq("companion_id", cid)
-                  .order("created_at")
-                  .execute().data)
-        base = [{"role":"system","content":
-                 f"You are {CID2COMP[cid]['name']}. {CID2COMP[cid]['bio']} Speak PG‑13."}]
-        hist = base + [{"role":r["role"],"content":r["content"]} for r in rows]
-        st.session_state.hist[cid] = hist
-
-    for msg in hist[1:]:
-        st.chat_message("assistant" if msg["role"]=="assistant" else "user")\
-          .write(msg["content"])
-    if st.session_state.spent >= MAX_TOKENS:
-        st.warning("Daily token budget hit."); st.stop()
-
-    user_input = st.chat_input("Say something…")
-    if user_input:
-        # Show user message immediately
-        st.chat_message("user").write(user_input)
+        # GET COMPANION INFO
+        comp = CID2COMP[cid]
         
-        hist.append({"role":"user","content":user_input})
-        try:
-            resp  = OA.chat.completions.create(
-                model="gpt-4o-mini", messages=hist, max_tokens=120
+        # DISPLAY COMPANION HEADER WITH PHOTO
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            st.image(comp.get("photo", PLACEHOLDER), width=100)
+        with col2:
+            rarity = comp.get("rarity", "Common")
+            clr = CLR[rarity]
+            st.markdown(
+                f"<span style='background:{clr};color:black;padding:2px 6px;"
+                f"border-radius:4px;font-size:0.75rem'>{rarity}</span> "
+                f"**{comp['name']}**",
+                unsafe_allow_html=True,
             )
-            reply = resp.choices[0].message.content
-            st.session_state.spent += resp.usage.prompt_tokens + resp.usage.completion_tokens
-            hist.append({"role":"assistant","content":reply})
-            st.chat_message("assistant").write(reply)
-            SRS.table("messages").insert({
-                "user_id":      user["id"],
-                "companion_id": cid,
-                "role":         "user",
-                "content":      user_input
-            }).execute()
-            SRS.table("messages").insert({
-                "user_id":      user["id"],
-                "companion_id": cid,
-                "role":         "assistant",
-                "content":      reply
-            }).execute()
-        except RateLimitError:
-            st.warning("OpenAI rate‑limit.")
-        except OpenAIError as e:
-            st.error(str(e))
+            st.markdown(f"*{comp['bio']}*")
+        
+        st.markdown("---")
+
+        hist = st.session_state.hist.get(cid)
+        if hist is None:
+            rows = (SRS.table("messages")
+                      .select("role,content,created_at")
+                      .eq("user_id", user["id"])
+                      .eq("companion_id", cid)
+                      .order("created_at")
+                      .execute().data)
+            base = [{"role":"system","content":
+                     f"You are {CID2COMP[cid]['name']}. {CID2COMP[cid]['bio']} Speak PG‑13."}]
+            hist = base + [{"role":r["role"],"content":r["content"]} for r in rows]
+            st.session_state.hist[cid] = hist
+
+        for msg in hist[1:]:
+            st.chat_message("assistant" if msg["role"]=="assistant" else "user")\
+              .write(msg["content"])
+        if st.session_state.spent >= MAX_TOKENS:
+            st.warning("Daily token budget hit.")
+        else:
+            user_input = st.chat_input("Say something…")
+            if user_input:
+                # Show user message immediately
+                st.chat_message("user").write(user_input)
+                
+                hist.append({"role":"user","content":user_input})
+                try:
+                    resp  = OA.chat.completions.create(
+                        model="gpt-4o-mini", messages=hist, max_tokens=120
+                    )
+                    reply = resp.choices[0].message.content
+                    st.session_state.spent += resp.usage.prompt_tokens + resp.usage.completion_tokens
+                    hist.append({"role":"assistant","content":reply})
+                    st.chat_message("assistant").write(reply)
+                    SRS.table("messages").insert({
+                        "user_id":      user["id"],
+                        "companion_id": cid,
+                        "role":         "user",
+                        "content":      user_input
+                    }).execute()
+                    SRS.table("messages").insert({
+                        "user_id":      user["id"],
+                        "companion_id": cid,
+                        "role":         "assistant",
+                        "content":      reply
+                    }).execute()
+                except RateLimitError:
+                    st.warning("OpenAI rate‑limit.")
+                except OpenAIError as e:
+                    st.error(str(e))
 
 # ─────────────────── MY COLLECTION ───────────────────────────────
-elif page == "My Collection":
+elif st.session_state.page == "My Collection":
     st.header("My BONDIGO Collection")
     colset = collection_set(user["id"])
     if not colset:
@@ -1167,12 +1179,9 @@ elif page == "My Collection":
                 )
             
             with col3:
-                # Simplified chat button - no disabled state to avoid conflicts
-                if col3.button("💬 Chat", 
-                              key=f"collection_chat_{cid}", 
-                              use_container_width=True):
+                # Simple chat button
+                if col3.button("💬 Chat", key=f"collection_chat_{cid}", use_container_width=True):
                     goto_chat(cid)
-
 # 🔧 PUT DEBUG PANEL HERE (after ALL page sections):
 if DEV_MODE:
     with st.expander("🔧 Debug: Navigation State", expanded=False):
