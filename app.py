@@ -952,11 +952,19 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# Initialize page if not set
+if "page" not in st.session_state:
+    st.session_state.page = "Find matches"
+
 page = st.radio(
     "", ["Find matches","Chat","My Collection"],
     index=["Find matches","Chat","My Collection"].index(st.session_state.page),
-    key="page", horizontal=True
+    key="page_nav", horizontal=True  # Changed key to avoid conflict
 )
+
+# Update session state only if different
+if page != st.session_state.page:
+    st.session_state.page = page
 
 
 # ─────────────────── FIND MATCHES ────────────────────────────────
@@ -1013,6 +1021,26 @@ elif page == "Chat":
                 index=options.index(default) if default else 0)
     cid = next(k for k,v in CID2COMP.items() if v["name"]==sel)
     st.session_state.chat_cid = cid
+
+    # GET COMPANION INFO
+    comp = CID2COMP[cid]
+    
+    # DISPLAY COMPANION HEADER WITH PHOTO
+    col1, col2 = st.columns([1, 4])
+    with col1:
+        st.image(comp.get("photo", PLACEHOLDER), width=100)
+    with col2:
+        rarity = comp.get("rarity", "Common")
+        clr = CLR[rarity]
+        st.markdown(
+            f"<span style='background:{clr};color:black;padding:2px 6px;"
+            f"border-radius:4px;font-size:0.75rem'>{rarity}</span> "
+            f"**{comp['name']}**",
+            unsafe_allow_html=True,
+        )
+        st.markdown(f"*{comp['bio']}*")
+    
+    st.markdown("---")
 
     hist = st.session_state.hist.get(cid)
     if hist is None:
