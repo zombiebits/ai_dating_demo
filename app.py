@@ -996,33 +996,6 @@ if page != st.session_state.page:
     st.session_state.page = page
 
 
-# ─────────────────── ENSURE STATE KEYS & VARIABLES ────────────────────────────
-for k,v in {
-    "spent":0, "matches":[], "hist":{},
-    "chat_cid":None, "flash":None, 
-    "show_resend":False
-}.items():
-    st.session_state.setdefault(k, v)
-
-user   = st.session_state.user
-colset = collection_set(user["id"])
-
-# ─────────────────── APP HEADER & NAVIGATION ────────────────────
-if Path(LOGO).is_file():
-    st.image(LOGO, width=380)
-    st.markdown(
-        f"<p style='text-align:center;margin-top:-2px;font-size:1.05rem;"
-        f"color:#FFC8D8'>{TAGLINE}</p>",
-        unsafe_allow_html=True,
-    )
-st.markdown(
-    f"<span style='background:#f93656;padding:6px 12px;border-radius:8px;display:inline-block;"
-    f"font-size:1.25rem;color:#000;font-weight:600;margin-right:8px;'>"
-    f"{user['username']}'s Wallet</span>"
-    f"<span style='background:#000;color:#57C784;padding:6px 12px;border-radius:8px;"
-    f"display:inline-block;font-size:1.25rem;'>{user['tokens']} 💎</span>",
-    unsafe_allow_html=True,
-)
 
 # ─────────────────── FIND MATCHES ────────────────────────────────
 if st.session_state.page == "Find matches":
