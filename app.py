@@ -1176,12 +1176,10 @@ elif page == "My Collection":
                 )
             
             with col3:
-                # Enhanced chat button with disabled state
+                # Simplified chat button - no disabled state to avoid conflicts
                 if col3.button("💬 Chat", 
                               key=f"collection_chat_{cid}", 
-                              disabled=st.session_state.get('button_clicked', False),
                               use_container_width=True):
-                    st.session_state.button_clicked = True
                     goto_chat(cid)
 
 # 🔧 PUT DEBUG PANEL HERE (after ALL page sections):
