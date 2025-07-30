@@ -228,6 +228,8 @@ def get_user_row(auth_uid: str) -> dict | None:
 
 def create_pending_signup(email: str, username: str, auth_uid: str = None) -> bool:
     try:
+        # Normalize email to lowercase
+        email = email.lower().strip()
         cleanup_pending_signup(email)
         
         SRS.table("pending_signups").insert({
@@ -245,8 +247,10 @@ def create_pending_signup(email: str, username: str, auth_uid: str = None) -> bo
 
 def get_pending_signup(email: str) -> dict | None:
     try:
+        # Normalize email to lowercase
+        email = email.lower().strip()
         rows = SRS.table("pending_signups").select("*")\
-                  .eq("email", email)\
+                  .ilike("email", email)\
                   .gte("expires_at", datetime.now(timezone.utc).isoformat())\
                   .order("created_at", desc=True)\
                   .limit(1)\
@@ -258,10 +262,13 @@ def get_pending_signup(email: str) -> dict | None:
 
 def cleanup_pending_signup(email: str):
     try:
-        SRS.table("pending_signups").delete().eq("email", email).execute()
+        # Normalize email to lowercase  
+        email = email.lower().strip()
+        SRS.table("pending_signups").delete().ilike("email", email).execute()
         logger.info(f"Cleaned up pending signup for: {email}")
     except Exception as e:
         logger.error(f"Failed to cleanup pending signup: {str(e)}")
+
 
 def cleanup_expired_signups():
     try:
@@ -293,6 +300,9 @@ def cleanup_unconfirmed_user(email: str) -> bool:
         return False
 
 def check_user_status(email: str) -> dict:
+    # Normalize email to lowercase
+    email = email.lower().strip()
+    
     status = {
         "auth_user_exists": False,
         "auth_user_confirmed": False,
@@ -305,7 +315,8 @@ def check_user_status(email: str) -> dict:
         users_response = SRS.auth.admin.list_users()
         if users_response and users_response.users:
             for user in users_response.users:
-                if user.email == email:
+                # Compare lowercase emails
+                if user.email.lower() == email:
                     status["auth_user_exists"] = True
                     status["auth_user_confirmed"] = bool(
                         getattr(user, 'email_confirmed_at', None) or 
@@ -318,7 +329,7 @@ def check_user_status(email: str) -> dict:
         pending = get_pending_signup(email)
         status["pending_signup_exists"] = bool(pending)
         
-        invite = SRS.table("invitees").select("claimed").eq("email", email).execute().data
+        invite = SRS.table("invitees").select("claimed").ilike("email", email).execute().data
         if invite:
             status["invite_claimed"] = invite[0]["claimed"]
         
@@ -403,7 +414,9 @@ if "confirm_email" in params:
                 # Check if user row exists, create if needed
                 existing_user = get_user_row(user_id)
                 if not existing_user:
-                    pending = get_pending_signup(email)
+                     # Normalize email for lookup
+                    normalized_email = email.lower().strip()
+                    pending = get_pending_signup(normalized_email)
                     if pending:
                         username = pending["username"]
                         logger.info(f"Creating user row for confirmed user: {email} with username: {username}")
@@ -412,7 +425,7 @@ if "confirm_email" in params:
                         
                         # Update invite status
                         try:
-                            SRS.table("invitees").update({"claimed": True}).eq("email", email).execute()
+                            SRS.table("invitees").update({"claimed": True}).ilike("email", email.lower().strip()).execute()
                         except Exception as invite_error:
                             logger.warning(f"Could not update invite status: {invite_error}")
                         
@@ -727,10 +740,14 @@ if "user" not in st.session_state:
             st.warning("Fill all required fields.")
             st.stop()
 
+        # NORMALIZE EMAIL - Convert to lowercase for consistency
+        email = email.lower().strip()
+        
         try:
+            # Make invite checking case-insensitive
             invite = SRS.table("invitees")\
                         .select("claimed")\
-                        .eq("email", email)\
+                        .ilike("email", email)\
                         .execute().data
             if not invite:
                 logger.warning(f"Unauthorized signup attempt: {email}")
@@ -798,7 +815,7 @@ if "user" not in st.session_state:
                     except Exception as e:
                         logger.error(f"Failed to update pending signup: {str(e)}")
                     
-                    # Replace the incomplete signup section (around line 686 after "# Send confirmation email directly via SendGrid") with this:
+                  
 
                     # Send confirmation email directly via SendGrid
                     try:
