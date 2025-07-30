@@ -506,7 +506,7 @@ def bond_and_chat(cid: str, comp: dict):
         st.session_state.page = "Chat"
         st.session_state.chat_cid = cid
         st.session_state.flash = f"Bonded with {comp['name']}!"
-        st.rerun()
+        # DON'T call st.rerun() here - let the natural flow handle it
     else:
         st.warning(new_user)
 
@@ -514,7 +514,7 @@ def goto_chat(cid: str):
     st.session_state.page = "Chat"
     st.session_state.chat_cid = cid
     st.session_state.flash = None
-    st.rerun()
+    # DON'T call st.rerun() here - let the natural flow handle it
 
 # ─────────────────── ADMIN PANEL (DEVELOPMENT ONLY) ─────────────
 # PUT THIS RIGHT AFTER YOUR CALLBACKS AND BEFORE THE LOGIN SECTION
