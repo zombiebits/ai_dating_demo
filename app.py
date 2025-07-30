@@ -196,16 +196,25 @@ def send_confirmation_email_direct(email: str, username: str, user_id: str) -> b
         api_key = os.environ.get('SENDGRID_API_KEY')
         if not api_key:
             logger.error("No SENDGRID_API_KEY found in environment")
+            st.error("🔑 No SendGrid API key found")
             return False
         
         logger.info(f"API key found: {api_key[:15]}...")
+        st.info(f"✅ API key found: {api_key[:15]}...")
         
-        sg = sendgrid.SendGridAPIClient(api_key=api_key)
-        logger.info("SendGrid client created successfully")
+        try:
+            sg = sendgrid.SendGridAPIClient(api_key=api_key)
+            logger.info("SendGrid client created successfully")
+            st.info("✅ SendGrid client created")
+        except Exception as e:
+            logger.error(f"Failed to create SendGrid client: {str(e)}")
+            st.error(f"❌ SendGrid client error: {str(e)}")
+            return False
         
         # Create confirmation URL - user clicks this to confirm
         confirmation_url = f"https://ai-matchmaker-demo.streamlit.app/?confirm_email={user_id}&email={email}"
         logger.info(f"Confirmation URL created: {confirmation_url}")
+        st.info("✅ Confirmation URL created")
         
         # More professional, less spammy email template
         html_content = f"""
@@ -248,33 +257,67 @@ def send_confirmation_email_direct(email: str, username: str, user_id: str) -> b
         """
         
         logger.info("HTML content created")
+        st.info("✅ HTML content created")
         
-        message = Mail(
-            from_email=('web34llc@gmail.com', 'BONDIGO Team'),  # Add sender name
-            to_emails=email,
-            subject='Confirm your BONDIGO account',  # Less promotional subject
-            html_content=html_content
-        )
+        try:
+            message = Mail(
+                from_email=('web34llc@gmail.com', 'BONDIGO Team'),  # Add sender name
+                to_emails=email,
+                subject='Confirm your BONDIGO account',  # Less promotional subject
+                html_content=html_content
+            )
+            
+            # Add headers to improve deliverability
+            message.header = {
+                'List-Unsubscribe': '<mailto:unsubscribe@your-domain.com>',
+                'X-Entity-Ref-ID': f'account-confirmation-{user_id}'
+            }
+            
+            logger.info("Mail object created successfully")
+            st.info("✅ Mail object created")
+        except Exception as e:
+            logger.error(f"Failed to create Mail object: {str(e)}")
+            st.error(f"❌ Mail object error: {str(e)}")
+            return False
         
-        # Add headers to improve deliverability
-        message.header = {
-            'List-Unsubscribe': '<mailto:unsubscribe@your-domain.com>',
-            'X-Entity-Ref-ID': f'account-confirmation-{user_id}'
-        }
-        
-        logger.info("Mail object created successfully")
-        
-        response = sg.send(message)
-        logger.info(f"SendGrid response: status={response.status_code}")
-        
-        success = response.status_code == 202
-        logger.info(f"Email send result: {success}")
-        
-        return success
+        try:
+            response = sg.send(message)
+            logger.info(f"SendGrid response: status={response.status_code}")
+            st.info(f"📤 SendGrid response: {response.status_code}")
+            
+            if hasattr(response, 'body') and response.body:
+                logger.info(f"Response body: {response.body}")
+                st.code(f"Response body: {response.body}")
+            
+            success = response.status_code == 202
+            logger.info(f"Email send result: {success}")
+            
+            if success:
+                st.success("✅ Email sent successfully!")
+            else:
+                st.error(f"❌ Unexpected status code: {response.status_code}")
+            
+            return success
+            
+        except Exception as e:
+            logger.error(f"SendGrid send failed: {str(e)}")
+            st.error(f"❌ SendGrid send error: {str(e)}")
+            
+            # Show more error details
+            error_str = str(e)
+            if "401" in error_str:
+                st.error("🔑 API key authentication failed")
+            elif "403" in error_str:
+                st.error("🚫 Forbidden - check account verification")
+            elif "429" in error_str:
+                st.error("⏰ Rate limit exceeded")
+            
+            return False
         
     except Exception as e:
         logger.error(f"Direct SendGrid email failed: {str(e)}")
         logger.error(f"Error type: {type(e).__name__}")
+        st.error(f"❌ Unexpected error: {str(e)}")
         return False
 
 def apply_daily_airdrop(user: dict) -> dict:
