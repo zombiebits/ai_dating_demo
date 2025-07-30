@@ -996,22 +996,29 @@ if "page" not in st.session_state:
 if "button_clicked" not in st.session_state:
     st.session_state.button_clicked = False
 
-# Store the current page before radio
-previous_page = st.session_state.page
+# NUCLEAR APPROACH: Store what the radio SHOULD show vs actual page state
+# This prevents the radio from interfering with programmatic navigation
+if "radio_page" not in st.session_state:
+    st.session_state.radio_page = st.session_state.page
 
 page = st.radio(
     "", ["Find matches","Chat","My Collection"],
-    index=["Find matches","Chat","My Collection"].index(st.session_state.page),
+    index=["Find matches","Chat","My Collection"].index(st.session_state.radio_page),
     key="page_nav", horizontal=True
 )
 
-# Only update if RADIO actually changed (not other interactions)
-if page != previous_page:
+# Handle radio changes separately from programmatic navigation
+if page != st.session_state.radio_page:
+    # User clicked radio - this is a real navigation
     st.session_state.page = page
-    st.session_state.button_clicked = False  # Reset button state
-    # Clear chat-specific state when leaving chat via RADIO only
+    st.session_state.radio_page = page
+    st.session_state.button_clicked = False
+    # Clear chat state when leaving chat via radio
     if page != "Chat":
         st.session_state.chat_cid = None
+elif st.session_state.page != st.session_state.radio_page:
+    # Programmatic navigation happened (like goto_chat) - sync the radio
+    st.session_state.radio_page = st.session_state.page
 
 
 # ─────────────────── FIND MATCHES ────────────────────────────────
