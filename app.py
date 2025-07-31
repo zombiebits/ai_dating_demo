@@ -1766,10 +1766,8 @@ if st.session_state.page == "Find matches":
                         else:
                             st.warning(result)
 
-# ─────────────────── CHAT ────────────────────────────────────────
-# REPLACE YOUR ENTIRE CHAT SECTION (around line 800+) WITH THIS:
+# ─────────────────── UPDATED CHAT SECTION WITH MYSTERY REVEAL ─────────────────────
 
-# ─────────────────── CHAT ────────────────────────────────────────
 elif st.session_state.page == "Chat":
     if st.session_state.flash:
         st.success(st.session_state.flash)
@@ -1784,23 +1782,35 @@ elif st.session_state.page == "Chat":
         cid = next(k for k,v in CID2COMP.items() if v["name"]==sel)
         st.session_state.chat_cid = cid
 
-        # GET COMPANION INFO
         comp = CID2COMP[cid]
         
-        # DISPLAY COMPANION HEADER WITH PHOTO
+        # Check if this is the first time chatting (reveal moment!)
+        if not is_companion_revealed(user["id"], cid):
+            reveal_info = reveal_companion_stats(user["id"], cid)
+            if reveal_info:
+                show_stats_reveal_animation(comp, reveal_info)
+                st.markdown("---")
+        
+        # DISPLAY COMPANION HEADER WITH STATS (now always revealed)
         col1, col2 = st.columns([1, 4])
         with col1:
             st.image(comp.get("photo", PLACEHOLDER), width=100)
         with col2:
             rarity = comp.get("rarity", "Common")
             clr = CLR[rarity]
+            
+            # Show full stats in chat (since we're in chat, it should be revealed)
+            stats_html = format_stats_display(comp["stats"])
+            total_stats = comp.get("total_stats", sum(comp["stats"].values()))
+            
             st.markdown(
                 f"<span style='background:{clr};color:black;padding:2px 6px;"
                 f"border-radius:4px;font-size:0.75rem'>{rarity}</span> "
-                f"**{comp['name']}**",
+                f"**{comp['name']}** • Total: {total_stats} ⭐<br>"
+                f"<div style='margin:8px 0;'>{stats_html}</div>"
+                f"<span style='font-style:italic;color:#666;'>{comp['bio']}</span>",
                 unsafe_allow_html=True,
             )
-            st.markdown(f"*{comp['bio']}*")
         
         st.markdown("---")
 
@@ -1823,8 +1833,9 @@ elif st.session_state.page == "Chat":
                     logger.error(f"Failed to clear history: {str(e)}")
                     st.error("❌ Failed to clear history. Please try again.")
 
-        st.markdown("---")  # Keep this separator  
+        st.markdown("---")
 
+        # Rest of your existing chat logic stays the same...
         hist = st.session_state.hist.get(cid)
         if hist is None:
             rows = (SRS.table("messages")
