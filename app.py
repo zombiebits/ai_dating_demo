@@ -285,6 +285,32 @@ def format_stats_display(stats):
     
     return " • ".join(formatted_stats)
 
+def format_stats_display_clean(stats):
+    """IMPROVED: Cleaner stat display with better contrast"""
+    config = {
+        "wit": {"emoji": "🧠", "color": "#A78BFA"},          # Lighter purple
+        "empathy": {"emoji": "❤️", "color": "#FB7185"},      # Lighter red
+        "creativity": {"emoji": "🎨", "color": "#FBBF24"},   # Lighter orange
+        "knowledge": {"emoji": "📚", "color": "#60A5FA"},    # Lighter blue
+        "boldness": {"emoji": "⚡", "color": "#34D399"}      # Lighter green
+    }
+    
+    formatted_stats = []
+    for stat_name, value in stats.items():
+        if stat_name in config:
+            emoji = config[stat_name]["emoji"]
+            color = config[stat_name]["color"]
+            formatted_stats.append(
+                f"<div style='display: inline-block; margin: 8px 12px; text-align: center;'>"
+                f"<div style='color: {color}; font-size: 1.5rem; margin-bottom: 4px;'>{emoji}</div>"
+                f"<div style='color: white; font-weight: 600; font-size: 1.1rem;'>{value}</div>"
+                f"<div style='color: #D1D5DB; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px;'>{stat_name}</div>"
+                f"</div>"
+            )
+    
+    return "<div style='text-align: center;'>" + "".join(formatted_stats) + "</div>"
+
+
 def is_companion_revealed(user_id: str, companion_id: str) -> bool:
     """Check if companion stats have been revealed"""
     try:
@@ -574,7 +600,7 @@ def display_mystery_tier_info():
 
 
 def show_stats_reveal_animation(companion, reveal_info):
-    """Show exciting reveal animation when stats are first shown"""
+    """Show exciting reveal animation when stats are first shown - IMPROVED VERSION"""
     if reveal_info["surprise_factor"] == "upgrade":
         st.balloons()
         st.success(f"🎉 SURPRISE UPGRADE! You got a {reveal_info['actual_tier']} companion!")
@@ -583,22 +609,34 @@ def show_stats_reveal_animation(companion, reveal_info):
     else:
         st.info(f"You got a {reveal_info['actual_tier']} companion!")
     
-    # Show the stats in a special reveal format
-    stats_html = format_stats_display(companion["stats"])
+    # IMPROVED: Better colors and readability
+    stats_html = format_stats_display_clean(companion["stats"])  # New cleaner version
     total_stats = reveal_info["stat_total"]
-    actual_rarity = reveal_info["actual_rarity"]  # Use calculated rarity
+    actual_rarity = reveal_info["actual_rarity"]
+    
+    # Get rarity color
+    rarity_colors = {
+        "Common": "#9CA3AF",     # Clean gray
+        "Rare": "#3B82F6",       # Clean blue  
+        "Legendary": "#F59E0B"   # Clean gold
+    }
+    rarity_color = rarity_colors.get(actual_rarity, "#9CA3AF")
     
     st.markdown(f"""
-    <div style='background: linear-gradient(45deg, #667eea 0%, #764ba2 100%); 
-                padding: 16px; border-radius: 12px; margin: 10px 0;
-                border: 2px solid #FFD700; box-shadow: 0 4px 15px rgba(0,0,0,0.2);'>
-        <h3 style='color: white; text-align: center; margin: 0 0 10px 0;'>
-            🎊 COMPANION REVEALED! 🎊
+    <div style='background: linear-gradient(135deg, #1F2937 0%, #374151 100%); 
+                padding: 20px; border-radius: 16px; margin: 15px 0;
+                border: 2px solid {rarity_color}; 
+                box-shadow: 0 8px 25px rgba(0,0,0,0.3);'>
+        <h3 style='color: white; text-align: center; margin: 0 0 15px 0; font-size: 1.4rem;'>
+            🎊 {companion['name']} Revealed! 🎊
         </h3>
-        <p style='color: white; text-align: center; font-size: 1.1rem; margin: 8px 0;'>
-            <strong>{companion['name']}</strong> • {actual_rarity} • Total: {total_stats} ⭐
-        </p>
-        <div style='text-align: center; font-size: 0.9rem;'>
+        <div style='text-align: center; margin-bottom: 15px;'>
+            <span style='background: {rarity_color}; color: white; padding: 6px 12px; 
+                        border-radius: 8px; font-weight: 600; font-size: 1rem;'>
+                {actual_rarity} • {total_stats} ⭐ Total
+            </span>
+        </div>
+        <div style='background: rgba(255,255,255,0.1); padding: 15px; border-radius: 12px;'>
             {stats_html}
         </div>
     </div>
@@ -1960,7 +1998,7 @@ if st.session_state.page == "Find matches":
                             st.session_state.user = result
                             st.session_state.page = "Chat"
                             st.session_state.chat_cid = companion["id"]
-                            st.session_state.flash = f"Mystery Bond purchased! Chat to reveal your companion! 🎁"
+                            st.session_state.flash = f"Mystery Bond purchased! 🎁"
                             st.rerun()
                         else:
                             st.warning(result)
