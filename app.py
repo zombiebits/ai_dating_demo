@@ -392,6 +392,161 @@ def reveal_companion_stats(user_id: str, companion_id: str):
     except Exception as e:
         logger.error(f"Failed to reveal companion stats: {str(e)}")
         return None
+    
+
+# ─────────────────── UI DISPLAY FUNCTIONS FOR MYSTERY BOX ─────────────────────
+# Add these right after your reveal_companion_stats function
+
+def display_mystery_tier_info():
+    """Display the mystery box pricing explanation"""
+    st.markdown("""
+    <div style='background: linear-gradient(45deg, #FF6B9D, #C44569); 
+                padding: 20px; border-radius: 12px; margin: 20px 0;'>
+        <h3 style='color: white; text-align: center; margin-bottom: 15px;'>
+            🎁 Mystery Box System
+        </h3>
+        <div style='display: flex; justify-content: space-around; flex-wrap: wrap;'>
+            <div style='background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; margin: 5px; min-width: 150px;'>
+                <div style='text-align: center; color: white;'>
+                    <div style='font-size: 1.5rem;'>🎁</div>
+                    <div><strong>Mystery Bond</strong></div>
+                    <div style='font-size: 1.2rem; color: #FFD700;'>50 💎</div>
+                    <div style='font-size: 0.8rem;'>Unknown stats until bonding</div>
+                </div>
+            </div>
+            <div style='background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; margin: 5px; min-width: 150px;'>
+                <div style='text-align: center; color: white;'>
+                    <div style='font-size: 1.5rem;'>✨</div>
+                    <div><strong>Premium Bond</strong></div>
+                    <div style='font-size: 1.2rem; color: #FFD700;'>150 💎</div>
+                    <div style='font-size: 0.8rem;'>Guaranteed 300+ stats</div>
+                </div>
+            </div>
+            <div style='background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; margin: 5px; min-width: 150px;'>
+                <div style='text-align: center; color: white;'>
+                    <div style='font-size: 1.5rem;'>🏆</div>
+                    <div><strong>Elite Bond</strong></div>
+                    <div style='font-size: 1.2rem; color: #FFD700;'>400 💎</div>
+                    <div style='font-size: 0.8rem;'>Guaranteed 400+ stats</div>
+                </div>
+            </div>
+        </div>
+        <p style='color: white; text-align: center; margin-top: 15px; font-size: 0.9rem;'>
+            💡 <strong>Discovery Element:</strong> Hunt for hidden gems and surprise upgrades!
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+def show_stats_reveal_animation(companion, reveal_info):
+    """Show exciting reveal animation when stats are first shown"""
+    if reveal_info["surprise_factor"] == "upgrade":
+        st.balloons()
+        st.success(f"🎉 SURPRISE UPGRADE! You got a {reveal_info['actual_tier']} companion!")
+    elif reveal_info["surprise_factor"] == "expected":
+        st.success(f"✨ Perfect match! This companion matches your {reveal_info['actual_tier']} purchase!")
+    
+    # Show the stats in a special reveal format
+    stats_html = format_stats_display(companion["stats"])
+    total_stats = reveal_info["stat_total"]
+    
+    st.markdown(f"""
+    <div style='background: linear-gradient(45deg, #667eea 0%, #764ba2 100%); 
+                padding: 16px; border-radius: 12px; margin: 10px 0;
+                border: 2px solid #FFD700; box-shadow: 0 4px 15px rgba(0,0,0,0.2);'>
+        <h3 style='color: white; text-align: center; margin: 0 0 10px 0;'>
+            🎊 COMPANION REVEALED! 🎊
+        </h3>
+        <p style='color: white; text-align: center; font-size: 1.1rem; margin: 8px 0;'>
+            <strong>{companion['name']}</strong> • Total Stats: {total_stats} ⭐
+        </p>
+        <div style='text-align: center; font-size: 0.9rem;'>
+            {stats_html}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+def display_mystery_companion_card(companion, user_id, owned=False, in_collection=False):
+    """Display companion card with mystery box or revealed stats"""
+    rarity = companion.get("rarity", "Common")
+    clr = CLR[rarity]
+    
+    # Check if this companion is revealed for this user
+    revealed = True  # Default for non-owned
+    mystery_tier = "Mystery Bond"
+    
+    if owned:
+        revealed = is_companion_revealed(user_id, companion["id"])
+        mystery_tier = get_companion_mystery_tier(user_id, companion["id"])
+    
+    # Create columns
+    c1, c2, c3 = st.columns([1, 5, 2])
+    
+    # Image
+    if revealed or not owned:
+        c1.image(companion.get("photo", PLACEHOLDER), width=90)
+    else:
+        # Mystery box - show a question mark or mystery image
+        mystery_placeholder = "❓"  # We'll use emoji for now
+        c1.markdown(f"<div style='font-size: 60px; text-align: center; margin: 10px 0;'>{mystery_placeholder}</div>", unsafe_allow_html=True)
+    
+    # Info column
+    with c2:
+        if revealed or not owned:
+            # Show full info
+            if in_collection:
+                # In collection, show stats
+                stats_html = format_stats_display(companion["stats"])
+                total_stats = companion.get("total_stats", sum(companion["stats"].values()))
+                
+                st.markdown(
+                    f"<span style='background:{clr};color:black;padding:2px 6px;"
+                    f"border-radius:4px;font-size:0.75rem'>{rarity}</span> "
+                    f"**{companion['name']}** • Total: {total_stats} ⭐<br>"
+                    f"<div style='font-size:0.8rem;margin:4px 0;'>{stats_html}</div>"
+                    f"<span style='font-size:0.85rem;font-style:italic;'>{companion['bio']}</span>",
+                    unsafe_allow_html=True,
+                )
+            else:
+                # In find matches, show mystery tier
+                if owned:
+                    display_tier = mystery_tier
+                    price = MYSTERY_COST[mystery_tier]
+                else:
+                    display_tier = get_mystery_tier_from_companion(companion)
+                    price = MYSTERY_COST[display_tier]
+                
+                tier_colors = {
+                    "Mystery Bond": "#8B5CF6",     # Purple
+                    "Premium Bond": "#3B82F6",     # Blue  
+                    "Elite Bond": "#F59E0B"        # Gold
+                }
+                tier_color = tier_colors.get(display_tier, "#8B5CF6")
+                
+                st.markdown(
+                    f"<span style='background:{tier_color};color:white;padding:2px 6px;"
+                    f"border-radius:4px;font-size:0.75rem'>{display_tier}</span> "
+                    f"**{companion['name']}** • {price} 💎<br>"
+                    f"<span style='font-size:0.85rem;font-style:italic;'>{companion['bio']}</span>",
+                    unsafe_allow_html=True,
+                )
+        else:
+            # Mystery box - hide details
+            tier_colors = {
+                "Mystery Bond": "#8B5CF6",
+                "Premium Bond": "#3B82F6", 
+                "Elite Bond": "#F59E0B"
+            }
+            tier_color = tier_colors.get(mystery_tier, "#8B5CF6")
+            
+            st.markdown(
+                f"<span style='background:{tier_color};color:white;padding:2px 6px;"
+                f"border-radius:4px;font-size:0.75rem'>{mystery_tier}</span> "
+                f"**Mystery Companion** 🎁<br>"
+                f"<span style='font-size:0.85rem;font-style:italic;'>Stats will be revealed when you start chatting!</span>",
+                unsafe_allow_html=True,
+            )
+    
+    return c3  # Return the action column for buttons
 
 def get_user_row(auth_uid: str) -> dict | None:
     try:
@@ -1377,16 +1532,19 @@ if st.session_state.page == "Find matches":
         st.success(st.session_state.flash)
         st.session_state.flash = None
 
-    st.image("assets/bondcosts.png", width=380)
-    hobby = st.selectbox("Pick a hobby",   ["space","foodie","gaming","music","art",
-                   "sports","reading","travel","gardening","coding"])
-    trait = st.selectbox("Pick a trait",   ["curious","adventurous","night‑owl","chill",
-                   "analytical","energetic","humorous","kind","bold","creative"])
-    vibe  = st.selectbox("Pick a vibe",    ["witty","caring","mysterious","romantic",
-                   "sarcastic","intellectual","playful","stoic","optimistic","pragmatic"])
-    scene = st.selectbox("Pick a scene",   ["beach","forest","cafe","space‑station",
-                   "cyberpunk‑city","medieval‑castle","mountain","underwater",
-                   "neon‑disco","cozy‑library"])
+    # Show mystery box pricing info instead of old image
+    display_mystery_tier_info()
+    
+    # Existing match finding logic (keep this the same)
+    hobby = st.selectbox("Pick a hobby", ["space","foodie","gaming","music","art",
+                       "sports","reading","travel","gardening","coding"])
+    trait = st.selectbox("Pick a trait", ["curious","adventurous","night‑owl","chill",
+                       "analytical","energetic","humorous","kind","bold","creative"])
+    vibe = st.selectbox("Pick a vibe", ["witty","caring","mysterious","romantic",
+                      "sarcastic","intellectual","playful","stoic","optimistic","pragmatic"])
+    scene = st.selectbox("Pick a scene", ["beach","forest","cafe","space‑station",
+                        "cyberpunk‑city","medieval‑castle","mountain","underwater",
+                        "neon‑disco","cozy‑library"])
     
     if st.button("Show matches"):
         st.session_state.matches = (
@@ -1394,25 +1552,30 @@ if st.session_state.page == "Find matches":
            or random.sample(COMPANIONS, 5)
         )
 
+    # Display matches with NEW mystery box system
     for c in st.session_state.matches:
-        rarity, clr = c.get("rarity","Common"), CLR[c.get("rarity","Common")]
-        c1,c2,c3    = st.columns([1,5,2])
-        c1.image(c.get("photo",PLACEHOLDER), width=90)
-        c2.markdown(
-          f"<span style='background:{clr};color:black;padding:2px 6px;"
-          f"border-radius:4px;font-size:0.75rem'>{rarity}</span> "
-          f"**{c['name']}** • {COST[rarity]} 💎  \n"
-          f"<span class='match-bio'>{c['bio']}</span>",
-          unsafe_allow_html=True,
-        )
+        action_col = display_mystery_companion_card(c, user["id"], owned=(c["id"] in colset))
         
-        # Simple buttons - no disabled state
+        # Action buttons
         if c["id"] in colset:
-            if c3.button("💬 Chat", key=f"chat-{c['id']}", use_container_width=True):
+            if action_col.button("💬 Chat", key=f"chat-{c['id']}", use_container_width=True):
                 goto_chat(c["id"])
         else:
-            if c3.button("💖 Bond", key=f"bond-{c['id']}", use_container_width=True):
-                bond_and_chat(c["id"], c)
+            # Show mystery tier options
+            mystery_tier = get_mystery_tier_from_companion(c)
+            price = MYSTERY_COST[mystery_tier]
+            
+            if action_col.button(f"🎁 Bond\n{price} 💎", key=f"bond-{c['id']}", use_container_width=True):
+                # Use NEW mystery box buying system
+                ok, result = buy_mystery_box(user, c, mystery_tier)
+                if ok:
+                    st.session_state.user = result
+                    st.session_state.page = "Chat"
+                    st.session_state.chat_cid = c["id"]
+                    st.session_state.flash = f"Bonded with Mystery Companion! Chat to reveal stats! 🎁"
+                    st.rerun()
+                else:
+                    st.warning(result)
 
 # ─────────────────── CHAT ────────────────────────────────────────
 # REPLACE YOUR ENTIRE CHAT SECTION (around line 800+) WITH THIS:
