@@ -1140,7 +1140,7 @@ st.markdown(
 )
 
 # ADD SPACING HERE - this creates proper gap
-st.markdown("<div style='margin: 10px 0;'></div>", unsafe_allow_html=True)
+#st.markdown("<div style='margin: 10px 0;'></div>", unsafe_allow_html=True)
 
 # Bond XP Display (with better spacing!)
 st.markdown(
