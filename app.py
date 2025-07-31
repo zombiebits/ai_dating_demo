@@ -478,7 +478,7 @@ def create_user_row(auth_uid: str, username: str, email: str = None) -> dict:
             "last_airdrop": None,
             "bond_xp": 0,           # New field
             "bond_level": 1,        # New field  
-            "bond_title": "Rookie Bonding"  # New field
+            "bond_title": "Bond Newbie"  # New field
         }).execute()
         logger.info(f"Created user row for: {auth_uid} with username: {username}, email: {email}")
         return result.data[0]
@@ -1126,7 +1126,7 @@ if Path(LOGO).is_file():
     )
 # Get Bond XP info
 bond_xp = user.get('bond_xp', 0)
-bond_title = user.get('bond_title', 'Rookie Bonding')
+bond_title = user.get('bond_title', 'Bond Newbie')
 level, title, current_level_xp, next_level_xp = get_bond_level_info(bond_xp)
 
 # Wallet Display
