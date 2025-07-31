@@ -54,9 +54,9 @@ st.markdown("""<style>
 MAX_TOKENS    = 10_000
 DAILY_AIRDROP = 150
 COST = {
-    "basic": 50,
-    "premium": 150,
-    "elite": 400
+    "Common": 50,
+    "Rare": 150,
+    "Legendary": 400
 }
 
 def calculate_true_rarity(companion_stats):
