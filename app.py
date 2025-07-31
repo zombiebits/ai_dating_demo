@@ -238,12 +238,24 @@ def get_mystery_tier_from_companion(companion):
     """Determine which mystery tier a companion should be sold as"""
     total_stats = companion.get("total_stats", 0)
     
+    # Use actual stats to determine tier, not the JSON rarity field
     if total_stats >= 400:
         return "Elite Bond"
     elif total_stats >= 300:
         return "Premium Bond"  
     else:
         return "Basic Bond"
+    
+def get_actual_rarity(companion):
+    """Get the TRUE rarity based on total stats, not JSON field"""
+    total_stats = companion.get("total_stats", sum(companion.get("stats", {}).values()))
+    
+    if total_stats >= 400:
+        return "Legendary"
+    elif total_stats >= 300:
+        return "Rare"
+    else:
+        return "Common"
 
 def get_stat_display_config():
     """Configuration for displaying stats with colors and emojis"""
@@ -303,9 +315,10 @@ def calculate_mystery_reveal_tier(companion, purchased_tier):
     Calculate what tier to reveal based on companion stats and what user bought
     Returns upgrade/expected/downgrade info
     """
+    # Use ACTUAL stats-based tier, not JSON tier
     actual_tier = get_mystery_tier_from_companion(companion)
     
-    tier_hierarchy = {"Basic Bond": 1, "Premium Bond": 2, "Elite Bond": 3}  # Updated
+    tier_hierarchy = {"Basic Bond": 1, "Premium Bond": 2, "Elite Bond": 3}
     purchased_level = tier_hierarchy[purchased_tier]
     actual_level = tier_hierarchy[actual_tier]
     
@@ -319,7 +332,8 @@ def calculate_mystery_reveal_tier(companion, purchased_tier):
     return {
         "actual_tier": actual_tier,
         "surprise_factor": surprise,
-        "stat_total": companion.get("total_stats", 0)
+        "stat_total": companion.get("total_stats", sum(companion.get("stats", {}).values())),
+        "actual_rarity": get_actual_rarity(companion)  # Add this
     }
 
 def buy_mystery_box(user: dict, comp: dict, mystery_tier: str):
@@ -561,10 +575,13 @@ def show_stats_reveal_animation(companion, reveal_info):
         st.success(f"🎉 SURPRISE UPGRADE! You got a {reveal_info['actual_tier']} companion!")
     elif reveal_info["surprise_factor"] == "expected":
         st.success(f"✨ Perfect match! This companion matches your {reveal_info['actual_tier']} purchase!")
+    else:
+        st.info(f"You got a {reveal_info['actual_tier']} companion!")
     
     # Show the stats in a special reveal format
     stats_html = format_stats_display(companion["stats"])
     total_stats = reveal_info["stat_total"]
+    actual_rarity = reveal_info["actual_rarity"]  # Use calculated rarity
     
     st.markdown(f"""
     <div style='background: linear-gradient(45deg, #667eea 0%, #764ba2 100%); 
@@ -574,7 +591,7 @@ def show_stats_reveal_animation(companion, reveal_info):
             🎊 COMPANION REVEALED! 🎊
         </h3>
         <p style='color: white; text-align: center; font-size: 1.1rem; margin: 8px 0;'>
-            <strong>{companion['name']}</strong> • Total Stats: {total_stats} ⭐
+            <strong>{companion['name']}</strong> • {actual_rarity} • Total: {total_stats} ⭐
         </p>
         <div style='text-align: center; font-size: 0.9rem;'>
             {stats_html}
@@ -1680,7 +1697,7 @@ if st.session_state.page == "Find matches":
         if owned:
             # If owned, always show full identity
             c1.image(c.get("photo", PLACEHOLDER), width=90)
-            rarity, clr = c.get("rarity","Common"), CLR[c.get("rarity","Common")]
+            rarity, clr = get_actual_rarity(c), CLR[get_actual_rarity(c)]
             c2.markdown(
                 f"<span style='background:{clr};color:black;padding:2px 6px;"
                 f"border-radius:4px;font-size:0.75rem'>{rarity}</span> "
@@ -1694,7 +1711,7 @@ if st.session_state.page == "Find matches":
         elif show_identity:
             # Show this companion's true identity - can buy specifically
             c1.image(c.get("photo", PLACEHOLDER), width=90)
-            rarity, clr = c.get("rarity","Common"), CLR[c.get("rarity","Common")]
+            rarity, clr = get_actual_rarity(c), CLR[get_actual_rarity(c)]
             mystery_tier = get_mystery_tier_from_companion(c)
             price = MYSTERY_COST[mystery_tier]
             
@@ -1796,7 +1813,7 @@ elif st.session_state.page == "Chat":
         with col1:
             st.image(comp.get("photo", PLACEHOLDER), width=100)
         with col2:
-            rarity = comp.get("rarity", "Common")
+            rarity = get_actual_rarity(comp)
             clr = CLR[rarity]
             
             # Show full stats in chat (since we're in chat, it should be revealed)
@@ -1909,7 +1926,7 @@ elif st.session_state.page == "My Collection":
     else:
         for cid in sorted(colset):
             c   = CID2COMP[cid]
-            rar = c.get("rarity","Common"); clr = CLR[rar]
+            rar = get_actual_rarity(c); clr = CLR[rar]
             
             # Create columns: image, info, chat button
             col1, col2, col3 = st.columns([1, 4, 1])
