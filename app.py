@@ -382,6 +382,109 @@ def buy(user: dict, comp: dict):
     fresh = get_user_row(user["auth_uid"])
     return True, apply_daily_airdrop(fresh)
 
+def get_bond_level_info(bond_xp: int) -> tuple[int, str, int, int]:
+    """
+    Calculate bond level and title from XP
+    Returns: (level, title, xp_for_current_level, xp_for_next_level)
+    """
+    if bond_xp < 500:
+        return 1, "Rookie Bonding", 0, 500
+    elif bond_xp < 1500:
+        return 2, "Skilled Bonding", 500, 1500
+    elif bond_xp < 3000:
+        return 3, "Expert Bonding", 1500, 3000
+    else:
+        return 4, "Master Bonding", 3000, 5000
+
+def update_user_bond_xp(user_id: str, xp_to_add: int) -> dict:
+    """Add XP to user and update their level/title"""
+    try:
+        # Get current user data
+        user = get_user_row(user_id)
+        if not user:
+            logger.error(f"User not found for XP update: {user_id}")
+            return None
+            
+        # Calculate new XP and level
+        old_xp = user.get('bond_xp', 0)
+        new_xp = old_xp + xp_to_add
+        level, title, _, _ = get_bond_level_info(new_xp)
+        
+        # Update database
+        updated_user = SRS.table("users").update({
+            "bond_xp": new_xp,
+            "bond_level": level,
+            "bond_title": title
+        }).eq("auth_uid", user_id).execute().data[0]
+        
+        logger.info(f"Updated user {user_id}: +{xp_to_add} XP (total: {new_xp})")
+        return updated_user
+        
+    except Exception as e:
+        logger.error(f"Failed to update bond XP: {str(e)}")
+        return None
+
+def award_chat_xp(user_id: str, companion_id: str, message_length: int) -> int:
+    """Award XP for sending a chat message"""
+    try:
+        # Base XP (we'll make this dynamic later with companion stats)
+        base_xp = 10
+        
+        # Quality bonus for longer messages
+        quality_bonus = 5 if message_length > 20 else 0
+        
+        # TODO: Add streak multiplier in Phase 2
+        total_xp = base_xp + quality_bonus
+        
+        # Update user's total Bond XP
+        update_user_bond_xp(user_id, total_xp)
+        
+        # Track individual companion bond (create if doesn't exist)
+        try:
+            # Try to update existing bond
+            result = SRS.table("companion_bonds").update({
+                "messages_sent": SRS.table("companion_bonds").select("messages_sent").eq("user_id", user_id).eq("companion_id", companion_id).execute().data[0]["messages_sent"] + 1,
+                "total_xp_earned": SRS.table("companion_bonds").select("total_xp_earned").eq("user_id", user_id).eq("companion_id", companion_id).execute().data[0]["total_xp_earned"] + total_xp,
+                "last_interaction_at": datetime.now(timezone.utc).isoformat()
+            }).eq("user_id", user_id).eq("companion_id", companion_id).execute()
+            
+        except:
+            # Create new bond record if it doesn't exist
+            SRS.table("companion_bonds").insert({
+                "user_id": user_id,
+                "companion_id": companion_id,
+                "messages_sent": 1,
+                "total_xp_earned": total_xp,
+                "bond_strength": 1
+            }).execute()
+        
+        return total_xp
+        
+    except Exception as e:
+        logger.error(f"Failed to award chat XP: {str(e)}")
+        return 0
+
+def create_user_row(auth_uid: str, username: str, email: str = None) -> dict:
+    """Updated version with Bond XP fields"""
+    try:
+        result = SRS.table("users").insert({
+            "id": auth_uid,
+            "auth_uid": auth_uid,
+            "username": username,
+            "email": email,
+            "tokens": 1000,
+            "last_airdrop": None,
+            "bond_xp": 0,           # New field
+            "bond_level": 1,        # New field  
+            "bond_title": "Rookie Bonding"  # New field
+        }).execute()
+        logger.info(f"Created user row for: {auth_uid} with username: {username}, email: {email}")
+        return result.data[0]
+    except Exception as e:
+        logger.error(f"Failed to create user row: {str(e)}")
+        raise
+
+
 # ────────── CUSTOM EMAIL CONFIRMATION HANDLER ─────────────
 
 params = st.query_params
@@ -1019,12 +1122,27 @@ if Path(LOGO).is_file():
         f"color:#FFC8D8'>{TAGLINE}</p>",
         unsafe_allow_html=True,
     )
+# Get Bond XP info
+bond_xp = user.get('bond_xp', 0)
+bond_title = user.get('bond_title', 'Rookie Bonding')
+level, title, current_level_xp, next_level_xp = get_bond_level_info(bond_xp)
+
+# Wallet Display
 st.markdown(
     f"<span style='background:linear-gradient(45deg, #ff6b9d, #ff8a5c);padding:6px 12px;border-radius:8px;display:inline-block;"
     f"font-size:1.25rem;color:white;font-weight:600;margin-right:8px;text-shadow: 0 1px 2px rgba(0,0,0,0.3);'>"
     f"{user['username']}'s Wallet</span>"
     f"<span style='background:#000;color:#57C784;padding:6px 12px;border-radius:8px;"
-    f"display:inline-block;font-size:1.25rem;'>{user['tokens']} 💎</span>",
+    f"display:inline-block;font-size:1.25rem;margin-right:8px;'>{user['tokens']} 💎</span>",
+    unsafe_allow_html=True,
+)
+
+# Bond XP Display (new!)
+st.markdown(
+    f"<div style='background:linear-gradient(45deg, #8B5CF6, #06D6A0);padding:8px 16px;border-radius:10px;"
+    f"display:inline-block;font-size:1.1rem;color:white;font-weight:600;text-shadow: 0 1px 2px rgba(0,0,0,0.3);"
+    f"margin-top:8px;'>"
+    f"Bond XP: {bond_xp:,} ✨ | {bond_title}</div>",
     unsafe_allow_html=True,
 )
 
@@ -1118,6 +1236,9 @@ if st.session_state.page == "Find matches":
                 bond_and_chat(c["id"], c)
 
 # ─────────────────── CHAT ────────────────────────────────────────
+# REPLACE YOUR ENTIRE CHAT SECTION (around line 800+) WITH THIS:
+
+# ─────────────────── CHAT ────────────────────────────────────────
 elif st.session_state.page == "Chat":
     if st.session_state.flash:
         st.success(st.session_state.flash)
@@ -1206,6 +1327,11 @@ elif st.session_state.page == "Chat":
                     st.session_state.spent += resp.usage.prompt_tokens + resp.usage.completion_tokens
                     hist.append({"role":"assistant","content":reply})
                     st.chat_message("assistant").write(reply)
+
+                    # Award XP for the interaction
+                    xp_earned = award_chat_xp(user["auth_uid"], cid, len(user_input))
+
+                    # Original database insertions
                     SRS.table("messages").insert({
                         "user_id":      user["id"],
                         "companion_id": cid,
@@ -1218,6 +1344,15 @@ elif st.session_state.page == "Chat":
                         "role":         "assistant",
                         "content":      reply
                     }).execute()
+
+                    # Show XP notification
+                    if xp_earned > 0:
+                        st.success(f"💫 +{xp_earned} Bond XP earned!")
+                        # Refresh user data to show updated XP
+                        fresh_user = get_user_row(user["auth_uid"])
+                        if fresh_user:
+                            st.session_state.user = fresh_user
+                            
                 except RateLimitError:
                     st.warning("OpenAI rate‑limit.")
                 except OpenAIError as e:
