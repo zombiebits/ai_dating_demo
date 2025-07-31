@@ -1028,19 +1028,6 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ─────────────────── LOGOUT BUTTON ────────────────────
-col_logout1, col_logout2, col_logout3 = st.columns([1, 1, 1])
-with col_logout3:  # Put it on the right side
-    if st.button("🚪 Logout", key="logout_btn", type="secondary"):
-        # Clear all session state
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
-        
-        # Clear URL parameters
-        st.query_params.clear()
-        
-        # Rerun to show login screen
-        st.rerun()
 
 # ─────────────────── NAVIGATION WITH LOGOUT ────────────────────
 if "page" not in st.session_state:
