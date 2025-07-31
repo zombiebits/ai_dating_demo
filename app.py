@@ -229,6 +229,170 @@ def create_user_row(auth_uid: str, username: str, email: str = None) -> dict:
         logger.error(f"Failed to create user row: {str(e)}")
         raise
 
+# ─────────────────── MYSTERY BOX SYSTEM (ADD AFTER YOUR EXISTING HELPERS) ─────────────────────
+import random
+
+# Mystery Box Pricing (what users pay)
+MYSTERY_COST = {
+    "Mystery Bond": 50,    # Unknown stats until bonding
+    "Premium Bond": 150,   # Guaranteed 300+ stats  
+    "Elite Bond": 400      # Guaranteed 400+ stats
+}
+
+def get_mystery_tier_from_companion(companion):
+    """Determine which mystery tier a companion should be sold as"""
+    total_stats = companion.get("total_stats", 0)
+    
+    if total_stats >= 400:
+        return "Elite Bond"
+    elif total_stats >= 300:
+        return "Premium Bond"  
+    else:
+        return "Mystery Bond"
+
+def get_stat_display_config():
+    """Configuration for displaying stats with colors and emojis"""
+    return {
+        "wit": {"emoji": "🧠", "color": "#9333EA"},          # Purple
+        "empathy": {"emoji": "❤️", "color": "#DC2626"},      # Red
+        "creativity": {"emoji": "🎨", "color": "#EA580C"},   # Orange
+        "knowledge": {"emoji": "📚", "color": "#2563EB"},    # Blue
+        "boldness": {"emoji": "⚡", "color": "#059669"}      # Green
+    }
+
+def format_stats_display(stats):
+    """Format companion stats for display with emojis and colors"""
+    config = get_stat_display_config()
+    formatted_stats = []
+    
+    for stat_name, value in stats.items():
+        if stat_name in config:
+            emoji = config[stat_name]["emoji"]
+            color = config[stat_name]["color"]
+            formatted_stats.append(
+                f"<span style='color:{color};font-weight:600;'>"
+                f"{emoji} {stat_name.title()}: {value}</span>"
+            )
+    
+    return " • ".join(formatted_stats)
+
+def is_companion_revealed(user_id: str, companion_id: str) -> bool:
+    """Check if companion stats have been revealed"""
+    try:
+        result = SRS.table("collection")\
+                   .select("revealed")\
+                   .eq("user_id", user_id)\
+                   .eq("companion_id", companion_id)\
+                   .execute().data
+        return result[0]["revealed"] if result else True  # Default to revealed if not found
+    except:
+        return True  # Default to revealed on error
+
+def get_companion_mystery_tier(user_id: str, companion_id: str) -> str:
+    """Get the mystery tier the user purchased"""
+    try:
+        result = SRS.table("collection")\
+                   .select("mystery_tier")\
+                   .eq("user_id", user_id)\
+                   .eq("companion_id", companion_id)\
+                   .execute().data
+        return result[0]["mystery_tier"] if result else "Mystery Bond"
+    except:
+        return "Mystery Bond"
+    
+# ─────────────────── ADD THESE ADDITIONAL MYSTERY BOX FUNCTIONS ─────────────────────
+# Add these right after your existing mystery box functions
+
+def calculate_mystery_reveal_tier(companion, purchased_tier):
+    """
+    Calculate what tier to reveal based on companion stats and what user bought
+    Returns upgrade/expected/downgrade info
+    """
+    actual_tier = get_mystery_tier_from_companion(companion)
+    
+    tier_hierarchy = {"Mystery Bond": 1, "Premium Bond": 2, "Elite Bond": 3}
+    purchased_level = tier_hierarchy[purchased_tier]
+    actual_level = tier_hierarchy[actual_tier]
+    
+    if actual_level > purchased_level:
+        surprise = "upgrade"
+    elif actual_level == purchased_level:
+        surprise = "expected"  
+    else:
+        surprise = "downgrade"
+    
+    return {
+        "actual_tier": actual_tier,
+        "surprise_factor": surprise,
+        "stat_total": companion.get("total_stats", 0)
+    }
+
+def buy_mystery_box(user: dict, comp: dict, mystery_tier: str):
+    """Updated buy function for mystery box system"""
+    price = MYSTERY_COST[mystery_tier]
+    
+    if price > user["tokens"]:
+        return False, "Not enough 💎"
+    
+    # Check if already owned
+    owned = SRS.table("collection").select("companion_id")\
+               .eq("user_id", user["id"])\
+               .eq("companion_id", comp["id"])\
+               .execute().data
+    if owned:
+        return False, "Already owned"
+    
+    # Deduct tokens
+    SRS.table("users").update({"tokens": user["tokens"] - price})\
+       .eq("id", user["id"]).execute()
+    
+    # Add to collection with mystery box info
+    SRS.table("collection").insert({
+        "user_id": user["id"],
+        "companion_id": comp["id"],
+        "revealed": False,  # Hidden until first chat
+        "mystery_tier": mystery_tier,
+        "bonded_at": datetime.now(timezone.utc).isoformat()
+    }).execute()
+    
+    fresh = get_user_row(user["auth_uid"])
+    return True, apply_daily_airdrop(fresh)
+
+def reveal_companion_stats(user_id: str, companion_id: str):
+    """Reveal companion stats when first entering chat"""
+    try:
+        # Mark as revealed
+        SRS.table("collection").update({"revealed": True})\
+           .eq("user_id", user_id)\
+           .eq("companion_id", companion_id)\
+           .execute()
+        
+        # Get collection info for analytics
+        collection_info = SRS.table("collection")\
+                            .select("mystery_tier")\
+                            .eq("user_id", user_id)\
+                            .eq("companion_id", companion_id)\
+                            .execute().data[0]
+        
+        companion = CID2COMP[companion_id]
+        reveal_info = calculate_mystery_reveal_tier(companion, collection_info["mystery_tier"])
+        
+        # Track the reveal for analytics
+        SRS.table("companion_stats_revealed").insert({
+            "user_id": user_id,
+            "companion_id": companion_id,
+            "original_tier": collection_info["mystery_tier"],
+            "actual_rarity": companion.get("rarity", "Common"),
+            "stat_total": reveal_info["stat_total"],
+            "surprise_factor": reveal_info["surprise_factor"]
+        }).execute()
+        
+        return reveal_info
+        
+    except Exception as e:
+        logger.error(f"Failed to reveal companion stats: {str(e)}")
+        return None
+
 def get_user_row(auth_uid: str) -> dict | None:
     try:
         rows = SRS.table("users").select("*")\
