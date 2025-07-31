@@ -1020,8 +1020,8 @@ if Path(LOGO).is_file():
         unsafe_allow_html=True,
     )
 st.markdown(
-    f"<span style='background:#f93656;padding:6px 12px;border-radius:8px;display:inline-block;"
-    f"font-size:1.25rem;color:#000;font-weight:600;margin-right:8px;'>"
+    f"<span style='background:linear-gradient(45deg, #ff6b9d, #ff8a5c);padding:6px 12px;border-radius:8px;display:inline-block;"
+    f"font-size:1.25rem;color:white;font-weight:600;margin-right:8px;text-shadow: 0 1px 2px rgba(0,0,0,0.3);'>"
     f"{user['username']}'s Wallet</span>"
     f"<span style='background:#000;color:#57C784;padding:6px 12px;border-radius:8px;"
     f"display:inline-block;font-size:1.25rem;'>{user['tokens']} 💎</span>",
