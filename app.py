@@ -336,7 +336,7 @@ def format_stats_display_badges(stats):
     return "<div style='margin:8px 0;'>" + " ".join(formatted_stats) + "</div>"
 
 def format_companion_card_enhanced(companion, show_stats=True):
-    """Enhanced companion card for collection/chat"""
+    """Enhanced companion card for collection/chat - FIXED VERSION"""
     rarity = get_actual_rarity(companion)
     rarity_colors = {
         "Common": {"bg": "#F3F4F6", "border": "#9CA3AF", "text": "#374151"},
@@ -346,6 +346,11 @@ def format_companion_card_enhanced(companion, show_stats=True):
     style = rarity_colors.get(rarity, rarity_colors["Common"])
     
     total_stats = companion.get("total_stats", sum(companion.get("stats", {}).values()))
+    
+    # Generate stats HTML only if show_stats is True
+    stats_html = ""
+    if show_stats:
+        stats_html = format_stats_display_badges(companion["stats"])
     
     card_html = f"""
     <div style='background:{style["bg"]};border:2px solid {style["border"]};border-radius:12px;
@@ -360,7 +365,7 @@ def format_companion_card_enhanced(companion, show_stats=True):
             </h4>
         </div>
         
-        {format_stats_display_badges(companion["stats"]) if show_stats else ""}
+        {stats_html}
         
         <p style='margin:8px 0 0 0;color:#6B7280;font-style:italic;font-size:0.9rem;'>
             {companion["bio"]}
@@ -368,7 +373,6 @@ def format_companion_card_enhanced(companion, show_stats=True):
     </div>
     """
     return card_html
-
 
 def is_companion_revealed(user_id: str, companion_id: str) -> bool:
     """Check if companion stats have been revealed"""
