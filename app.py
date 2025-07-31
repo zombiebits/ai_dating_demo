@@ -1042,13 +1042,12 @@ with col_logout3:  # Put it on the right side
         # Rerun to show login screen
         st.rerun()
 
-# ─────────────────── NAVIGATION (BUTTON-BASED - BULLETPROOF) ────────────────────
-# Initialize page if not set
+# ─────────────────── NAVIGATION WITH LOGOUT ────────────────────
 if "page" not in st.session_state:
     st.session_state.page = "Find matches"
 
-# Create navigation buttons in columns
-col1, col2, col3 = st.columns(3)
+# 4-column layout with logout
+col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
 
 with col1:
     if st.button("🔍 Find matches", 
@@ -1072,6 +1071,18 @@ with col3:
                 use_container_width=True,
                 type="primary" if st.session_state.page == "My Collection" else "secondary"):
         st.session_state.page = "My Collection"
+        st.rerun()
+
+with col4:
+    if st.button("🚪", key="logout_btn", help="Logout", type="secondary", use_container_width=True):
+        # Clear all session state
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        
+        # Clear URL parameters
+        st.query_params.clear()
+        
+        # Rerun to show login screen
         st.rerun()
 
 
