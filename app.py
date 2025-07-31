@@ -246,15 +246,17 @@ def get_mystery_tier_from_companion(companion):
     else:
         return "Basic Bond"
     
+# ─────────────────── CLEAN RARITY SYSTEM ─────────────────────
 def get_actual_rarity(companion):
-    """Get the TRUE rarity based on total stats, not JSON field"""
+    """Clean, logical rarity thresholds"""
     total_stats = companion.get("total_stats", sum(companion.get("stats", {}).values()))
     
-    if total_stats >= 400:
+    # Clean round numbers that make sense
+    if total_stats >= 400:      # 400+ = Legendary (top tier)
         return "Legendary"
-    elif total_stats >= 300:
-        return "Rare"
-    else:
+    elif total_stats >= 350:    # 350-399 = Rare (solid tier)
+        return "Rare" 
+    else:                       # Under 350 = Common
         return "Common"
 
 def get_stat_display_config():
@@ -517,6 +519,9 @@ def buy_mystery_box_hybrid(user: dict, mystery_tier: str, specific_companion=Non
         "mystery_tier": mystery_tier,
         "bonded_at": datetime.now(timezone.utc).isoformat()
     }).execute()
+
+    # Update collection score after purchase
+    update_user_collection_score(user["auth_uid"])
     
     fresh = get_user_row(user["auth_uid"])
     return True, apply_daily_airdrop(fresh), chosen_companion
@@ -929,9 +934,200 @@ def award_chat_xp(user_id: str, companion_id: str, message_length: int) -> int:
     except Exception as e:
         logger.error(f"Failed to award chat XP: {str(e)}")
         return 0
+    
+
+# ─────────────────── COLLECTION SCORE SYSTEM ─────────────────────
+def calculate_collection_score(user_id: str) -> dict:
+    """
+    Calculate comprehensive collection score with breakdown
+    Returns dict with score and breakdown for display
+    """
+    # Get user's companions
+    owned_ids = collection_set(user_id)
+    if not owned_ids:
+        return {"total": 0, "breakdown": {}}
+    
+    user_companions = [CID2COMP[cid] for cid in owned_ids]
+    
+    # 1. BASE SCORE: Sum of all companion stats
+    base_score = sum(
+        companion.get("total_stats", sum(companion.get("stats", {}).values())) 
+        for companion in user_companions
+    )
+    
+    # 2. SYNERGY BONUSES: Matching high stats (70+)
+    synergy_bonus = 0
+    stat_groups = {}
+    
+    for companion in user_companions:
+        for stat_name, value in companion.get("stats", {}).items():
+            if value >= 70:  # High stat threshold
+                if stat_name not in stat_groups:
+                    stat_groups[stat_name] = []
+                stat_groups[stat_name].append(companion["name"])
+    
+    # Award bonuses for 2+ companions with same high stat
+    for stat_name, companions in stat_groups.items():
+        if len(companions) >= 2:
+            bonus = len(companions) * 50  # 50 points per companion in group
+            synergy_bonus += bonus
+    
+    # 3. RARITY MULTIPLIERS
+    rarity_bonus = 0
+    rarity_counts = {"Common": 0, "Rare": 0, "Legendary": 0}
+    
+    for companion in user_companions:
+        rarity = get_actual_rarity(companion)
+        rarity_counts[rarity] += 1
+        
+        # Bonus points for rare companions
+        if rarity == "Rare":
+            rarity_bonus += 100
+        elif rarity == "Legendary":
+            rarity_bonus += 250
+    
+    # 4. ACHIEVEMENT BONUSES
+    achievement_bonus = 0
+    achievements_earned = []
+    
+    # Collection size milestones
+    collection_size = len(user_companions)
+    if collection_size >= 10:
+        achievement_bonus += 500
+        achievements_earned.append("Collector (10+ companions)")
+    elif collection_size >= 5:
+        achievement_bonus += 200
+        achievements_earned.append("Starter Collection (5+ companions)")
+    
+    # Rarity achievements
+    if rarity_counts["Legendary"] >= 3:
+        achievement_bonus += 1000
+        achievements_earned.append("Legend Hunter (3+ Legendaries)")
+    elif rarity_counts["Legendary"] >= 1:
+        achievement_bonus += 300
+        achievements_earned.append("First Legend")
+    
+    # Diversity achievement (one of each rarity)
+    if all(count > 0 for count in rarity_counts.values()):
+        achievement_bonus += 400
+        achievements_earned.append("Rarity Master (All tiers)")
+    
+    # High stats achievement (companion with 90+ in any stat)
+    for companion in user_companions:
+        if any(value >= 90 for value in companion.get("stats", {}).values()):
+            achievement_bonus += 200
+            achievements_earned.append("Stat Perfectionist (90+ stat)")
+            break
+    
+    # TOTAL CALCULATION
+    total_score = base_score + synergy_bonus + rarity_bonus + achievement_bonus
+    
+    return {
+        "total": total_score,
+        "breakdown": {
+            "base_score": base_score,
+            "synergy_bonus": synergy_bonus,
+            "rarity_bonus": rarity_bonus,
+            "achievement_bonus": achievement_bonus,
+            "stat_groups": stat_groups,
+            "rarity_counts": rarity_counts,
+            "achievements_earned": achievements_earned
+        }
+    }
+
+def get_collection_level_info(collection_score: int) -> tuple[int, str, int, int]:
+    """
+    Calculate collection level and title from score
+    Returns: (level, title, score_for_current_level, score_for_next_level)
+    """
+    if collection_score < 1000:
+        return 1, "Rookie Collector", 0, 1000
+    elif collection_score < 3000:
+        return 2, "Bond Enthusiast", 1000, 3000
+    elif collection_score < 6000:
+        return 3, "Collection Curator", 3000, 6000
+    elif collection_score < 10000:
+        return 4, "Master Collector", 6000, 10000
+    elif collection_score < 15000:
+        return 5, "Collection Legend", 10000, 15000
+    else:
+        return 6, "Grandmaster", 15000, 25000
+
+def update_user_collection_score(user_id: str) -> dict:
+    """Update user's collection score in database"""
+    try:
+        score_data = calculate_collection_score(user_id)
+        collection_score = score_data["total"]
+        level, title, _, _ = get_collection_level_info(collection_score)
+        
+        # Update database
+        updated_user = SRS.table("users").update({
+            "collection_score": collection_score,
+            "collection_level": level,
+            "collection_title": title
+        }).eq("auth_uid", user_id).execute().data[0]
+        
+        logger.info(f"Updated collection score for {user_id}: {collection_score} ({title})")
+        return updated_user
+        
+    except Exception as e:
+        logger.error(f"Failed to update collection score: {str(e)}")
+        return None
+
+def display_collection_score(user_id: str):
+    """Display collection score with beautiful breakdown"""
+    score_data = calculate_collection_score(user_id)
+    
+    if score_data["total"] == 0:
+        return
+    
+    total = score_data["total"]
+    breakdown = score_data["breakdown"]
+    
+    # Main score display
+    st.markdown(f"""
+    <div style='background: linear-gradient(45deg, #FF6B9D, #4ECDC4); 
+                padding: 16px; border-radius: 12px; margin: 15px 0;
+                border: 2px solid #FFD700; box-shadow: 0 4px 15px rgba(0,0,0,0.2);'>
+        <div style='color: white; text-align: center; font-size: 1.3rem; font-weight: 700;'>
+            🏆 Collection Score: {total:,} 🏆
+        </div>
+        <div style='color: white; text-align: center; font-size: 0.9rem; margin-top: 5px;'>
+            {len(breakdown["rarity_counts"])} Companions • {len(breakdown["achievements_earned"])} Achievements
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Expandable breakdown
+    with st.expander("📊 Score Breakdown", expanded=False):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("**Score Components:**")
+            st.markdown(f"• Base Stats: **{breakdown['base_score']:,}**")
+            st.markdown(f"• Synergy Bonus: **+{breakdown['synergy_bonus']:,}**")
+            st.markdown(f"• Rarity Bonus: **+{breakdown['rarity_bonus']:,}**")
+            st.markdown(f"• Achievements: **+{breakdown['achievement_bonus']:,}**")
+            
+            st.markdown("**Rarity Distribution:**")
+            for rarity, count in breakdown["rarity_counts"].items():
+                if count > 0:
+                    st.markdown(f"• {rarity}: **{count}**")
+        
+        with col2:
+            if breakdown["stat_groups"]:
+                st.markdown("**Synergy Groups (70+ stats):**")
+                for stat, companions in breakdown["stat_groups"].items():
+                    if len(companions) >= 2:
+                        st.markdown(f"• {stat.title()}: {len(companions)} companions (+{len(companions)*50})")
+            
+            if breakdown["achievements_earned"]:
+                st.markdown("**Achievements Unlocked:**")
+                for achievement in breakdown["achievements_earned"]:
+                    st.markdown(f"• {achievement}")
 
 def create_user_row(auth_uid: str, username: str, email: str = None) -> dict:
-    """Updated version with Bond XP fields"""
+    """Updated version with Bond XP and Collection Score fields"""
     try:
         result = SRS.table("users").insert({
             "id": auth_uid,
@@ -940,16 +1136,18 @@ def create_user_row(auth_uid: str, username: str, email: str = None) -> dict:
             "email": email,
             "tokens": 1000,
             "last_airdrop": None,
-            "bond_xp": 0,           # New field
-            "bond_level": 1,        # New field  
-            "bond_title": "Bond Newbie"  # New field
+            "bond_xp": 0,                    # Bond XP field
+            "bond_level": 1,                 # Bond XP field  
+            "bond_title": "Bond Newbie",     # Bond XP field
+            "collection_score": 0,           # NEW: Collection Score field
+            "collection_level": 1,           # NEW: Collection Level field
+            "collection_title": "Rookie Collector"  # NEW: Collection Title field
         }).execute()
         logger.info(f"Created user row for: {auth_uid} with username: {username}, email: {email}")
         return result.data[0]
     except Exception as e:
         logger.error(f"Failed to create user row: {str(e)}")
         raise
-
 
 # ────────── CUSTOM EMAIL CONFIRMATION HANDLER ─────────────
 
@@ -1593,6 +1791,10 @@ bond_xp = user.get('bond_xp', 0)
 bond_title = user.get('bond_title', 'Bond Newbie')
 level, title, current_level_xp, next_level_xp = get_bond_level_info(bond_xp)
 
+# Get Collection info
+collection_score = user.get('collection_score', 0)
+collection_title = user.get('collection_title', 'Rookie Collector')
+
 # Wallet Display
 st.markdown(
     f"<span style='background:linear-gradient(45deg, #ff6b9d, #ff8a5c);padding:6px 12px;border-radius:8px;display:inline-block;"
@@ -1603,16 +1805,20 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# Dual Progress Display
+st.markdown(f"""
+<div style='display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;'>
+    <div style='background:linear-gradient(45deg, #8B5CF6, #06D6A0);padding:8px 16px;border-radius:10px;
+                color:white;font-weight:600;text-shadow: 0 1px 2px rgba(0,0,0,0.3); flex: 1; min-width: 200px;'>
+        ✨ Bond XP: {bond_xp:,} | {bond_title}
+    </div>
+    <div style='background:linear-gradient(45deg, #FF6B9D, #4ECDC4);padding:8px 16px;border-radius:10px;
+                color:white;font-weight:600;text-shadow: 0 1px 2px rgba(0,0,0,0.3); flex: 1; min-width: 200px;'>
+        🏆 Collection: {collection_score:,} | {collection_title}
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
-
-# Bond XP Display (with better spacing!)
-st.markdown(
-    f"<div style='background:linear-gradient(45deg, #8B5CF6, #06D6A0);padding:8px 16px;border-radius:10px;"
-    f"display:inline-block;font-size:1.1rem;color:white;font-weight:600;text-shadow: 0 1px 2px rgba(0,0,0,0.3);"
-    f"margin-bottom:15px;'>"  # Added margin-bottom for space from nav buttons
-    f"Bond XP: {bond_xp:,} ✨ | {bond_title}</div>",
-    unsafe_allow_html=True,
-)
 
 
 # ─────────────────── NAVIGATION WITH LOGOUT ────────────────────
@@ -1920,6 +2126,10 @@ elif st.session_state.page == "Chat":
 # ─────────────────── MY COLLECTION ───────────────────────────────
 elif st.session_state.page == "My Collection":
     st.header("My BONDIGO Collection")
+    
+    # Display collection score
+    display_collection_score(user["id"])
+    
     colset = collection_set(user["id"])
     if not colset:
         st.info("No Bonds yet.")
@@ -1935,10 +2145,15 @@ elif st.session_state.page == "My Collection":
                 col1.image(c.get("photo",PLACEHOLDER), width=80)
             
             with col2:
+                # Show stats in collection
+                stats_html = format_stats_display(c["stats"])
+                total_stats = c.get("total_stats", sum(c["stats"].values()))
+                
                 col2.markdown(
                   f"<span style='background:{clr};color:black;padding:2px 6px;"
                   f"border-radius:4px;font-size:0.75rem'>{rar}</span> "
-                  f"**{c['name']}**  \n"
+                  f"**{c['name']}** • Total: {total_stats} ⭐<br>"
+                  f"<div style='font-size:0.8rem;margin:4px 0;'>{stats_html}</div>"
                   f"<span style='font-size:0.85rem'>{c['bio']}</span>",
                   unsafe_allow_html=True,
                 )
@@ -1947,14 +2162,4 @@ elif st.session_state.page == "My Collection":
                 # Simple chat button
                 if col3.button("💬 Chat", key=f"collection_chat_{cid}", use_container_width=True):
                     goto_chat(cid)
-# 🔧 PUT DEBUG PANEL HERE (after ALL page sections):
-if DEV_MODE:
-    with st.expander("🔧 Debug: Navigation State", expanded=False):
-        st.json({
-            "page": st.session_state.page,
-            "chat_cid": st.session_state.get('chat_cid'),
-            "button_clicked": st.session_state.get('button_clicked', False),
-            "flash": st.session_state.get('flash'),
-            "collection_size": len(colset) if 'colset' in locals() else 0
-        })
 
