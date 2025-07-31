@@ -53,7 +53,18 @@ st.markdown("""<style>
 # ─────────────────── CONSTANTS & DATA ─────────────────────────────
 MAX_TOKENS    = 10_000
 DAILY_AIRDROP = 150
-COST          = {"Common":50,"Rare":200,"Legendary":700}
+COST = {
+    "basic": 50,
+    "premium": 150,
+    "elite": 400
+}
+
+def calculate_true_rarity(companion_stats):
+    total = sum(companion_stats.values())
+    if total >= 400: return "Legendary"
+    elif total >= 300: return "Rare"
+    else: return "Common"
+
 CONFIRMATION_EXPIRY_HOURS = 24
 
 PLACEHOLDER = "assets/placeholder.png"

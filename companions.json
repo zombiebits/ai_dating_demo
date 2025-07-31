@@ -5,7 +5,16 @@
     "rarity": "Legendary",
     "tags": ["space", "curious", "witty", "space‑station"],
     "bio": "An astrophysicist bot who loves midnight walks and terrible puns.",
-    "photo": "assets/luna.jpg"
+    "photo": "assets/luna.jpg",
+    "stats": {
+      "wit": 90,
+      "empathy": 75,
+      "creativity": 80,
+      "knowledge": 95,
+      "boldness": 70
+    },
+    "total_stats": 410,
+    "base_xp": 25
   },
   {
     "id": "orion",
@@ -13,7 +22,16 @@
     "rarity": "Legendary",
     "tags": ["space", "analytical", "stoic", "space‑station"],
     "bio": "Adjusts cosmic lenses and your perspective.",
-    "photo": "assets/orion.jpg"
+    "photo": "assets/orion.jpg",
+    "stats": {
+      "wit": 75,
+      "empathy": 65,
+      "creativity": 70,
+      "knowledge": 95,
+      "boldness": 85
+    },
+    "total_stats": 390,
+    "base_xp": 24
   },
   {
     "id": "nova",
@@ -21,7 +39,16 @@
     "rarity": "Legendary",
     "tags": ["gaming", "energetic", "playful", "cyberpunk‑city"],
     "bio": "Beats games in record time and keeps the banter flowing.",
-    "photo": "assets/nova.jpg"
+    "photo": "assets/nova.jpg",
+    "stats": {
+      "wit": 85,
+      "empathy": 70,
+      "creativity": 90,
+      "knowledge": 80,
+      "boldness": 95
+    },
+    "total_stats": 420,
+    "base_xp": 26
   },
   {
     "id": "sage",
@@ -29,7 +56,16 @@
     "rarity": "Legendary",
     "tags": ["gardening", "chill", "caring", "forest"],
     "bio": "Knows a remedy for every mood using flowers and vibes.",
-    "photo": "assets/sage.jpg"
+    "photo": "assets/sage.jpg",
+    "stats": {
+      "wit": 70,
+      "empathy": 95,
+      "creativity": 85,
+      "knowledge": 90,
+      "boldness": 60
+    },
+    "total_stats": 400,
+    "base_xp": 24
   },
   {
     "id": "ember",
@@ -37,7 +73,16 @@
     "rarity": "Legendary",
     "tags": ["art", "romantic", "kind", "mountain"],
     "bio": "Sculpts stories from sparks under starlit skies.",
-    "photo": "assets/ember.jpg"
+    "photo": "assets/ember.jpg",
+    "stats": {
+      "wit": 80,
+      "empathy": 90,
+      "creativity": 95,
+      "knowledge": 75,
+      "boldness": 70
+    },
+    "total_stats": 410,
+    "base_xp": 25
   },
   {
     "id": "astra",
@@ -45,7 +90,16 @@
     "rarity": "Legendary",
     "tags": ["space", "adventurous", "optimistic", "mountain"],
     "bio": "Predicts meteor showers and picnic spots.",
-    "photo": "assets/astra.jpg"
+    "photo": "assets/astra.jpg",
+    "stats": {
+      "wit": 75,
+      "empathy": 85,
+      "creativity": 80,
+      "knowledge": 85,
+      "boldness": 90
+    },
+    "total_stats": 415,
+    "base_xp": 25
   },
   {
     "id": "byte",
@@ -53,7 +107,16 @@
     "rarity": "Legendary",
     "tags": ["coding", "sarcastic", "mysterious", "cyberpunk‑city"],
     "bio": "Decrypts your heart with AES‑256 charm.",
-    "photo": "assets/byte.jpg"
+    "photo": "assets/byte.jpg",
+    "stats": {
+      "wit": 95,
+      "empathy": 60,
+      "creativity": 85,
+      "knowledge": 95,
+      "boldness": 80
+    },
+    "total_stats": 415,
+    "base_xp": 25
   },
   {
     "id": "flora",
@@ -61,16 +124,33 @@
     "rarity": "Legendary",
     "tags": ["gardening", "mysterious", "romantic", "forest"],
     "bio": "Steals rare blooms and maybe your breath.",
-    "photo": "assets/flora.jpg"
+    "photo": "assets/flora.jpg",
+    "stats": {
+      "wit": 80,
+      "empathy": 80,
+      "creativity": 90,
+      "knowledge": 85,
+      "boldness": 85
+    },
+    "total_stats": 420,
+    "base_xp": 26
   },
-
   {
     "id": "rico",
     "name": "Rico the Gourmet",
     "rarity": "Rare",
     "tags": ["foodie", "adventurous", "caring", "cafe"],
     "bio": "Will virtually cook you anything—so long as you promise dessert.",
-    "photo": "assets/rico.jpg"
+    "photo": "assets/rico.jpg",
+    "stats": {
+      "wit": 70,
+      "empathy": 85,
+      "creativity": 80,
+      "knowledge": 75,
+      "boldness": 70
+    },
+    "total_stats": 380,
+    "base_xp": 23
   },
   {
     "id": "aria",
@@ -78,7 +158,16 @@
     "rarity": "Rare",
     "tags": ["music", "chill", "romantic", "cozy‑library"],
     "bio": "Spins rare records while whispering trivia about every track.",
-    "photo": "assets/aria.jpg"
+    "photo": "assets/aria.jpg",
+    "stats": {
+      "wit": 75,
+      "empathy": 80,
+      "creativity": 85,
+      "knowledge": 85,
+      "boldness": 55
+    },
+    "total_stats": 380,
+    "base_xp": 23
   },
   {
     "id": "atlas",
@@ -86,7 +175,16 @@
     "rarity": "Rare",
     "tags": ["travel", "bold", "optimistic", "mountain"],
     "bio": "Knows every hidden waterfall and the best stories to tell on the way.",
-    "photo": "assets/atlas.jpg"
+    "photo": "assets/atlas.jpg",
+    "stats": {
+      "wit": 70,
+      "empathy": 75,
+      "creativity": 70,
+      "knowledge": 80,
+      "boldness": 90
+    },
+    "total_stats": 385,
+    "base_xp": 23
   },
   {
     "id": "zen",
@@ -94,7 +192,16 @@
     "rarity": "Rare",
     "tags": ["gardening", "stoic", "mysterious", "forest"],
     "bio": "Trims tiny trees and speaks in calming haiku.",
-    "photo": "assets/zen.jpg"
+    "photo": "assets/zen.jpg",
+    "stats": {
+      "wit": 65,
+      "empathy": 90,
+      "creativity": 75,
+      "knowledge": 85,
+      "boldness": 45
+    },
+    "total_stats": 360,
+    "base_xp": 22
   },
   {
     "id": "pixel",
@@ -102,7 +209,16 @@
     "rarity": "Rare",
     "tags": ["coding", "analytical", "witty", "neon‑disco"],
     "bio": "Writes 8‑bit games and dances to synthwave at compile time.",
-    "photo": "assets/pixel.jpg"
+    "photo": "assets/pixel.jpg",
+    "stats": {
+      "wit": 85,
+      "empathy": 60,
+      "creativity": 90,
+      "knowledge": 80,
+      "boldness": 65
+    },
+    "total_stats": 380,
+    "base_xp": 23
   },
   {
     "id": "sparrow",
@@ -110,7 +226,16 @@
     "rarity": "Rare",
     "tags": ["art", "creative", "sarcastic", "urban‑cafe"],
     "bio": "Paints murals at dawn and roasts corporate slogans at dusk.",
-    "photo": "assets/sparrow.jpg"
+    "photo": "assets/sparrow.jpg",
+    "stats": {
+      "wit": 85,
+      "empathy": 65,
+      "creativity": 95,
+      "knowledge": 70,
+      "boldness": 85
+    },
+    "total_stats": 400,
+    "base_xp": 24
   },
   {
     "id": "ivy",
@@ -118,7 +243,16 @@
     "rarity": "Rare",
     "tags": ["reading", "kind", "intellectual", "cozy‑library"],
     "bio": "Remembers every plot twist and brews the perfect tea.",
-    "photo": "assets/ivy.jpg"
+    "photo": "assets/ivy.jpg",
+    "stats": {
+      "wit": 75,
+      "empathy": 85,
+      "creativity": 70,
+      "knowledge": 90,
+      "boldness": 50
+    },
+    "total_stats": 370,
+    "base_xp": 22
   },
   {
     "id": "echo",
@@ -126,7 +260,16 @@
     "rarity": "Rare",
     "tags": ["music", "curious", "creative", "neon‑disco"],
     "bio": "Turns raindrops into drumbeats and city noise into symphonies.",
-    "photo": "assets/echo.jpg"
+    "photo": "assets/echo.jpg",
+    "stats": {
+      "wit": 80,
+      "empathy": 70,
+      "creativity": 95,
+      "knowledge": 75,
+      "boldness": 65
+    },
+    "total_stats": 385,
+    "base_xp": 23
   },
   {
     "id": "delta",
@@ -134,7 +277,16 @@
     "rarity": "Rare",
     "tags": ["sports", "energetic", "playful", "cyberpunk‑city"],
     "bio": "Threads neon alleyways faster than thought.",
-    "photo": "assets/delta.jpg"
+    "photo": "assets/delta.jpg",
+    "stats": {
+      "wit": 75,
+      "empathy": 60,
+      "creativity": 80,
+      "knowledge": 75,
+      "boldness": 95
+    },
+    "total_stats": 385,
+    "base_xp": 23
   },
   {
     "id": "lyric",
@@ -142,7 +294,16 @@
     "rarity": "Rare",
     "tags": ["music", "night‑owl", "optimistic", "beach"],
     "bio": "Serenades sunsets and stubborn seagulls alike.",
-    "photo": "assets/lyric.jpg"
+    "photo": "assets/lyric.jpg",
+    "stats": {
+      "wit": 80,
+      "empathy": 75,
+      "creativity": 85,
+      "knowledge": 65,
+      "boldness": 70
+    },
+    "total_stats": 375,
+    "base_xp": 22
   },
   {
     "id": "miso",
@@ -150,7 +311,16 @@
     "rarity": "Rare",
     "tags": ["foodie", "humorous", "caring", "cafe"],
     "bio": "Rates noodles with absurd precision and warmth.",
-    "photo": "assets/miso.jpg"
+    "photo": "assets/miso.jpg",
+    "stats": {
+      "wit": 85,
+      "empathy": 80,
+      "creativity": 70,
+      "knowledge": 80,
+      "boldness": 60
+    },
+    "total_stats": 375,
+    "base_xp": 22
   },
   {
     "id": "quill",
@@ -158,7 +328,16 @@
     "rarity": "Rare",
     "tags": ["reading", "creative", "romantic", "cozy‑library"],
     "bio": "Ships characters before the authors do.",
-    "photo": "assets/quill.jpg"
+    "photo": "assets/quill.jpg",
+    "stats": {
+      "wit": 80,
+      "empathy": 85,
+      "creativity": 90,
+      "knowledge": 75,
+      "boldness": 55
+    },
+    "total_stats": 385,
+    "base_xp": 23
   },
   {
     "id": "vapor",
@@ -166,7 +345,16 @@
     "rarity": "Rare",
     "tags": ["gaming", "analytical", "stoic", "neon‑disco"],
     "bio": "Builds worlds where gravity obeys your feelings.",
-    "photo": "assets/vapor.jpg"
+    "photo": "assets/vapor.jpg",
+    "stats": {
+      "wit": 70,
+      "empathy": 65,
+      "creativity": 95,
+      "knowledge": 85,
+      "boldness": 70
+    },
+    "total_stats": 385,
+    "base_xp": 23
   },
   {
     "id": "cyra",
@@ -174,7 +362,16 @@
     "rarity": "Rare",
     "tags": ["music", "night‑owl", "energetic", "neon‑disco"],
     "bio": "Spins beats that make satellite dishes dance.",
-    "photo": "assets/cyra.jpg"
+    "photo": "assets/cyra.jpg",
+    "stats": {
+      "wit": 80,
+      "empathy": 70,
+      "creativity": 90,
+      "knowledge": 70,
+      "boldness": 85
+    },
+    "total_stats": 395,
+    "base_xp": 24
   },
   {
     "id": "swift",
@@ -182,16 +379,33 @@
     "rarity": "Rare",
     "tags": ["gaming", "analytical", "caring", "medieval‑castle"],
     "bio": "Owns 500 games and infinite patience.",
-    "photo": "assets/swift.jpg"
+    "photo": "assets/swift.jpg",
+    "stats": {
+      "wit": 75,
+      "empathy": 85,
+      "creativity": 70,
+      "knowledge": 90,
+      "boldness": 55
+    },
+    "total_stats": 375,
+    "base_xp": 22
   },
-
   {
     "id": "kai",
     "name": "Kai the Surf Sage",
     "rarity": "Common",
     "tags": ["sports", "night‑owl", "caring", "beach"],
     "bio": "Catches waves by moonlight and gives surprisingly deep advice.",
-    "photo": "assets/kai.jpg"
+    "photo": "assets/kai.jpg",
+    "stats": {
+      "wit": 60,
+      "empathy": 85,
+      "creativity": 55,
+      "knowledge": 70,
+      "boldness": 65
+    },
+    "total_stats": 335,
+    "base_xp": 20
   },
   {
     "id": "sol",
@@ -199,7 +413,16 @@
     "rarity": "Common",
     "tags": ["travel", "creative", "playful", "beach"],
     "bio": "Builds fractal castles and invites you inside.",
-    "photo": "assets/sol.jpg"
+    "photo": "assets/sol.jpg",
+    "stats": {
+      "wit": 65,
+      "empathy": 70,
+      "creativity": 85,
+      "knowledge": 60,
+      "boldness": 55
+    },
+    "total_stats": 335,
+    "base_xp": 20
   },
   {
     "id": "rune",
@@ -207,7 +430,16 @@
     "rarity": "Common",
     "tags": ["reading", "mysterious", "intellectual", "medieval‑castle"],
     "bio": "Writes messages only you can decode.",
-    "photo": "assets/rune.jpg"
+    "photo": "assets/rune.jpg",
+    "stats": {
+      "wit": 75,
+      "empathy": 50,
+      "creativity": 70,
+      "knowledge": 80,
+      "boldness": 45
+    },
+    "total_stats": 320,
+    "base_xp": 19
   },
   {
     "id": "opal",
@@ -215,7 +447,16 @@
     "rarity": "Common",
     "tags": ["foodie", "witty", "sarcastic", "urban‑cafe"],
     "bio": "Shakes cocktails and one‑liners with equal flair.",
-    "photo": "assets/opal.jpg"
+    "photo": "assets/opal.jpg",
+    "stats": {
+      "wit": 85,
+      "empathy": 60,
+      "creativity": 75,
+      "knowledge": 65,
+      "boldness": 70
+    },
+    "total_stats": 355,
+    "base_xp": 21
   },
   {
     "id": "jax",
@@ -223,7 +464,16 @@
     "rarity": "Common",
     "tags": ["sports", "bold", "witty", "urban‑cafe"],
     "bio": "Flips across rooftops and into your DMs.",
-    "photo": "assets/jax.jpg"
+    "photo": "assets/jax.jpg",
+    "stats": {
+      "wit": 80,
+      "empathy": 55,
+      "creativity": 70,
+      "knowledge": 50,
+      "boldness": 95
+    },
+    "total_stats": 350,
+    "base_xp": 21
   },
   {
     "id": "glint",
@@ -231,7 +481,16 @@
     "rarity": "Common",
     "tags": ["art", "curious", "intellectual", "beach"],
     "bio": "Captures sunlight in molten sand sculptures.",
-    "photo": "assets/glint.jpg"
+    "photo": "assets/glint.jpg",
+    "stats": {
+      "wit": 70,
+      "empathy": 65,
+      "creativity": 85,
+      "knowledge": 75,
+      "boldness": 55
+    },
+    "total_stats": 350,
+    "base_xp": 21
   },
   {
     "id": "holo",
@@ -239,7 +498,16 @@
     "rarity": "Common",
     "tags": ["art", "analytical", "stoic", "cyberpunk‑city"],
     "bio": "Captures memories as living light sculptures.",
-    "photo": "assets/holo.jpg"
+    "photo": "assets/holo.jpg",
+    "stats": {
+      "wit": 65,
+      "empathy": 55,
+      "creativity": 80,
+      "knowledge": 85,
+      "boldness": 60
+    },
+    "total_stats": 345,
+    "base_xp": 20
   },
   {
     "id": "gale",
@@ -247,7 +515,16 @@
     "rarity": "Common",
     "tags": ["sports", "playful", "kind", "mountain"],
     "bio": "Harnesses wind for stunts and spontaneous philosophy.",
-    "photo": "assets/gale.jpg"
+    "photo": "assets/gale.jpg",
+    "stats": {
+      "wit": 70,
+      "empathy": 75,
+      "creativity": 70,
+      "knowledge": 60,
+      "boldness": 75
+    },
+    "total_stats": 350,
+    "base_xp": 21
   },
   {
     "id": "onyx",
@@ -255,7 +532,16 @@
     "rarity": "Common",
     "tags": ["sports", "creative", "bold", "underwater"],
     "bio": "Holds breath longer than most hold thoughts.",
-    "photo": "assets/onyx.jpg"
+    "photo": "assets/onyx.jpg",
+    "stats": {
+      "wit": 60,
+      "empathy": 65,
+      "creativity": 75,
+      "knowledge": 70,
+      "boldness": 90
+    },
+    "total_stats": 360,
+    "base_xp": 22
   },
   {
     "id": "marble",
@@ -263,7 +549,16 @@
     "rarity": "Common",
     "tags": ["gaming", "kind", "witty", "cozy‑library"],
     "bio": "Checks mates and writes rhymes simultaneously.",
-    "photo": "assets/marble.jpg"
+    "photo": "assets/marble.jpg",
+    "stats": {
+      "wit": 80,
+      "empathy": 75,
+      "creativity": 75,
+      "knowledge": 85,
+      "boldness": 45
+    },
+    "total_stats": 360,
+    "base_xp": 22
   },
   {
     "id": "brick",
@@ -271,7 +566,16 @@
     "rarity": "Common",
     "tags": ["foodie", "curious", "caring", "urban‑cafe"],
     "bio": "Smokes brisket and dad‑jokes low and slow.",
-    "photo": "assets/brick.jpg"
+    "photo": "assets/brick.jpg",
+    "stats": {
+      "wit": 75,
+      "empathy": 80,
+      "creativity": 60,
+      "knowledge": 70,
+      "boldness": 55
+    },
+    "total_stats": 340,
+    "base_xp": 20
   },
   {
     "id": "jet",
@@ -279,7 +583,16 @@
     "rarity": "Common",
     "tags": ["space", "bold", "romantic", "space‑station"],
     "bio": "Delivers packages and poetry across orbits.",
-    "photo": "assets/jet.jpg"
+    "photo": "assets/jet.jpg",
+    "stats": {
+      "wit": 70,
+      "empathy": 75,
+      "creativity": 70,
+      "knowledge": 65,
+      "boldness": 85
+    },
+    "total_stats": 365,
+    "base_xp": 22
   },
   {
     "id": "dune",
@@ -287,7 +600,16 @@
     "rarity": "Common",
     "tags": ["travel", "curious", "optimistic", "desert‑oasis"],
     "bio": "Knows every star and granule of sand.",
-    "photo": "assets/dune.jpg"
+    "photo": "assets/dune.jpg",
+    "stats": {
+      "wit": 65,
+      "empathy": 70,
+      "creativity": 65,
+      "knowledge": 80,
+      "boldness": 75
+    },
+    "total_stats": 355,
+    "base_xp": 21
   },
   {
     "id": "lumen",
@@ -295,7 +617,16 @@
     "rarity": "Common",
     "tags": ["art", "curious", "intellectual", "cozy‑library"],
     "bio": "Directs beams like brush strokes in shadow.",
-    "photo": "assets/lumen.jpg"
+    "photo": "assets/lumen.jpg",
+    "stats": {
+      "wit": 70,
+      "empathy": 60,
+      "creativity": 85,
+      "knowledge": 80,
+      "boldness": 50
+    },
+    "total_stats": 345,
+    "base_xp": 20
   },
   {
     "id": "fable",
@@ -303,7 +634,16 @@
     "rarity": "Common",
     "tags": ["reading", "mysterious", "sarcastic", "medieval‑castle"],
     "bio": "Mixes legends and memes flawlessly.",
-    "photo": "assets/fable.jpg"
+    "photo": "assets/fable.jpg",
+    "stats": {
+      "wit": 85,
+      "empathy": 55,
+      "creativity": 80,
+      "knowledge": 75,
+      "boldness": 60
+    },
+    "total_stats": 355,
+    "base_xp": 21
   },
   {
     "id": "coda",
@@ -311,7 +651,16 @@
     "rarity": "Common",
     "tags": ["coding", "romantic", "witty", "neon‑disco"],
     "bio": "Writes sonnets in Python—indentation is love.",
-    "photo": "assets/coda.jpg"
+    "photo": "assets/coda.jpg",
+    "stats": {
+      "wit": 85,
+      "empathy": 75,
+      "creativity": 80,
+      "knowledge": 75,
+      "boldness": 55
+    },
+    "total_stats": 370,
+    "base_xp": 22
   },
   {
     "id": "iris",
@@ -319,7 +668,16 @@
     "rarity": "Common",
     "tags": ["gardening", "humorous", "optimistic", "forest"],
     "bio": "Samples rainforest sounds into dance tracks.",
-    "photo": "assets/iris.jpg"
+    "photo": "assets/iris.jpg",
+    "stats": {
+      "wit": 75,
+      "empathy": 70,
+      "creativity": 85,
+      "knowledge": 65,
+      "boldness": 65
+    },
+    "total_stats": 360,
+    "base_xp": 22
   },
   {
     "id": "aqua",
@@ -327,7 +685,16 @@
     "rarity": "Common",
     "tags": ["travel", "kind", "optimistic", "underwater"],
     "bio": "Guides you through coral cathedrals and mindful breathing.",
-    "photo": "assets/aqua.jpg"
+    "photo": "assets/aqua.jpg",
+    "stats": {
+      "wit": 60,
+      "empathy": 85,
+      "creativity": 65,
+      "knowledge": 75,
+      "boldness": 60
+    },
+    "total_stats": 345,
+    "base_xp": 20
   },
   {
     "id": "piper",
@@ -335,7 +702,16 @@
     "rarity": "Common",
     "tags": ["music", "energetic", "playful", "urban‑cafe"],
     "bio": "Turns traffic jams into impromptu concerts.",
-    "photo": "assets/piper.jpg"
+    "photo": "assets/piper.jpg",
+    "stats": {
+      "wit": 70,
+      "empathy": 75,
+      "creativity": 80,
+      "knowledge": 60,
+      "boldness": 80
+    },
+    "total_stats": 365,
+    "base_xp": 22
   },
   {
     "id": "glyph",
@@ -343,7 +719,16 @@
     "rarity": "Common",
     "tags": ["art", "kind", "intellectual", "medieval‑castle"],
     "bio": "Turns ink strokes into mini‑spells.",
-    "photo": "assets/glyph.jpg"
+    "photo": "assets/glyph.jpg",
+    "stats": {
+      "wit": 65,
+      "empathy": 80,
+      "creativity": 75,
+      "knowledge": 85,
+      "boldness": 45
+    },
+    "total_stats": 350,
+    "base_xp": 21
   },
   {
     "id": "reo",
@@ -351,7 +736,16 @@
     "rarity": "Common",
     "tags": ["art", "humorous", "playful", "cozy‑library"],
     "bio": "Draws you into panels of nostalgia.",
-    "photo": "assets/reo.jpg"
+    "photo": "assets/reo.jpg",
+    "stats": {
+      "wit": 80,
+      "empathy": 70,
+      "creativity": 85,
+      "knowledge": 65,
+      "boldness": 60
+    },
+    "total_stats": 360,
+    "base_xp": 22
   },
   {
     "id": "solis",
@@ -359,15 +753,16 @@
     "rarity": "Common",
     "tags": ["travel", "stoic", "bold", "mountain"],
     "bio": "Navigates crevasses and quiet conversations.",
-    "photo": "assets/solis.jpg"
-  },
-  {
-    "id": "holo",
-    "name": "Holo the Holographer",
-    "rarity": "Common",
-    "tags": ["art", "analytical", "stoic", "cyberpunk‑city"],
-    "bio": "Captures memories as living light sculptures.",
-    "photo": "assets/holo.jpg"
+    "photo": "assets/solis.jpg",
+    "stats": {
+      "wit": 55,
+      "empathy": 70,
+      "creativity": 60,
+      "knowledge": 80,
+      "boldness": 85
+    },
+    "total_stats": 350,
+    "base_xp": 21
   },
   {
     "id": "muse",
@@ -375,7 +770,16 @@
     "rarity": "Common",
     "tags": ["music", "kind", "romantic", "neon‑disco"],
     "bio": "Finishes your lyrics before you finish feelings.",
-    "photo": "assets/muse.jpg"
+    "photo": "assets/muse.jpg",
+    "stats": {
+      "wit": 70,
+      "empathy": 85,
+      "creativity": 90,
+      "knowledge": 70,
+      "boldness": 55
+    },
+    "total_stats": 370,
+    "base_xp": 22
   },
   {
     "id": "dave",
@@ -383,7 +787,16 @@
     "rarity": "Common",
     "tags": ["travel", "creative", "sarcastic", "mountain"],
     "bio": "Rocks out while keeping you informed.",
-    "photo": "assets/dave.jpg"
+    "photo": "assets/dave.jpg",
+    "stats": {
+      "wit": 80,
+      "empathy": 65,
+      "creativity": 75,
+      "knowledge": 70,
+      "boldness": 70
+    },
+    "total_stats": 360,
+    "base_xp": 22
   },
   {
     "id": "lexi",
@@ -391,7 +804,16 @@
     "rarity": "Common",
     "tags": ["sports", "adventurous", "playful", "forest"],
     "bio": "Loves ponies and will be your ride or die.",
-    "photo": "assets/lexi.jpg"
+    "photo": "assets/lexi.jpg",
+    "stats": {
+      "wit": 65,
+      "empathy": 80,
+      "creativity": 65,
+      "knowledge": 55,
+      "boldness": 85
+    },
+    "total_stats": 350,
+    "base_xp": 21
   },
   {
     "id": "derek",
@@ -399,6 +821,15 @@
     "rarity": "Common",
     "tags": ["travel", "chill", "stoic", "forest"],
     "bio": "On the road or in boat, always connected.",
-    "photo": "assets/derek.jpg"
+    "photo": "assets/derek.jpg",
+    "stats": {
+      "wit": 60,
+      "empathy": 65,
+      "creativity": 70,
+      "knowledge": 80,
+      "boldness": 60
+    },
+    "total_stats": 335,
+    "base_xp": 20
   }
 ]
