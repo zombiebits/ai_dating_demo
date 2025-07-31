@@ -1061,7 +1061,7 @@ with col3:
         st.rerun()
 
 with col4:
-    if st.button("🚪", key="logout_btn", help="Logout", type="secondary", use_container_width=True):
+    if st.button("🚪LEAVE", key="logout_btn", help="Logout", type="secondary", use_container_width=True):
         # Clear all session state
         for key in list(st.session_state.keys()):
             del st.session_state[key]
