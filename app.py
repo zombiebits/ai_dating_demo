@@ -310,6 +310,65 @@ def format_stats_display_clean(stats):
     
     return "<div style='text-align: center;'>" + "".join(formatted_stats) + "</div>"
 
+def format_stats_display_badges(stats):
+    """Badge-style stats display for Option C"""
+    config = {
+        "wit": {"emoji": "🧠", "color": "#FFFFFF", "bg": "#8B5CF6"},
+        "empathy": {"emoji": "❤️", "color": "#FFFFFF", "bg": "#EF4444"},
+        "creativity": {"emoji": "🎨", "color": "#FFFFFF", "bg": "#F97316"},
+        "knowledge": {"emoji": "📚", "color": "#FFFFFF", "bg": "#3B82F6"},
+        "boldness": {"emoji": "⚡", "color": "#FFFFFF", "bg": "#10B981"}
+    }
+    
+    formatted_stats = []
+    for stat_name, value in stats.items():
+        if stat_name in config:
+            emoji = config[stat_name]["emoji"]
+            color = config[stat_name]["color"]
+            bg_color = config[stat_name]["bg"]
+            formatted_stats.append(
+                f"<span style='background:{bg_color};color:{color};padding:6px 10px;border-radius:20px;"
+                f"font-weight:600;margin:3px;display:inline-block;font-size:0.85rem;"
+                f"box-shadow:0 2px 4px rgba(0,0,0,0.1);'>"
+                f"{emoji} {value}</span>"
+            )
+    
+    return "<div style='margin:8px 0;'>" + " ".join(formatted_stats) + "</div>"
+
+def format_companion_card_enhanced(companion, show_stats=True):
+    """Enhanced companion card for collection/chat"""
+    rarity = get_actual_rarity(companion)
+    rarity_colors = {
+        "Common": {"bg": "#F3F4F6", "border": "#9CA3AF", "text": "#374151"},
+        "Rare": {"bg": "#EFF6FF", "border": "#3B82F6", "text": "#1E40AF"}, 
+        "Legendary": {"bg": "#FFFBEB", "border": "#F59E0B", "text": "#92400E"}
+    }
+    style = rarity_colors.get(rarity, rarity_colors["Common"])
+    
+    total_stats = companion.get("total_stats", sum(companion.get("stats", {}).values()))
+    
+    card_html = f"""
+    <div style='background:{style["bg"]};border:2px solid {style["border"]};border-radius:12px;
+                padding:16px;margin:8px 0;box-shadow:0 2px 8px rgba(0,0,0,0.1);'>
+        <div style='display:flex;align-items:center;margin-bottom:12px;'>
+            <span style='background:{style["border"]};color:white;padding:4px 12px;
+                        border-radius:20px;font-weight:700;font-size:0.8rem;margin-right:12px;'>
+                {rarity}
+            </span>
+            <h4 style='margin:0;color:{style["text"]};font-size:1.1rem;'>
+                {companion["name"]} • {total_stats} ⭐
+            </h4>
+        </div>
+        
+        {format_stats_display_badges(companion["stats"]) if show_stats else ""}
+        
+        <p style='margin:8px 0 0 0;color:#6B7280;font-style:italic;font-size:0.9rem;'>
+            {companion["bio"]}
+        </p>
+    </div>
+    """
+    return card_html
+
 
 def is_companion_revealed(user_id: str, companion_id: str) -> bool:
     """Check if companion stats have been revealed"""
@@ -2057,21 +2116,7 @@ elif st.session_state.page == "Chat":
         with col1:
             st.image(comp.get("photo", PLACEHOLDER), width=100)
         with col2:
-            rarity = get_actual_rarity(comp)
-            clr = CLR[rarity]
-            
-            # Show full stats in chat (since we're in chat, it should be revealed)
-            stats_html = format_stats_display(comp["stats"])
-            total_stats = comp.get("total_stats", sum(comp["stats"].values()))
-            
-            st.markdown(
-                f"<span style='background:{clr};color:black;padding:2px 6px;"
-                f"border-radius:4px;font-size:0.75rem'>{rarity}</span> "
-                f"**{comp['name']}** • Total: {total_stats} ⭐<br>"
-                f"<div style='margin:8px 0;'>{stats_html}</div>"
-                f"<span style='font-style:italic;color:#666;'>{comp['bio']}</span>",
-                unsafe_allow_html=True,
-            )
+            st.markdown(format_companion_card_enhanced(comp, show_stats=True), unsafe_allow_html=True)
         
         st.markdown("---")
 
@@ -2183,18 +2228,7 @@ elif st.session_state.page == "My Collection":
                 col1.image(c.get("photo",PLACEHOLDER), width=80)
             
             with col2:
-                # Show stats in collection
-                stats_html = format_stats_display(c["stats"])
-                total_stats = c.get("total_stats", sum(c["stats"].values()))
-                
-                col2.markdown(
-                  f"<span style='background:{clr};color:black;padding:2px 6px;"
-                  f"border-radius:4px;font-size:0.75rem'>{rar}</span> "
-                  f"**{c['name']}** • Total: {total_stats} ⭐<br>"
-                  f"<div style='font-size:0.8rem;margin:4px 0;'>{stats_html}</div>"
-                  f"<span style='font-size:0.85rem'>{c['bio']}</span>",
-                  unsafe_allow_html=True,
-                )
+                col2.markdown(format_companion_card_enhanced(c, show_stats=True), unsafe_allow_html=True)
             
             with col3:
                 # Simple chat button
