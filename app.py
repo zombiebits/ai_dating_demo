@@ -388,13 +388,15 @@ def get_bond_level_info(bond_xp: int) -> tuple[int, str, int, int]:
     Returns: (level, title, xp_for_current_level, xp_for_next_level)
     """
     if bond_xp < 500:
-        return 1, "Rookie Bonding", 0, 500
+        return 1, "Bond Newbie", 0, 500
     elif bond_xp < 1500:
-        return 2, "Skilled Bonding", 500, 1500
+        return 2, "Heart Hacker", 500, 1500
     elif bond_xp < 3000:
-        return 3, "Expert Bonding", 1500, 3000
+        return 3, "Soul Syncer", 1500, 3000
+    elif bond_xp < 5000:
+        return 4, "Bond Virtuoso", 3000, 5000
     else:
-        return 4, "Master Bonding", 3000, 5000
+        return 5, "Love Legend", 5000, 10000
 
 def update_user_bond_xp(user_id: str, xp_to_add: int) -> dict:
     """Add XP to user and update their level/title"""
@@ -428,10 +430,10 @@ def award_chat_xp(user_id: str, companion_id: str, message_length: int) -> int:
     """Award XP for sending a chat message"""
     try:
         # Base XP (we'll make this dynamic later with companion stats)
-        base_xp = 10
+        base_xp = 1
         
         # Quality bonus for longer messages
-        quality_bonus = 5 if message_length > 20 else 0
+        quality_bonus = 4 if message_length > 20 else 0
         
         # TODO: Add streak multiplier in Phase 2
         total_xp = base_xp + quality_bonus
@@ -1137,11 +1139,14 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Bond XP Display (new!)
+# ADD SPACING HERE - this creates proper gap
+st.markdown("<div style='margin: 10px 0;'></div>", unsafe_allow_html=True)
+
+# Bond XP Display (with better spacing!)
 st.markdown(
     f"<div style='background:linear-gradient(45deg, #8B5CF6, #06D6A0);padding:8px 16px;border-radius:10px;"
     f"display:inline-block;font-size:1.1rem;color:white;font-weight:600;text-shadow: 0 1px 2px rgba(0,0,0,0.3);"
-    f"margin-top:8px;'>"
+    f"margin-bottom:15px;'>"  # Added margin-bottom for space from nav buttons
     f"Bond XP: {bond_xp:,} ✨ | {bond_title}</div>",
     unsafe_allow_html=True,
 )
