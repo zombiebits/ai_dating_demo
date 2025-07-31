@@ -232,12 +232,7 @@ def create_user_row(auth_uid: str, username: str, email: str = None) -> dict:
 # ─────────────────── MYSTERY BOX SYSTEM (ADD AFTER YOUR EXISTING HELPERS) ─────────────────────
 import random
 
-# Mystery Box Pricing (what users pay)
-MYSTERY_COST = {
-    "Mystery Bond": 50,    # Unknown stats until bonding
-    "Premium Bond": 150,   # Guaranteed 300+ stats  
-    "Elite Bond": 400      # Guaranteed 400+ stats
-}
+
 
 def get_mystery_tier_from_companion(companion):
     """Determine which mystery tier a companion should be sold as"""
@@ -248,7 +243,7 @@ def get_mystery_tier_from_companion(companion):
     elif total_stats >= 300:
         return "Premium Bond"  
     else:
-        return "Mystery Bond"
+        return "Basic Bond"
 
 def get_stat_display_config():
     """Configuration for displaying stats with colors and emojis"""
@@ -296,9 +291,9 @@ def get_companion_mystery_tier(user_id: str, companion_id: str) -> str:
                    .eq("user_id", user_id)\
                    .eq("companion_id", companion_id)\
                    .execute().data
-        return result[0]["mystery_tier"] if result else "Mystery Bond"
+        return result[0]["mystery_tier"] if result else "Basic Bond"  # Changed default
     except:
-        return "Mystery Bond"
+        return "Basic Bond"  # Changed default
     
 # ─────────────────── ADD THESE ADDITIONAL MYSTERY BOX FUNCTIONS ─────────────────────
 # Add these right after your existing mystery box functions
@@ -310,7 +305,7 @@ def calculate_mystery_reveal_tier(companion, purchased_tier):
     """
     actual_tier = get_mystery_tier_from_companion(companion)
     
-    tier_hierarchy = {"Mystery Bond": 1, "Premium Bond": 2, "Elite Bond": 3}
+    tier_hierarchy = {"Basic Bond": 1, "Premium Bond": 2, "Elite Bond": 3}  # Updated
     purchased_level = tier_hierarchy[purchased_tier]
     actual_level = tier_hierarchy[actual_tier]
     
@@ -393,12 +388,128 @@ def reveal_companion_stats(user_id: str, companion_id: str):
         logger.error(f"Failed to reveal companion stats: {str(e)}")
         return None
     
+  # ─────────────────── UPDATED HYBRID MYSTERY SYSTEM ─────────────────────
 
-# ─────────────────── UI DISPLAY FUNCTIONS FOR MYSTERY BOX ─────────────────────
-# Add these right after your reveal_companion_stats function
+# Update the Mystery Cost names and add odds
+MYSTERY_COST = {
+    "Basic Bond": 50,      # Changed from "Mystery Bond" 
+    "Premium Bond": 150,   # Guaranteed better odds
+    "Elite Bond": 400      # Best odds for legendaries
+}
 
+# Define the odds for each tier
+MYSTERY_ODDS = {
+    "Basic Bond": {"Common": 80, "Rare": 18, "Legendary": 2},
+    "Premium Bond": {"Common": 30, "Rare": 50, "Legendary": 20}, 
+    "Elite Bond": {"Common": 10, "Rare": 30, "Legendary": 60}
+}
+
+def should_show_companion_identity(companion):
+    """
+    Decide if this companion should show their true identity or be a mystery box
+    - Show identity for ~30% of companions (the premium/elite ones mostly)
+    - Keep ~70% as mystery boxes
+    """
+    import random
+    
+    # Always show some legendary companions (collectors will want specific ones)
+    if companion.get("rarity") == "Legendary" and random.random() < 0.4:  # 40% of legendaries show
+        return True
+    
+    # Show some rare companions 
+    if companion.get("rarity") == "Rare" and random.random() < 0.2:  # 20% of rares show
+        return True
+        
+    # Rarely show common companions
+    if companion.get("rarity") == "Common" and random.random() < 0.1:  # 10% of commons show
+        return True
+    
+    return False  # Most companions stay as mystery boxes
+
+def roll_mystery_companion(mystery_tier, available_companions):
+    """
+    Roll a random companion based on the mystery tier odds
+    """
+    import random
+    
+    odds = MYSTERY_ODDS[mystery_tier]
+    
+    # Create weighted list based on odds
+    weighted_companions = []
+    for companion in available_companions:
+        rarity = companion.get("rarity", "Common")
+        weight = odds.get(rarity, 0)
+        
+        # Add this companion multiple times based on its weight
+        for _ in range(weight):
+            weighted_companions.append(companion)
+    
+    if not weighted_companions:
+        # Fallback to random selection if no weighted companions
+        return random.choice(available_companions)
+    
+    return random.choice(weighted_companions)
+
+def buy_mystery_box_hybrid(user: dict, mystery_tier: str, specific_companion=None):
+    """
+    Updated buy function for hybrid mystery box system
+    - If specific_companion is provided, buy that exact one
+    - If not, roll a random companion based on mystery_tier odds
+    """
+    price = MYSTERY_COST[mystery_tier]
+    
+    if price > user["tokens"]:
+        return False, "Not enough 💎", None
+    
+    # If buying a specific companion, check if already owned
+    if specific_companion:
+        owned = SRS.table("collection").select("companion_id")\
+                   .eq("user_id", user["id"])\
+                   .eq("companion_id", specific_companion["id"])\
+                   .execute().data
+        if owned:
+            return False, "Already owned", None
+            
+        chosen_companion = specific_companion
+    else:
+        # Roll a mystery companion!
+        # Get all companions not already owned
+        owned_ids = collection_set(user["id"])
+        available_companions = [c for c in COMPANIONS if c["id"] not in owned_ids]
+        
+        if not available_companions:
+            return False, "No more companions available!", None
+            
+        chosen_companion = roll_mystery_companion(mystery_tier, available_companions)
+        
+        # Double-check we don't already own this one (safety check)
+        if chosen_companion["id"] in owned_ids:
+            # Try again with a different companion
+            available_companions = [c for c in available_companions if c["id"] != chosen_companion["id"]]
+            if available_companions:
+                chosen_companion = roll_mystery_companion(mystery_tier, available_companions)
+            else:
+                return False, "No more companions available!", None
+    
+    # Deduct tokens
+    SRS.table("users").update({"tokens": user["tokens"] - price})\
+       .eq("id", user["id"]).execute()
+    
+    # Add to collection with mystery box info
+    SRS.table("collection").insert({
+        "user_id": user["id"],
+        "companion_id": chosen_companion["id"],
+        "revealed": False if not specific_companion else True,  # Specific purchases are immediately revealed
+        "mystery_tier": mystery_tier,
+        "bonded_at": datetime.now(timezone.utc).isoformat()
+    }).execute()
+    
+    fresh = get_user_row(user["auth_uid"])
+    return True, apply_daily_airdrop(fresh), chosen_companion
+
+# Update the display function
 def display_mystery_tier_info():
-    """Display the mystery box pricing explanation"""
+    """Display the updated mystery box pricing explanation"""
     st.markdown("""
     <div style='background: linear-gradient(45deg, #FF6B9D, #C44569); 
                 padding: 20px; border-radius: 12px; margin: 20px 0;'>
@@ -409,9 +520,9 @@ def display_mystery_tier_info():
             <div style='background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; margin: 5px; min-width: 150px;'>
                 <div style='text-align: center; color: white;'>
                     <div style='font-size: 1.5rem;'>🎁</div>
-                    <div><strong>Mystery Bond</strong></div>
+                    <div><strong>Basic Bond</strong></div>
                     <div style='font-size: 1.2rem; color: #FFD700;'>50 💎</div>
-                    <div style='font-size: 0.8rem;'>Unknown stats until bonding</div>
+                    <div style='font-size: 0.8rem;'>80% Common, 18% Rare, 2% Legendary</div>
                 </div>
             </div>
             <div style='background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; margin: 5px; min-width: 150px;'>
@@ -419,7 +530,7 @@ def display_mystery_tier_info():
                     <div style='font-size: 1.5rem;'>✨</div>
                     <div><strong>Premium Bond</strong></div>
                     <div style='font-size: 1.2rem; color: #FFD700;'>150 💎</div>
-                    <div style='font-size: 0.8rem;'>Guaranteed 300+ stats</div>
+                    <div style='font-size: 0.8rem;'>30% Common, 50% Rare, 20% Legendary</div>
                 </div>
             </div>
             <div style='background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; margin: 5px; min-width: 150px;'>
@@ -427,15 +538,21 @@ def display_mystery_tier_info():
                     <div style='font-size: 1.5rem;'>🏆</div>
                     <div><strong>Elite Bond</strong></div>
                     <div style='font-size: 1.2rem; color: #FFD700;'>400 💎</div>
-                    <div style='font-size: 0.8rem;'>Guaranteed 400+ stats</div>
+                    <div style='font-size: 0.8rem;'>10% Common, 30% Rare, 60% Legendary</div>
                 </div>
             </div>
         </div>
         <p style='color: white; text-align: center; margin-top: 15px; font-size: 0.9rem;'>
-            💡 <strong>Discovery Element:</strong> Hunt for hidden gems and surprise upgrades!
+            💡 <strong>Strategy:</strong> Some companions show their identity - buy them directly or try your luck with mystery boxes!
         </p>
     </div>
-    """, unsafe_allow_html=True)
+    """, unsafe_allow_html=True) 
+    
+
+# ─────────────────── UI DISPLAY FUNCTIONS FOR MYSTERY BOX ─────────────────────
+# Add these right after your reveal_companion_stats function
+
+
 
 def show_stats_reveal_animation(companion, reveal_info):
     """Show exciting reveal animation when stats are first shown"""
@@ -472,7 +589,7 @@ def display_mystery_companion_card(companion, user_id, owned=False, in_collectio
     
     # Check if this companion is revealed for this user
     revealed = True  # Default for non-owned
-    mystery_tier = "Mystery Bond"
+    mystery_tier = "Basic Bond"
     
     if owned:
         revealed = is_companion_revealed(user_id, companion["id"])
@@ -1532,7 +1649,7 @@ if st.session_state.page == "Find matches":
         st.success(st.session_state.flash)
         st.session_state.flash = None
 
-    # Show mystery box pricing info instead of old image
+    # Show updated mystery box pricing info
     display_mystery_tier_info()
     
     # Existing match finding logic (keep this the same)
@@ -1552,30 +1669,102 @@ if st.session_state.page == "Find matches":
            or random.sample(COMPANIONS, 5)
         )
 
-    # Display matches with NEW mystery box system
+    # Display matches with HYBRID system
     for c in st.session_state.matches:
-        action_col = display_mystery_companion_card(c, user["id"], owned=(c["id"] in colset))
+        owned = c["id"] in colset
+        show_identity = should_show_companion_identity(c)
         
-        # Action buttons
-        if c["id"] in colset:
-            if action_col.button("💬 Chat", key=f"chat-{c['id']}", use_container_width=True):
+        # Create columns
+        c1, c2, c3 = st.columns([1, 5, 2])
+        
+        if owned:
+            # If owned, always show full identity
+            c1.image(c.get("photo", PLACEHOLDER), width=90)
+            rarity, clr = c.get("rarity","Common"), CLR[c.get("rarity","Common")]
+            c2.markdown(
+                f"<span style='background:{clr};color:black;padding:2px 6px;"
+                f"border-radius:4px;font-size:0.75rem'>{rarity}</span> "
+                f"**{c['name']}**<br>"
+                f"<span style='font-size:0.85rem;font-style:italic;'>{c['bio']}</span>",
+                unsafe_allow_html=True,
+            )
+            if c3.button("💬 Chat", key=f"chat-{c['id']}", use_container_width=True):
                 goto_chat(c["id"])
-        else:
-            # Show mystery tier options
+                
+        elif show_identity:
+            # Show this companion's true identity - can buy specifically
+            c1.image(c.get("photo", PLACEHOLDER), width=90)
+            rarity, clr = c.get("rarity","Common"), CLR[c.get("rarity","Common")]
             mystery_tier = get_mystery_tier_from_companion(c)
             price = MYSTERY_COST[mystery_tier]
             
-            if action_col.button(f"🎁 Bond\n{price} 💎", key=f"bond-{c['id']}", use_container_width=True):
-                # Use NEW mystery box buying system
-                ok, result = buy_mystery_box(user, c, mystery_tier)
+            c2.markdown(
+                f"<span style='background:{clr};color:black;padding:2px 6px;"
+                f"border-radius:4px;font-size:0.75rem'>{rarity}</span> "
+                f"**{c['name']}** • {price} 💎<br>"
+                f"<span style='font-size:0.85rem;font-style:italic;'>{c['bio']}</span>",
+                unsafe_allow_html=True,
+            )
+            
+            if c3.button(f"🎯 Buy\n{price} 💎", key=f"buy-{c['id']}", use_container_width=True):
+                # Buy this specific companion
+                ok, result, companion = buy_mystery_box_hybrid(user, mystery_tier, c)
                 if ok:
                     st.session_state.user = result
                     st.session_state.page = "Chat"
                     st.session_state.chat_cid = c["id"]
-                    st.session_state.flash = f"Bonded with Mystery Companion! Chat to reveal stats! 🎁"
+                    st.session_state.flash = f"Bonded with {c['name']}!"
                     st.rerun()
                 else:
                     st.warning(result)
+        else:
+            # Mystery box - don't reveal identity
+            c1.markdown("<div style='font-size: 60px; text-align: center; margin: 10px 0;'>❓</div>", unsafe_allow_html=True)
+            
+            c2.markdown(
+                f"**Mystery Companion** 🎁<br>"
+                f"<span style='font-size:0.85rem;font-style:italic;'>Choose your risk level!</span>",
+                unsafe_allow_html=True,
+            )
+            
+            # Show three mystery tier options
+            with c3:
+                col_a, col_b, col_c = st.columns(3)
+                with col_a:
+                    if st.button("🎁\n50💎", key=f"basic-{c['id']}", use_container_width=True, help="Basic Bond"):
+                        ok, result, companion = buy_mystery_box_hybrid(user, "Basic Bond")
+                        if ok:
+                            st.session_state.user = result
+                            st.session_state.page = "Chat"
+                            st.session_state.chat_cid = companion["id"]
+                            st.session_state.flash = f"Mystery Bond purchased! Chat to reveal your companion! 🎁"
+                            st.rerun()
+                        else:
+                            st.warning(result)
+                
+                with col_b:
+                    if st.button("✨\n150💎", key=f"premium-{c['id']}", use_container_width=True, help="Premium Bond"):
+                        ok, result, companion = buy_mystery_box_hybrid(user, "Premium Bond")
+                        if ok:
+                            st.session_state.user = result
+                            st.session_state.page = "Chat"
+                            st.session_state.chat_cid = companion["id"]
+                            st.session_state.flash = f"Premium Bond purchased! Chat to reveal your companion! ✨"
+                            st.rerun()
+                        else:
+                            st.warning(result)
+                
+                with col_c:
+                    if st.button("🏆\n400💎", key=f"elite-{c['id']}", use_container_width=True, help="Elite Bond"):
+                        ok, result, companion = buy_mystery_box_hybrid(user, "Elite Bond")
+                        if ok:
+                            st.session_state.user = result
+                            st.session_state.page = "Chat"
+                            st.session_state.chat_cid = companion["id"]
+                            st.session_state.flash = f"Elite Bond purchased! Chat to reveal your companion! 🏆"
+                            st.rerun()
+                        else:
+                            st.warning(result)
 
 # ─────────────────── CHAT ────────────────────────────────────────
 # REPLACE YOUR ENTIRE CHAT SECTION (around line 800+) WITH THIS:
