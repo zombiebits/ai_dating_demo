@@ -479,7 +479,7 @@ def roll_mystery_companion(mystery_tier, available_companions):
     # Create weighted list based on odds
     weighted_companions = []
     for companion in available_companions:
-        rarity = companion.get("rarity", "Common")
+        rarity = get_actual_rarity(companion)
         weight = odds.get(rarity, 0)
         
         # Add this companion multiple times based on its weight
