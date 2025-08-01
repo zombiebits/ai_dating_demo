@@ -900,32 +900,14 @@ def show_companion_details_popup(companion):
     col1, col2 = st.columns([1, 1])
     
     with col1:
-        # Large portrait with rarity glow - RECTANGULAR VERSION
-        rarity = get_actual_rarity(companion)
-        rarity_glows = {
-            "Common": "rgba(156, 163, 175, 0.8)",
-            "Rare": "rgba(59, 130, 246, 0.8)", 
-            "Legendary": "rgba(245, 158, 11, 0.8)"
-        }
-        glow_color = rarity_glows.get(rarity, rarity_glows["Common"])
-        
-        # Create container with rectangular glow effect
-        st.markdown(f"""
-        <div style='display: flex; justify-content: center; margin-bottom: 20px; padding: 10px;'>
-            <div style='border-radius: 8px; 
-                        box-shadow: 0 0 25px {glow_color}, 
-                                    0 0 50px {glow_color},
-                                    0 0 75px {glow_color}; 
-                        padding: 6px; 
-                        background: linear-gradient(45deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
-                        border: 2px solid rgba(255,255,255,0.15);
-                        width: fit-content;'>
+        # Large portrait with subtle border
+        st.markdown("""
+        <div style='display: flex; justify-content: center; margin-bottom: 20px;'>
         """, unsafe_allow_html=True)
         
-        # Use Streamlit's image function inside the glowing container
-        st.image(companion.get("photo", PLACEHOLDER), width=380)
+        st.image(companion.get("photo", PLACEHOLDER), width=400)
         
-        st.markdown("</div></div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
         
     with col2:
         # Companion details using your existing card styling
