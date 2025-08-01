@@ -2289,6 +2289,11 @@ if st.session_state.page == "Find matches":
 # ─────────────────── UPDATED CHAT SECTION WITH MYSTERY REVEAL ─────────────────────
 
 elif st.session_state.page == "Chat":
+
+    if st.session_state.show_companion_details:
+        show_companion_details_popup(st.session_state.show_companion_details)
+        st.markdown("---")
+
     if st.session_state.flash:
         st.success(st.session_state.flash)
         st.session_state.flash = None
@@ -2412,6 +2417,11 @@ elif st.session_state.page == "Chat":
 
 # ─────────────────── MY COLLECTION ───────────────────────────────
 elif st.session_state.page == "My Collection":
+
+    if st.session_state.show_companion_details:
+        show_companion_details_popup(st.session_state.show_companion_details)
+        st.markdown("---")
+
     st.header("My BONDIGO Collection")
     
     # Display collection score
