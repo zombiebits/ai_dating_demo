@@ -831,5 +831,22 @@
     },
     "total_stats": 335,
     "base_xp": 20
+  },
+  {
+    "id": "bryan",
+    "name": "Bryan the Degenerate Gambler",
+    "rarity": "Legendary",
+    "tags": ["gaming", "bold", "mysterious", "neon-disco"],
+    "bio": "Wins big, loses bigger, but always comes back for one more hand.",
+    "photo": "assets/bryan.jpg",
+    "stats": {
+      "wit": 85,
+      "empathy": 45,
+      "creativity": 90,
+      "knowledge": 95,
+      "boldness": 100
+    },
+    "total_stats": 415,
+    "base_xp": 50
   }
 ]
