@@ -333,43 +333,7 @@ def format_stats_display_badges(stats):
     
     return "<div style='margin:8px 0;'>" + " ".join(formatted_stats) + "</div>"
 
-# STEP 1: REPLACE format_companion_card_enhanced FUNCTION
-# Find this function around line 420 and replace it entirely with:
 
-# QUICK TWEAK: Just change these lines in your format_companion_card_enhanced function
-# Find the "Build the complete card HTML" section and replace the opening div with this:
-
-# ORIGINAL D3 CARD OPENING:
-"""
-    <div style='background: {style["bg_gradient"]}; 
-                border: 2px solid; border-image: {style["border_gradient"]} 1;
-                padding: 16px; margin: 8px 0; border-radius: 12px;
-                box-shadow: 0 8px 32px {style["glow"]}, inset 0 1px 0 rgba(255,255,255,0.1);'>
-"""
-
-# REPLACE WITH D2-STYLE BORDER + D3 INTERIOR:
-"""
-    <div style='background: {style["bg_gradient"]}; 
-                border-left: 8px solid transparent;
-                border-image: {style["border_gradient"]} 1;
-                padding: 16px; margin: 8px 0; border-radius: 8px;
-                box-shadow: 0 0 20px {style["glow"]}, inset 0 1px 0 rgba(255,255,255,0.2);
-                position: relative; overflow: hidden;'>
-        <div style='position: absolute; top: -2px; left: -2px; right: -2px; bottom: -2px;
-                    background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
-                    border-radius: inherit; z-index: -1;
-                 
-"""
-
-# ADD THIS CSS ANIMATION TO THE TOP OF YOUR STREAMLIT APP (after st.set_page_config):
-SHIMMER_CSS = """
-<style>
-@keyframes shimmer {
-    0% { transform: translateX(-100%); }
-    100% { transform: translateX(100%); }
-}
-</style>
-"""
 
 # COMPLETE HYBRID FUNCTION (D3 interior + D2 border):
 def format_companion_card_enhanced_hybrid(companion, show_stats=True):
