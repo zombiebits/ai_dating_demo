@@ -1419,19 +1419,22 @@ def display_collection_score(user_id: str):
     total = score_data["total"]
     breakdown = score_data["breakdown"]
     
+    # Get actual companion count
+    owned_ids = collection_set(user_id)
+    
     # Main score display
     st.markdown(f"""
-    <div style='background: linear-gradient(45deg, #FF6B9D, #4ECDC4); 
-                padding: 16px; border-radius: 12px; margin: 15px 0;
-                border: 2px solid #FFD700; box-shadow: 0 4px 15px rgba(0,0,0,0.2);'>
-        <div style='color: white; text-align: center; font-size: 1.3rem; font-weight: 700;'>
-            🏆 Collection Score: {total:,} 🏆
-        </div>
-        <div style='color: white; text-align: center; font-size: 0.9rem; margin-top: 5px;'>
-            {len(breakdown["rarity_counts"])} Companions • {len(breakdown["achievements_earned"])} Achievements
-        </div>
+<div style='background: linear-gradient(45deg, #FF6B9D, #4ECDC4); 
+            padding: 16px; border-radius: 12px; margin: 15px 0;
+            border: 2px solid #FFD700; box-shadow: 0 4px 15px rgba(0,0,0,0.2);'>
+    <div style='color: white; text-align: center; font-size: 1.3rem; font-weight: 700;'>
+        🏆 Collection Score: {total:,} 🏆
     </div>
-    """, unsafe_allow_html=True)
+    <div style='color: white; text-align: center; font-size: 0.9rem; margin-top: 5px;'>
+        {len(owned_ids)} Companions • {len(breakdown["achievements_earned"])} Achievements
+    </div>
+</div>
+""", unsafe_allow_html=True)
     
     # Expandable breakdown
     with st.expander("📊 Score Breakdown", expanded=False):
