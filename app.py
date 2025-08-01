@@ -831,7 +831,6 @@ def show_stats_reveal_animation(companion, reveal_info):
         st.info(f"You got a {reveal_info['actual_tier']} companion!")
     
     # Enhanced stats display with hybrid styling
-    stats_html = format_stats_display_clean(companion["stats"])
     total_stats = reveal_info["stat_total"]
     actual_rarity = reveal_info["actual_rarity"]
     
@@ -856,6 +855,7 @@ def show_stats_reveal_animation(companion, reveal_info):
     
     style = rarity_styles.get(actual_rarity, rarity_styles["Common"])
     
+    # Render the main container
     st.markdown(f"""
     <div class='shimmer-container' style='background: linear-gradient(135deg, #1F2937 0%, #374151 100%); 
                 border-left: 8px solid transparent;
@@ -875,10 +875,14 @@ def show_stats_reveal_animation(companion, reveal_info):
         </div>
         <div style='background: rgba(255,255,255,0.1); padding: 15px; border-radius: 12px;
                     border: 1px solid rgba(255,255,255,0.2); position: relative; z-index: 2;'>
-            {stats_html}
-        </div>
-    </div>
     """, unsafe_allow_html=True)
+    
+    # Render stats separately to avoid quote conflicts
+    stats_html = format_stats_display_clean(companion["stats"])
+    st.markdown(stats_html, unsafe_allow_html=True)
+    
+    # Close the container
+    st.markdown("</div></div>", unsafe_allow_html=True)
 
 def display_mystery_companion_card(companion, user_id, owned=False, in_collection=False):
     """Display companion card with mystery box or revealed stats"""
