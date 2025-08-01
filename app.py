@@ -2281,6 +2281,12 @@ if st.session_state.page == "Find matches":
 
     # Display matches with HYBRID system (now guaranteed to have matches)
     for c in st.session_state.matches:
+        # ADD THIS LINE - OPENING CARD CONTAINER
+        st.markdown("""
+        <div style='background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); 
+                    border-radius: 8px; padding: 15px; margin: 10px 0;'>
+        """, unsafe_allow_html=True)
+        
         owned = c["id"] in colset
         show_identity = should_show_companion_identity(c)
         
@@ -2339,6 +2345,8 @@ if st.session_state.page == "Find matches":
                     st.rerun()
                 else:
                     st.warning(result)
+
+
         else:
             # Mystery box - don't reveal identity
             c1.markdown("""
@@ -2363,42 +2371,48 @@ if st.session_state.page == "Find matches":
             
             # Show three mystery tier options
             with c3:
-                col_a, col_b, col_c = st.columns(3)
-                with col_a:
-                    if st.button("🎁\n50💎", key=f"basic-{c['id']}", use_container_width=True, help="Basic Bond"):
-                        ok, result, companion = buy_mystery_box_hybrid(user, "Basic Bond")
-                        if ok:
-                            st.session_state.user = result
-                            st.session_state.page = "Chat"
-                            st.session_state.chat_cid = companion["id"]
-                            st.session_state.flash = f"Mystery Bond purchased! 🎁"
-                            st.rerun()
-                        else:
-                            st.warning(result)
+                st.markdown("<div style='font-size: 0.8rem; color: #888; text-align: center; margin-bottom: 5px;'>Choose Risk Level:</div>", unsafe_allow_html=True)
                 
-                with col_b:
-                    if st.button("✨\n150💎", key=f"premium-{c['id']}", use_container_width=True, help="Premium Bond"):
-                        ok, result, companion = buy_mystery_box_hybrid(user, "Premium Bond")
-                        if ok:
-                            st.session_state.user = result
-                            st.session_state.page = "Chat"
-                            st.session_state.chat_cid = companion["id"]
-                            st.session_state.flash = f"Premium Bond purchased! Chat to reveal your companion! ✨"
-                            st.rerun()
-                        else:
-                            st.warning(result)
+                # Basic Bond
+                if st.button("🎁 Basic\n50 💎", key=f"basic-{c['id']}", use_container_width=True, help="Basic Bond - 80% Common, 18% Rare, 2% Legendary"):
+                    ok, result, companion = buy_mystery_box_hybrid(user, "Basic Bond")
+                    if ok:
+                        st.session_state.user = result
+                        st.session_state.page = "Chat"
+                        st.session_state.chat_cid = companion["id"]
+                        st.session_state.flash = f"Mystery Bond purchased! 🎁"
+                        st.rerun()
+                    else:
+                        st.warning(result)
                 
-                with col_c:
-                    if st.button("🏆\n400💎", key=f"elite-{c['id']}", use_container_width=True, help="Elite Bond"):
-                        ok, result, companion = buy_mystery_box_hybrid(user, "Elite Bond")
-                        if ok:
-                            st.session_state.user = result
-                            st.session_state.page = "Chat"
-                            st.session_state.chat_cid = companion["id"]
-                            st.session_state.flash = f"Elite Bond purchased! Chat to reveal your companion! 🏆"
-                            st.rerun()
-                        else:
-                            st.warning(result)
+                # Premium Bond
+                if st.button("✨ Premium\n150 💎", key=f"premium-{c['id']}", use_container_width=True, help="Premium Bond - 30% Common, 50% Rare, 20% Legendary"):
+                    ok, result, companion = buy_mystery_box_hybrid(user, "Premium Bond")
+                    if ok:
+                        st.session_state.user = result
+                        st.session_state.page = "Chat"
+                        st.session_state.chat_cid = companion["id"]
+                        st.session_state.flash = f"Premium Bond purchased! Chat to reveal your companion! ✨"
+                        st.rerun()
+                    else:
+                        st.warning(result)
+                
+                # Elite Bond  
+                if st.button("🏆 Elite\n400 💎", key=f"elite-{c['id']}", use_container_width=True, help="Elite Bond - 10% Common, 30% Rare, 60% Legendary"):
+                    ok, result, companion = buy_mystery_box_hybrid(user, "Elite Bond")
+                    if ok:
+                        st.session_state.user = result
+                        st.session_state.page = "Chat"
+                        st.session_state.chat_cid = companion["id"]
+                        st.session_state.flash = f"Elite Bond purchased! Chat to reveal your companion! 🏆"
+                        st.rerun()
+                    else:
+                        st.warning(result)
+
+   # ADD THIS LINE - CLOSING CARD CONTAINER
+    st.markdown("</div>", unsafe_allow_html=True)                      
+
+
 
 # ─────────────────── UPDATED CHAT SECTION WITH MYSTERY REVEAL ─────────────────────
 
@@ -2553,6 +2567,10 @@ elif st.session_state.page == "My Collection":
         st.info("No Bonds yet.")
     else:
         for cid in sorted(colset):
+            st.markdown("""
+            <div style='background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); 
+                        border-radius: 8px; padding: 15px; margin: 10px 0;'>
+            """, unsafe_allow_html=True)
             c   = CID2COMP[cid]
             rar = get_actual_rarity(c); clr = CLR[rar]
             
@@ -2574,4 +2592,6 @@ elif st.session_state.page == "My Collection":
                 # Simple chat button
                 if col3.button("💬 Chat", key=f"collection_chat_{cid}", use_container_width=True):
                     goto_chat(cid)
+
+            st.markdown("</div>", unsafe_allow_html=True)
 
