@@ -2056,25 +2056,6 @@ with col4:
 
 
 
-# ─────────────────── FIND MATCHES ────────────────────────────────
-# SOLUTION: Fix the button click bug in Find Matches
-
-# PROBLEM: When you come back from Chat to Find matches, the first button click 
-# refreshes matches instead of processing the purchase.
-
-# CURRENT BROKEN CODE (in your Find Matches section):
-"""
-if st.button("Show matches"):
-    st.session_state.matches = (
-       [c for c in COMPANIONS if all(t in c["tags"] for t in (hobby,trait,vibe,scene))]
-       or random.sample(COMPANIONS, 5)
-    )
-
-# Display matches with HYBRID system
-for c in st.session_state.matches:  # ← BUG: matches might be empty here
-"""
-
-# FIXED VERSION - Replace your Find Matches section with this:
 
 # ─────────────────── FIND MATCHES (FIXED) ────────────────────────────────
 if st.session_state.page == "Find matches":
