@@ -2283,8 +2283,9 @@ if st.session_state.page == "Find matches":
     for c in st.session_state.matches:
         # ADD THIS LINE - OPENING CARD CONTAINER
         st.markdown("""
-        <div style='background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); 
-                    border-radius: 8px; padding: 15px; margin: 10px 0;'>
+        <div style='border-left: 3px solid rgba(255,255,255,0.2); 
+                    padding-left: 12px; margin: 8px 0; 
+                    background: linear-gradient(90deg, rgba(255,255,255,0.02) 0%, transparent 100%);'>
         """, unsafe_allow_html=True)
         
         owned = c["id"] in colset
@@ -2568,8 +2569,9 @@ elif st.session_state.page == "My Collection":
     else:
         for cid in sorted(colset):
             st.markdown("""
-            <div style='background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); 
-                        border-radius: 8px; padding: 15px; margin: 10px 0;'>
+            <div style='border-left: 3px solid rgba(255,255,255,0.2); 
+                        padding-left: 12px; margin: 8px 0; 
+                        background: linear-gradient(90deg, rgba(255,255,255,0.02) 0%, transparent 100%);'>
             """, unsafe_allow_html=True)
             c   = CID2COMP[cid]
             rar = get_actual_rarity(c); clr = CLR[rar]
