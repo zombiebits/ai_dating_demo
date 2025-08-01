@@ -60,6 +60,32 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# Auto-scroll JavaScript for popups
+st.markdown("""
+<script>
+function scrollToTop() {
+    setTimeout(function() {
+        window.scrollTo({top: 0, behavior: 'smooth'});
+    }, 100);
+}
+
+// Monitor for popup changes
+window.addEventListener('load', function() {
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            if (mutation.addedNodes.length > 0) {
+                const addedNode = mutation.addedNodes[0];
+                if (addedNode.nodeType === 1 && addedNode.textContent.includes('Full Details')) {
+                    scrollToTop();
+                }
+            }
+        });
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+});
+</script>
+""", unsafe_allow_html=True)
+
 
 
 # ─────────────────── CONSTANTS & DATA ─────────────────────────────
