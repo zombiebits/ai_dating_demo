@@ -740,9 +740,9 @@ def display_mystery_tier_info():
 # EMERGENCY FIX - Replace the broken reveal function with this SIMPLE version
 
 def show_stats_reveal_animation(companion, reveal_info):
-    """Simple, working reveal animation - no fancy HTML"""
+    """Reveal animation that matches your beautiful collection card styling"""
     
-    # Show the upgrade message
+    # Show the upgrade message first
     if reveal_info["surprise_factor"] == "upgrade":
         st.balloons()
         st.success(f"🎉 SURPRISE UPGRADE! You got a {reveal_info['actual_tier']} companion!")
@@ -751,53 +751,126 @@ def show_stats_reveal_animation(companion, reveal_info):
     else:
         st.info(f"You got a {reveal_info['actual_tier']} companion!")
     
-    # Simple reveal info
+    # Get the info we need
     total_stats = reveal_info["stat_total"]
     actual_rarity = reveal_info["actual_rarity"]
     
-    # Use Streamlit's built-in styling instead of custom HTML
-    st.markdown(f"### 🎊 {companion['name']} Revealed! 🎊")
-    
-    # Show rarity and total in a simple way
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        st.metric("Rarity & Total Stats", f"{actual_rarity} • {total_stats} ⭐")
-    
-    # Show stats using Streamlit metrics (safe and clean)
-    st.markdown("**📊 Individual Stats:**")
-    stat_cols = st.columns(len(companion["stats"]))
-    
-    stat_emojis = {
-        "wit": "🧠",
-        "empathy": "❤️", 
-        "creativity": "🎨",
-        "knowledge": "📚",
-        "boldness": "⚡"
+    # Use the SAME styling as your collection cards
+    rarity_styles = {
+        "Common": {
+            "bg_gradient": "linear-gradient(135deg, rgba(156, 163, 175, 0.1), rgba(156, 163, 175, 0.05))",
+            "border_color": "#9CA3AF",
+            "badge_gradient": "linear-gradient(45deg, #6B7280, #9CA3AF, #D1D5DB)",
+            "glow": "rgba(156, 163, 175, 0.3)",
+            "badge_icon": "⚪"
+        },
+        "Rare": {
+            "bg_gradient": "linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(59, 130, 246, 0.05))",
+            "border_color": "#3B82F6",
+            "badge_gradient": "linear-gradient(45deg, #1E40AF, #3B82F6, #60A5FA)",
+            "glow": "rgba(59, 130, 246, 0.4)",
+            "badge_icon": "💎"
+        },
+        "Legendary": {
+            "bg_gradient": "linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(245, 158, 11, 0.05))",
+            "border_color": "#F59E0B",
+            "badge_gradient": "linear-gradient(45deg, #92400E, #F59E0B, #FBBF24)",
+            "glow": "rgba(245, 158, 11, 0.5)",
+            "badge_icon": "🏆"
+        }
     }
     
-    for i, (stat, value) in enumerate(companion["stats"].items()):
-        emoji = stat_emojis.get(stat, "⭐")
-        with stat_cols[i]:
-            st.metric(f"{emoji} {stat.title()}", value)
+    style = rarity_styles.get(actual_rarity, rarity_styles["Common"])
     
+    # Create the stats section using the SAME trait styling as your collection cards
+    trait_configs = {
+        "wit": {
+            "emoji": "🧠", 
+            "text_color": "#E0E7FF",
+            "bg_gradient": "linear-gradient(45deg, rgba(139, 92, 246, 0.3), rgba(167, 139, 250, 0.2))",
+            "border_color": "rgba(167, 139, 250, 0.5)",
+            "glow": "rgba(139, 92, 246, 0.25)"
+        },
+        "empathy": {
+            "emoji": "❤️", 
+            "text_color": "#FEE2E2",
+            "bg_gradient": "linear-gradient(45deg, rgba(239, 68, 68, 0.3), rgba(248, 113, 113, 0.2))",
+            "border_color": "rgba(248, 113, 113, 0.5)",
+            "glow": "rgba(239, 68, 68, 0.25)"
+        },
+        "creativity": {
+            "emoji": "🎨", 
+            "text_color": "#FED7AA",
+            "bg_gradient": "linear-gradient(45deg, rgba(249, 115, 22, 0.3), rgba(251, 146, 60, 0.2))",
+            "border_color": "rgba(251, 146, 60, 0.5)",
+            "glow": "rgba(249, 115, 22, 0.25)"
+        },
+        "knowledge": {
+            "emoji": "📚", 
+            "text_color": "#DBEAFE",
+            "bg_gradient": "linear-gradient(45deg, rgba(59, 130, 246, 0.3), rgba(96, 165, 250, 0.2))",
+            "border_color": "rgba(96, 165, 250, 0.5)",
+            "glow": "rgba(59, 130, 246, 0.25)"
+        },
+        "boldness": {
+            "emoji": "⚡", 
+            "text_color": "#D1FAE5",
+            "bg_gradient": "linear-gradient(45deg, rgba(16, 185, 129, 0.3), rgba(52, 211, 153, 0.2))",
+            "border_color": "rgba(52, 211, 153, 0.5)",
+            "glow": "rgba(16, 185, 129, 0.25)"
+        }
+    }
+    
+    # Build the stats badges using the same styling
+    trait_html = []
+    for stat_name, value in companion["stats"].items():
+        if stat_name in trait_configs:
+            config = trait_configs[stat_name]
+            trait_html.append(
+                f"<span style='color: {config['text_color']}; font-weight: 700; "
+                f"background: {config['bg_gradient']}; "
+                f"border: 1px solid {config['border_color']}; "
+                f"padding: 6px 10px; border-radius: 10px; margin: 4px; "
+                f"box-shadow: 0 2px 8px {config['glow']}; display: inline-block;'>"
+                f"{config['emoji']} {value}</span>"
+            )
+    
+    stats_section = "".join(trait_html)
+    
+    # Create the reveal card using the EXACT same styling as your collection cards
+    reveal_card_html = f"""
+    <div style='background: {style["bg_gradient"]}; 
+                border-left: 6px solid {style["border_color"]};
+                padding: 20px; margin: 16px 0; border-radius: 12px;
+                box-shadow: 0 0 25px {style["glow"]}, inset 0 1px 0 rgba(255,255,255,0.2);'>
+        
+        <div style='text-align: center; margin-bottom: 16px;'>
+            <h3 style='color: white; margin: 0 0 12px 0; font-size: 1.4rem;'>
+                🎊 {companion['name']} Revealed! 🎊
+            </h3>
+            <span style='background: {style["badge_gradient"]};
+                       color: white; padding: 8px 16px; border-radius: 20px;
+                       font-size: 1rem; font-weight: 700;
+                       box-shadow: 0 4px 15px {style["glow"]};
+                       text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+                       border: 1px solid rgba(255,255,255,0.2);'>{style["badge_icon"]} {actual_rarity} • {total_stats} ⭐ {style["badge_icon"]}</span>
+        </div>
+        
+        <div style='text-align: center; margin: 16px 0; font-size: 0.9rem;'>
+            {stats_section}
+        </div>
+        
+        <div style='color: #F1F5F9; font-style: italic; text-align: center; font-size: 0.9rem; opacity: 0.9; margin-top: 12px;'>
+            "{companion['bio']}"
+        </div>
+    </div>
+    """
+    
+    # Display the reveal card
+    st.markdown(reveal_card_html, unsafe_allow_html=True)
+    
+    # Add some spacing
     st.markdown("---")
-
-# ALSO - Check for broken HTML in your companion card functions
-# Look for any unclosed HTML tags or malformed CSS that might be causing the raw HTML to show
-
-# IMMEDIATE DEBUGGING - Add this to find the source of broken HTML:
-def debug_html_issues():
-    """Debug function to find HTML issues"""
-    st.write("🔧 Debug mode - checking for HTML issues...")
-    
-    # Check if there are any unclosed HTML tags in session state
-    for key, value in st.session_state.items():
-        if isinstance(value, str) and ('<div' in value or '<span' in value):
-            st.write(f"Found HTML in session state key: {key}")
-            st.code(value[:200] + "..." if len(value) > 200 else value)
-
-# CALL THIS TEMPORARILY to debug:
-# debug_html_issues()
 
 def display_mystery_companion_card(companion, user_id, owned=False, in_collection=False):
     """Display companion card with mystery box or revealed stats"""
