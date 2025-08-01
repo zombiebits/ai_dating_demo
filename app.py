@@ -779,7 +779,9 @@ def display_mystery_tier_info():
 
 
 def show_stats_reveal_animation(companion, reveal_info):
-    """Enhanced reveal animation that matches companion card styling"""
+    """Fixed reveal animation that matches your existing beautiful collection cards"""
+    
+    # Show the upgrade/surprise message
     if reveal_info["surprise_factor"] == "upgrade":
         st.balloons()
         st.success(f"🎉 SURPRISE UPGRADE! You got a {reveal_info['actual_tier']} companion!")
@@ -791,38 +793,58 @@ def show_stats_reveal_animation(companion, reveal_info):
     total_stats = reveal_info["stat_total"]
     actual_rarity = reveal_info["actual_rarity"]
     
-    # Use the same rarity styles as your companion cards
-    rarity_styles = {
-        "Common": {"color": "#9CA3AF", "glow": "rgba(156, 163, 175, 0.4)"},
-        "Rare": {"color": "#3B82F6", "glow": "rgba(59, 130, 246, 0.5)"},
-        "Legendary": {"color": "#F59E0B", "glow": "rgba(245, 158, 11, 0.6)"}
-    }
-    
-    style = rarity_styles.get(actual_rarity, rarity_styles["Common"])
-    
+    # Use the same blue color scheme as your collection cards
     st.markdown(f"""
-    <div style='background: linear-gradient(135deg, #1F2937 0%, #374151 100%); 
-                border-left: 8px solid {style["color"]};
-                padding: 20px; border-radius: 16px; margin: 15px 0;
-                box-shadow: 0 0 25px {style["glow"]};'>
+    <div style='background: linear-gradient(135deg, #1E293B 0%, #334155 100%); 
+                border-left: 6px solid #3B82F6;
+                padding: 20px; border-radius: 12px; margin: 15px 0;
+                box-shadow: 0 4px 20px rgba(59, 130, 246, 0.3);'>
         <h3 style='color: white; text-align: center; margin: 0 0 15px 0; font-size: 1.4rem;'>
             🎊 {companion['name']} Revealed! 🎊
         </h3>
-        <div style='text-align: center; margin-bottom: 15px;'>
-            <span style='background: {style["color"]}; color: white; padding: 8px 16px; 
-                        border-radius: 10px; font-weight: 700; font-size: 1.1rem;'>
-                {actual_rarity} • {total_stats} ⭐ Total
+        <div style='text-align: center; margin-bottom: 20px;'>
+            <span style='background: #3B82F6; color: white; padding: 8px 16px; 
+                        border-radius: 8px; font-weight: 600; font-size: 1.1rem;'>
+                💎 {actual_rarity} • {total_stats} ⭐ Total
             </span>
         </div>
-        <div style='background: rgba(255,255,255,0.1); padding: 15px; border-radius: 12px;'>
-            <div style='text-align: center; color: white;'>
+        <div style='display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;'>
     """, unsafe_allow_html=True)
     
-    # Display stats
-    for stat, value in companion["stats"].items():
-        st.markdown(f"**{stat.title()}:** {value}")
+    # Display stats using the same badge style as your collection cards
+    stat_colors = {
+        "wit": "#A78BFA",      # Purple
+        "empathy": "#FB7185",  # Pink
+        "creativity": "#FBBF24", # Yellow
+        "knowledge": "#60A5FA", # Blue
+        "boldness": "#34D399"   # Green
+    }
     
-    st.markdown("</div></div></div>", unsafe_allow_html=True)
+    stat_emojis = {
+        "wit": "🧠",
+        "empathy": "❤️", 
+        "creativity": "🎨",
+        "knowledge": "📚",
+        "boldness": "⚡"
+    }
+    
+    for stat, value in companion["stats"].items():
+        color = stat_colors.get(stat, "#60A5FA")
+        emoji = stat_emojis.get(stat, "⭐")
+        
+        st.markdown(f"""
+            <span style='background: {color}; color: white; padding: 6px 12px; 
+                        border-radius: 20px; font-weight: 600; margin: 4px;
+                        display: inline-block; font-size: 0.9rem;'>
+                {emoji} {value}
+            </span>
+        """, unsafe_allow_html=True)
+    
+    # Close the container
+    st.markdown("</div></div>", unsafe_allow_html=True)
+    
+    # Add some spacing
+    st.markdown("<br>", unsafe_allow_html=True)
 
 def display_mystery_companion_card(companion, user_id, owned=False, in_collection=False):
     """Display companion card with mystery box or revealed stats"""
