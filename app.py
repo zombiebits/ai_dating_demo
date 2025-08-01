@@ -2283,9 +2283,8 @@ if st.session_state.page == "Find matches":
     for c in st.session_state.matches:
         # ADD THIS LINE - OPENING CARD CONTAINER
         st.markdown("""
-        <div style='border: 2px solid rgba(255,255,255,0.3); 
-            padding: 10px; margin: 8px 0; border-radius: 8px;
-            background: rgba(255,255,255,0.05);'>
+        <div style='border-bottom: 1px solid rgba(255,255,255,0.1); 
+            padding-bottom: 8px; margin-bottom: 8px;'>
         """, unsafe_allow_html=True)
         
         owned = c["id"] in colset
