@@ -1268,7 +1268,7 @@ def award_chat_xp(user_id: str, companion_id: str, message_length: int) -> int:
 # ─────────────────── COLLECTION SCORE SYSTEM ─────────────────────
 def calculate_collection_score(user_id: str) -> dict:
     """
-    Calculate comprehensive collection score with breakdown
+    Calculate comprehensive collection score with breakdown - SLOWER PROGRESSION
     Returns dict with score and breakdown for display
     """
     # Get user's companions
@@ -1278,30 +1278,30 @@ def calculate_collection_score(user_id: str) -> dict:
     
     user_companions = [CID2COMP[cid] for cid in owned_ids]
     
-    # 1. BASE SCORE: Sum of all companion stats
-    base_score = sum(
-        companion.get("total_stats", sum(companion.get("stats", {}).values())) 
+    # 1. BASE SCORE: Reduced from full stats to 70% of stats
+    base_score = int(sum(
+        companion.get("total_stats", sum(companion.get("stats", {}).values())) * 0.7
         for companion in user_companions
-    )
+    ))
     
-    # 2. SYNERGY BONUSES: Matching high stats (70+)
+    # 2. SYNERGY BONUSES: Higher threshold, smaller bonus
     synergy_bonus = 0
     stat_groups = {}
     
     for companion in user_companions:
         for stat_name, value in companion.get("stats", {}).items():
-            if value >= 70:  # High stat threshold
+            if value >= 80:  # Raised from 70 to 80
                 if stat_name not in stat_groups:
                     stat_groups[stat_name] = []
                 stat_groups[stat_name].append(companion["name"])
     
-    # Award bonuses for 2+ companions with same high stat
+    # Award bonuses for 2+ companions with same high stat (reduced bonus)
     for stat_name, companions in stat_groups.items():
         if len(companions) >= 2:
-            bonus = len(companions) * 50  # 50 points per companion in group
+            bonus = len(companions) * 25  # Reduced from 50 to 25
             synergy_bonus += bonus
     
-    # 3. RARITY MULTIPLIERS
+    # 3. RARITY MULTIPLIERS: Reduced bonuses
     rarity_bonus = 0
     rarity_counts = {"Common": 0, "Rare": 0, "Legendary": 0}
     
@@ -1309,43 +1309,49 @@ def calculate_collection_score(user_id: str) -> dict:
         rarity = get_actual_rarity(companion)
         rarity_counts[rarity] += 1
         
-        # Bonus points for rare companions
+        # Reduced bonus points for rare companions
         if rarity == "Rare":
-            rarity_bonus += 100
+            rarity_bonus += 50  # Reduced from 100
         elif rarity == "Legendary":
-            rarity_bonus += 250
+            rarity_bonus += 125  # Reduced from 250
     
-    # 4. ACHIEVEMENT BONUSES
+    # 4. ACHIEVEMENT BONUSES: Higher thresholds, smaller bonuses
     achievement_bonus = 0
     achievements_earned = []
     
-    # Collection size milestones
+    # Collection size milestones - HIGHER THRESHOLDS
     collection_size = len(user_companions)
-    if collection_size >= 10:
-        achievement_bonus += 500
-        achievements_earned.append("Collector (10+ companions)")
-    elif collection_size >= 5:
-        achievement_bonus += 200
-        achievements_earned.append("Starter Collection (5+ companions)")
+    if collection_size >= 15:  # Raised from 10
+        achievement_bonus += 300  # Reduced from 500
+        achievements_earned.append("Mega Collector (15+ companions)")
+    elif collection_size >= 8:  # Raised from 5
+        achievement_bonus += 100  # Reduced from 200
+        achievements_earned.append("Growing Collection (8+ companions)")
+    elif collection_size >= 3:  # New smaller milestone
+        achievement_bonus += 50
+        achievements_earned.append("First Steps (3+ companions)")
     
-    # Rarity achievements
-    if rarity_counts["Legendary"] >= 3:
-        achievement_bonus += 1000
-        achievements_earned.append("Legend Hunter (3+ Legendaries)")
+    # Rarity achievements - HIGHER THRESHOLDS
+    if rarity_counts["Legendary"] >= 5:  # Raised from 3
+        achievement_bonus += 500  # Reduced from 1000
+        achievements_earned.append("Legend Master (5+ Legendaries)")
+    elif rarity_counts["Legendary"] >= 2:  # Raised from 1
+        achievement_bonus += 150  # Reduced from 300
+        achievements_earned.append("Legend Collector (2+ Legendaries)")
     elif rarity_counts["Legendary"] >= 1:
-        achievement_bonus += 300
+        achievement_bonus += 75
         achievements_earned.append("First Legend")
     
     # Diversity achievement (one of each rarity)
     if all(count > 0 for count in rarity_counts.values()):
-        achievement_bonus += 400
+        achievement_bonus += 200  # Reduced from 400
         achievements_earned.append("Rarity Master (All tiers)")
     
-    # High stats achievement (companion with 90+ in any stat)
+    # High stats achievement - HIGHER THRESHOLD
     for companion in user_companions:
-        if any(value >= 90 for value in companion.get("stats", {}).values()):
-            achievement_bonus += 200
-            achievements_earned.append("Stat Perfectionist (90+ stat)")
+        if any(value >= 95 for value in companion.get("stats", {}).values()):  # Raised from 90
+            achievement_bonus += 100  # Reduced from 200
+            achievements_earned.append("Stat Perfectionist (95+ stat)")
             break
     
     # TOTAL CALCULATION
@@ -2506,7 +2512,23 @@ elif st.session_state.page == "Chat":
 
 # ─────────────────── MY COLLECTION ───────────────────────────────
 elif st.session_state.page == "My Collection":
-    st.header("My BONDIGO Collection")
+    # ENHANCED COLLECTION HEADER
+    st.markdown(f"""
+    <div style='text-align: center; margin-bottom: 20px;'>
+        <h1 style='background: linear-gradient(45deg, #FF6B9D, #4ECDC4, #FFAA33); 
+                   -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+                   font-size: 2.5rem; font-weight: 800; margin: 10px 0;
+                   text-shadow: 2px 2px 4px rgba(0,0,0,0.3);'>
+            ✨ {user['username']}'s BONDIGO Collection ✨
+        </h1>
+        <div style='background: linear-gradient(45deg, #667eea, #764ba2); 
+                    color: white; padding: 8px 20px; border-radius: 25px; 
+                    display: inline-block; font-weight: 600; font-size: 1.1rem;
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.2);'>
+            🏆 Collector Level: {user.get('collection_level', 1)} • {user.get('collection_title', 'Rookie Collector')}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     
     # Display collection score
     display_collection_score(user["id"])
