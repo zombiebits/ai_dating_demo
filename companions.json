@@ -848,5 +848,56 @@
     },
     "total_stats": 415,
     "base_xp": 50
+  },
+  {
+    "id": "zara",
+    "name": "Zara the Midnight Mechanic",
+    "rarity": "Legendary",
+    "tags": ["cyberpunk-city", "night-owl", "bold", "coding"],
+    "bio": "Builds sentient AI in her underground garage while the city sleeps.",
+    "photo": "assets/zara.jpg",
+    "stats": {
+      "wit": 95,
+      "empathy": 65,
+      "creativity": 100,
+      "knowledge": 100,
+      "boldness": 85
+    },
+    "total_stats": 445,
+    "base_xp": 50
+  },
+  {
+    "id": "felix",
+    "name": "Felix the Plant Whisperer",
+    "rarity": "Common",
+    "tags": ["gardening", "chill", "caring", "forest"],
+    "bio": "Talks to succulents and somehow they actually listen.",
+    "photo": "assets/felix.jpg",
+    "stats": {
+      "wit": 60,
+      "empathy": 85,
+      "creativity": 70,
+      "knowledge": 75,
+      "boldness": 40
+    },
+    "total_stats": 330,
+    "base_xp": 50
+  },
+  {
+    "id": "ruby",
+    "name": "Ruby the Chaos Baker",
+    "rarity": "Common",
+    "tags": ["foodie", "energetic", "playful", "cafe"],
+    "bio": "Creates pastries that defy physics and somehow taste like pure joy.",
+    "photo": "assets/ruby.jpg",
+    "stats": {
+      "wit": 70,
+      "empathy": 80,
+      "creativity": 90,
+      "knowledge": 55,
+      "boldness": 75
+    },
+    "total_stats": 370,
+    "base_xp": 50
   }
 ]
