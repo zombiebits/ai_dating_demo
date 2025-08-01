@@ -846,9 +846,7 @@ def show_stats_reveal_animation(companion, reveal_info):
     st.markdown(f"*\"{companion['bio']}\"*")
     st.markdown("---")
 
-def show_stats_reveal_animation(companion, reveal_info):
-    # ... your existing reveal function ...
-    pass
+
 
 def show_companion_details_popup(companion):
     """Show full companion details in a prominent popup-style display with enhanced auto-scroll"""
