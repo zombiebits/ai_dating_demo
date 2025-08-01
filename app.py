@@ -900,7 +900,7 @@ def show_companion_details_popup(companion):
     col1, col2 = st.columns([1, 1])
     
     with col1:
-        # Large portrait with rarity glow - FIXED VERSION
+        # Large portrait with rarity glow - RECTANGULAR VERSION
         rarity = get_actual_rarity(companion)
         rarity_glows = {
             "Common": "rgba(156, 163, 175, 0.8)",
@@ -909,14 +909,17 @@ def show_companion_details_popup(companion):
         }
         glow_color = rarity_glows.get(rarity, rarity_glows["Common"])
         
-        # Create container with glow effect
+        # Create container with rectangular glow effect
         st.markdown(f"""
         <div style='display: flex; justify-content: center; margin-bottom: 20px; padding: 10px;'>
-            <div style='border-radius: 12px; 
-                        box-shadow: 0 0 30px {glow_color}, 0 0 60px {glow_color}; 
-                        padding: 8px; 
+            <div style='border-radius: 8px; 
+                        box-shadow: 0 0 25px {glow_color}, 
+                                    0 0 50px {glow_color},
+                                    0 0 75px {glow_color}; 
+                        padding: 6px; 
                         background: linear-gradient(45deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
-                        border: 2px solid rgba(255,255,255,0.2);'>
+                        border: 2px solid rgba(255,255,255,0.15);
+                        width: fit-content;'>
         """, unsafe_allow_html=True)
         
         # Use Streamlit's image function inside the glowing container
