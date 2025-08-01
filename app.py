@@ -2283,9 +2283,9 @@ if st.session_state.page == "Find matches":
     for c in st.session_state.matches:
         # ADD THIS LINE - OPENING CARD CONTAINER
         st.markdown("""
-        <div style='border-left: 3px solid rgba(255,255,255,0.2); 
-                    padding-left: 12px; margin: 8px 0; 
-                    background: linear-gradient(90deg, rgba(255,255,255,0.02) 0%, transparent 100%);'>
+        <div style='border: 2px solid rgba(255,255,255,0.3); 
+            padding: 10px; margin: 8px 0; border-radius: 8px;
+            background: rgba(255,255,255,0.05);'>
         """, unsafe_allow_html=True)
         
         owned = c["id"] in colset
@@ -2410,8 +2410,8 @@ if st.session_state.page == "Find matches":
                     else:
                         st.warning(result)
 
-   # ADD THIS LINE - CLOSING CARD CONTAINER
-    st.markdown("</div>", unsafe_allow_html=True)                      
+        # ADD THIS LINE - CLOSING CARD CONTAINER
+        st.markdown("</div>", unsafe_allow_html=True)                      
 
 
 
