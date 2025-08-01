@@ -478,28 +478,37 @@ def get_companion_mystery_tier(user_id: str, companion_id: str) -> str:
 
 def calculate_mystery_reveal_tier(companion, purchased_tier):
     """
-    Calculate what tier to reveal based on companion stats and what user bought
-    Returns upgrade/expected/downgrade info
+    FIXED: Compare actual companion rarity vs expected rarity for purchased tier
     """
-    # Use ACTUAL stats-based tier, not JSON tier
-    actual_tier = get_mystery_tier_from_companion(companion)
+    # Get the companion's actual rarity based on stats
+    actual_rarity = get_actual_rarity(companion)  # "Common", "Rare", or "Legendary"
     
-    tier_hierarchy = {"Basic Bond": 1, "Premium Bond": 2, "Elite Bond": 3}
-    purchased_level = tier_hierarchy[purchased_tier]
-    actual_level = tier_hierarchy[actual_tier]
+    # Define what rarity you'd EXPECT for each mystery tier (most likely outcome)
+    expected_rarity_for_tier = {
+        "Basic Bond": "Common",      # 80% chance Common
+        "Premium Bond": "Rare",      # 50% chance Rare  
+        "Elite Bond": "Legendary"    # 60% chance Legendary
+    }
     
-    if actual_level > purchased_level:
-        surprise = "upgrade"
-    elif actual_level == purchased_level:
-        surprise = "expected"  
+    expected_rarity = expected_rarity_for_tier[purchased_tier]
+    
+    # Compare actual vs expected rarity
+    rarity_hierarchy = {"Common": 1, "Rare": 2, "Legendary": 3}
+    actual_level = rarity_hierarchy[actual_rarity]
+    expected_level = rarity_hierarchy[expected_rarity]
+    
+    if actual_level > expected_level:
+        surprise = "upgrade"        # Got better than expected!
+    elif actual_level == expected_level:
+        surprise = "expected"       # Got what you'd expect
     else:
-        surprise = "downgrade"
+        surprise = "downgrade"      # Got worse than expected
     
     return {
-        "actual_tier": actual_tier,
+        "actual_tier": get_mystery_tier_from_companion(companion),  # Keep for other uses
+        "actual_rarity": actual_rarity,                            # The key fix!
         "surprise_factor": surprise,
-        "stat_total": companion.get("total_stats", sum(companion.get("stats", {}).values())),
-        "actual_rarity": get_actual_rarity(companion)  # Add this
+        "stat_total": companion.get("total_stats", sum(companion.get("stats", {}).values()))
     }
 
 def buy_mystery_box(user: dict, comp: dict, mystery_tier: str):
@@ -740,22 +749,21 @@ def display_mystery_tier_info():
 # EMERGENCY FIX - Replace the broken reveal function with this SIMPLE version
 
 def show_stats_reveal_animation(companion, reveal_info):
-    """Safe reveal animation using Streamlit components instead of complex HTML"""
+    """Updated to show correct surprise messages"""
     
-    # Show the upgrade message first
+    # Show the CORRECT upgrade message
     if reveal_info["surprise_factor"] == "upgrade":
         st.balloons()
-        st.success(f"🎉 SURPRISE UPGRADE! You got a {reveal_info['actual_tier']} companion!")
+        st.success(f"🎉 SURPRISE UPGRADE! You got a {reveal_info['actual_rarity']} companion!")  # ← FIXED
     elif reveal_info["surprise_factor"] == "expected":
-        st.success(f"✨ Perfect match! This companion matches your {reveal_info['actual_tier']} purchase!")
+        st.success(f"✨ Perfect match! You got the expected {reveal_info['actual_rarity']} companion!")  # ← FIXED
     else:
-        st.info(f"You got a {reveal_info['actual_tier']} companion!")
+        st.info(f"You got a {reveal_info['actual_rarity']} companion.")  # ← FIXED
     
-    # Get the info we need
+    # Rest of the function stays the same...
     total_stats = reveal_info["stat_total"]
     actual_rarity = reveal_info["actual_rarity"]
     
-    # Create a simple, safe reveal card using basic HTML
     st.markdown(f"""
     <div style='background: linear-gradient(135deg, #1F2937 0%, #374151 100%); 
                 border-left: 6px solid #3B82F6;
@@ -773,16 +781,13 @@ def show_stats_reveal_animation(companion, reveal_info):
     </div>
     """, unsafe_allow_html=True)
     
-    # Use Streamlit's built-in metrics for stats (always works)
+    # Use Streamlit's built-in metrics for stats
     st.markdown("**📊 Individual Stats:**")
     stat_cols = st.columns(len(companion["stats"]))
     
     stat_emojis = {
-        "wit": "🧠",
-        "empathy": "❤️", 
-        "creativity": "🎨",
-        "knowledge": "📚",
-        "boldness": "⚡"
+        "wit": "🧠", "empathy": "❤️", "creativity": "🎨", 
+        "knowledge": "📚", "boldness": "⚡"
     }
     
     for i, (stat, value) in enumerate(companion["stats"].items()):
@@ -790,7 +795,6 @@ def show_stats_reveal_animation(companion, reveal_info):
         with stat_cols[i]:
             st.metric(f"{emoji} {stat.title()}", value)
     
-    # Show the bio
     st.markdown(f"*\"{companion['bio']}\"*")
     st.markdown("---")
 
