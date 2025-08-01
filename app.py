@@ -338,31 +338,67 @@ def format_stats_display_badges(stats):
 # STEP 1: REPLACE format_companion_card_enhanced FUNCTION
 # Find this function around line 420 and replace it entirely with:
 
-def format_companion_card_enhanced(companion, show_stats=True):
-    """OPTION D3: Premium Metallic - Luxury holographic finish"""
+# QUICK TWEAK: Just change these lines in your format_companion_card_enhanced function
+# Find the "Build the complete card HTML" section and replace the opening div with this:
+
+# ORIGINAL D3 CARD OPENING:
+"""
+    <div style='background: {style["bg_gradient"]}; 
+                border: 2px solid; border-image: {style["border_gradient"]} 1;
+                padding: 16px; margin: 8px 0; border-radius: 12px;
+                box-shadow: 0 8px 32px {style["glow"]}, inset 0 1px 0 rgba(255,255,255,0.1);'>
+"""
+
+# REPLACE WITH D2-STYLE BORDER + D3 INTERIOR:
+"""
+    <div style='background: {style["bg_gradient"]}; 
+                border-left: 8px solid transparent;
+                border-image: {style["border_gradient"]} 1;
+                padding: 16px; margin: 8px 0; border-radius: 8px;
+                box-shadow: 0 0 20px {style["glow"]}, inset 0 1px 0 rgba(255,255,255,0.2);
+                position: relative; overflow: hidden;'>
+        <div style='position: absolute; top: -2px; left: -2px; right: -2px; bottom: -2px;
+                    background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
+                    border-radius: inherit; z-index: -1;
+                    animation: shimmer 3s infinite;'></div>
+"""
+
+# ADD THIS CSS ANIMATION TO THE TOP OF YOUR STREAMLIT APP (after st.set_page_config):
+SHIMMER_CSS = """
+<style>
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+</style>
+"""
+
+# COMPLETE HYBRID FUNCTION (D3 interior + D2 border):
+def format_companion_card_enhanced_hybrid(companion, show_stats=True):
+    """HYBRID: D3 Premium interior with D2 animated border"""
     rarity = get_actual_rarity(companion)
     
-    # Premium metallic styling for each rarity
+    # Keep all the D3 styling (badges, traits, etc.)
     rarity_styles = {
         "Common": {
             "bg_gradient": "linear-gradient(135deg, rgba(156, 163, 175, 0.1), rgba(156, 163, 175, 0.05))",
             "border_gradient": "linear-gradient(45deg, #9CA3AF, #D1D5DB, #F3F4F6, #9CA3AF)",
             "badge_gradient": "linear-gradient(45deg, #6B7280, #9CA3AF, #D1D5DB)",
-            "glow": "rgba(156, 163, 175, 0.2)",
+            "glow": "rgba(156, 163, 175, 0.3)",  # Stronger glow for D2 style
             "badge_icon": "⚪"
         },
         "Rare": {
             "bg_gradient": "linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(59, 130, 246, 0.05))",
             "border_gradient": "linear-gradient(45deg, #3B82F6, #60A5FA, #93C5FD, #3B82F6)",
             "badge_gradient": "linear-gradient(45deg, #1E40AF, #3B82F6, #60A5FA)",
-            "glow": "rgba(59, 130, 246, 0.2)",
+            "glow": "rgba(59, 130, 246, 0.4)",  # Stronger glow
             "badge_icon": "💎"
         },
         "Legendary": {
             "bg_gradient": "linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(245, 158, 11, 0.05))",
             "border_gradient": "linear-gradient(45deg, #F59E0B, #FBBF24, #FCD34D, #F59E0B)",
             "badge_gradient": "linear-gradient(45deg, #92400E, #F59E0B, #FBBF24)",
-            "glow": "rgba(245, 158, 11, 0.3)",
+            "glow": "rgba(245, 158, 11, 0.5)",  # Stronger glow
             "badge_icon": "🏆"
         }
     }
@@ -372,7 +408,7 @@ def format_companion_card_enhanced(companion, show_stats=True):
     companion_name = companion["name"]
     companion_bio = companion["bio"]
     
-    # Premium trait styling with holographic effects
+    # Keep all the D3 trait styling (same as before)
     stats_section = ""
     if show_stats:
         trait_configs = {
@@ -428,12 +464,17 @@ def format_companion_card_enhanced(companion, show_stats=True):
         
         stats_section = f"<div style='margin: 12px 0; font-size: 0.85rem;'>{''.join(trait_html)}</div>"
     
-    # Build the complete card HTML
+    # HYBRID: D2 border style + D3 content
     card_html = f"""
     <div style='background: {style["bg_gradient"]}; 
-                border: 2px solid; border-image: {style["border_gradient"]} 1;
-                padding: 16px; margin: 8px 0; border-radius: 12px;
-                box-shadow: 0 8px 32px {style["glow"]}, inset 0 1px 0 rgba(255,255,255,0.1);'>
+                border-left: 8px solid transparent;
+                border-image: {style["border_gradient"]} 1;
+                padding: 16px; margin: 8px 0; border-radius: 8px;
+                box-shadow: 0 0 20px {style["glow"]}, inset 0 1px 0 rgba(255,255,255,0.2);
+                position: relative; overflow: hidden;'>
+        <div style='position: absolute; top: -2px; left: -2px; right: -2px; bottom: -2px;
+                    background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
+                    border-radius: inherit; z-index: -1;'></div>
         <div style='margin-bottom: 12px;'>
             <span style='background: {style["badge_gradient"]};
                        color: white; padding: 6px 14px; border-radius: 20px;
