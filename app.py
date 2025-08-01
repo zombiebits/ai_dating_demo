@@ -900,14 +900,8 @@ def show_companion_details_popup(companion):
     col1, col2 = st.columns([1, 1])
     
     with col1:
-        # Large portrait with subtle border
-        st.markdown("""
-        <div style='display: flex; justify-content: center; margin-bottom: 20px;'>
-        """, unsafe_allow_html=True)
-        
+        # Large portrait - clean version
         st.image(companion.get("photo", PLACEHOLDER), width=400)
-        
-        st.markdown("</div>", unsafe_allow_html=True)
         
     with col2:
         # Companion details using your existing card styling
@@ -2212,35 +2206,39 @@ with col4:
         # Rerun to show login screen
         st.rerun()
 
-# ─────────────────── HANDLE PAGE CHANGES & POPUP DISPLAY ────────────────────
+# ─────────────────── ENHANCED POPUP STATE MANAGEMENT ────────────────────
+# Handle popup state changes more reliably
+if "popup_just_opened" not in st.session_state:
+    st.session_state.popup_just_opened = False
+
 # Clear companion details popup when navigating between pages
 if "previous_page" not in st.session_state:
     st.session_state.previous_page = st.session_state.page
 
 if st.session_state.previous_page != st.session_state.page:
     st.session_state.show_companion_details = None
+    st.session_state.popup_just_opened = False
     st.session_state.previous_page = st.session_state.page
 
-# CHECK FOR COMPANION DETAILS POPUP - GLOBAL DISPLAY WITH ENHANCED SCROLL
+# CHECK FOR COMPANION DETAILS POPUP - ENHANCED VERSION
 if st.session_state.show_companion_details:
-    # Enhanced handling for different pages
-    if st.session_state.page == "Chat":
-        st.empty()  # Force a render cycle
-    elif st.session_state.page == "My Collection":
-        # Extra aggressive scroll for collection page
-        st.markdown("""
-        <script>
-        setTimeout(function() {
-            window.scrollTo({top: 0, behavior: 'instant'});
-            setTimeout(function() {
-                window.scrollTo({top: 0, behavior: 'smooth'});
-            }, 50);
-        }, 10);
-        </script>
-        """, unsafe_allow_html=True)
+    # Force aggressive scroll for all cases
+    st.markdown("""
+    <script>
+    // Multiple scroll attempts with different timings
+    window.scrollTo(0, 0);
+    setTimeout(() => window.scrollTo({top: 0, behavior: 'instant'}), 1);
+    setTimeout(() => window.scrollTo({top: 0, behavior: 'instant'}), 10);
+    setTimeout(() => window.scrollTo({top: 0, behavior: 'smooth'}), 50);
+    setTimeout(() => window.scrollTo({top: 0, behavior: 'smooth'}), 150);
+    setTimeout(() => window.scrollTo({top: 0, behavior: 'smooth'}), 300);
+    </script>
+    """, unsafe_allow_html=True)
     
     show_companion_details_popup(st.session_state.show_companion_details)
-    st.markdown("---")  # Separator
+    st.markdown("---")
+    
+    
 
 # ─────────────────── FIND MATCHES (FIXED) ────────────────────────────────
 if st.session_state.page == "Find matches":
@@ -2288,6 +2286,7 @@ if st.session_state.page == "Find matches":
                 # Add view details button
                 if st.button("👁️", key=f"view_{c['id']}", help="View full details", use_container_width=True):
                     st.session_state.show_companion_details = c
+                    st.session_state.popup_just_opened = True
                     st.rerun()
                 st.image(c.get("photo", PLACEHOLDER), width=90)
             rarity, clr = get_actual_rarity(c), CLR[get_actual_rarity(c)]
@@ -2307,6 +2306,7 @@ if st.session_state.page == "Find matches":
                 # Add view details button
                 if st.button("👁️", key=f"view_{c['id']}", help="View full details", use_container_width=True):
                     st.session_state.show_companion_details = c
+                    st.session_state.popup_just_opened = True
                     st.rerun()
                 st.image(c.get("photo", PLACEHOLDER), width=90)
             rarity, clr = get_actual_rarity(c), CLR[get_actual_rarity(c)]
@@ -2412,6 +2412,7 @@ elif st.session_state.page == "Chat":
             # Add view details button in chat too
             if st.button("👁️ View Details", key=f"chat_view_{cid}", use_container_width=True):
                 st.session_state.show_companion_details = comp
+                st.session_state.popup_just_opened = True
                 st.rerun()
             st.image(comp.get("photo", PLACEHOLDER), width=100)
         with col2:
@@ -2527,6 +2528,7 @@ elif st.session_state.page == "My Collection":
                 # Add view details button
                 if st.button("👁️", key=f"collection_view_{cid}", help="View full details", use_container_width=True):
                     st.session_state.show_companion_details = c
+                    st.session_state.popup_just_opened = True
                     st.rerun()
                 col1.image(c.get("photo",PLACEHOLDER), width=80)
             
