@@ -790,7 +790,7 @@ def display_mystery_tier_info():
 
 
 def show_stats_reveal_animation(companion, reveal_info):
-    """Show exciting reveal animation when stats are first shown - IMPROVED VERSION"""
+    """Show exciting reveal animation with hybrid border styling - ENHANCED VERSION"""
     if reveal_info["surprise_factor"] == "upgrade":
         st.balloons()
         st.success(f"🎉 SURPRISE UPGRADE! You got a {reveal_info['actual_tier']} companion!")
@@ -799,34 +799,56 @@ def show_stats_reveal_animation(companion, reveal_info):
     else:
         st.info(f"You got a {reveal_info['actual_tier']} companion!")
     
-    # IMPROVED: Better colors and readability
-    stats_html = format_stats_display_clean(companion["stats"])  # New cleaner version
+    # Enhanced stats display with hybrid styling
+    stats_html = format_stats_display_clean(companion["stats"])
     total_stats = reveal_info["stat_total"]
     actual_rarity = reveal_info["actual_rarity"]
     
-    # Get rarity color
-    rarity_colors = {
-        "Common": "#9CA3AF",     # Clean gray
-        "Rare": "#3B82F6",       # Clean blue  
-        "Legendary": "#F59E0B"   # Clean gold
+    # Enhanced rarity styling with gradients
+    rarity_styles = {
+        "Common": {
+            "color": "#9CA3AF",
+            "border_gradient": "linear-gradient(45deg, #9CA3AF, #D1D5DB, #F3F4F6, #9CA3AF)",
+            "glow": "rgba(156, 163, 175, 0.4)"
+        },
+        "Rare": {
+            "color": "#3B82F6",
+            "border_gradient": "linear-gradient(45deg, #3B82F6, #60A5FA, #93C5FD, #3B82F6)",
+            "glow": "rgba(59, 130, 246, 0.5)"
+        },
+        "Legendary": {
+            "color": "#F59E0B",
+            "border_gradient": "linear-gradient(45deg, #F59E0B, #FBBF24, #FCD34D, #F59E0B)",
+            "glow": "rgba(245, 158, 11, 0.6)"
+        }
     }
-    rarity_color = rarity_colors.get(actual_rarity, "#9CA3AF")
+    
+    style = rarity_styles.get(actual_rarity, rarity_styles["Common"])
     
     st.markdown(f"""
     <div style='background: linear-gradient(135deg, #1F2937 0%, #374151 100%); 
+                border-left: 8px solid transparent;
+                border-image: {style["border_gradient"]} 1;
                 padding: 20px; border-radius: 16px; margin: 15px 0;
-                border: 2px solid {rarity_color}; 
-                box-shadow: 0 8px 25px rgba(0,0,0,0.3);'>
+                box-shadow: 0 0 25px {style["glow"]}, inset 0 1px 0 rgba(255,255,255,0.2);
+                position: relative; overflow: hidden;'>
+        <div style='position: absolute; top: -2px; left: -2px; right: -2px; bottom: -2px;
+                    background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
+                    border-radius: inherit; z-index: -1;
+                    animation: shimmer 3s infinite;'></div>
         <h3 style='color: white; text-align: center; margin: 0 0 15px 0; font-size: 1.4rem;'>
             🎊 {companion['name']} Revealed! 🎊
         </h3>
         <div style='text-align: center; margin-bottom: 15px;'>
-            <span style='background: {rarity_color}; color: white; padding: 6px 12px; 
-                        border-radius: 8px; font-weight: 600; font-size: 1rem;'>
+            <span style='background: {style["border_gradient"]}; color: white; padding: 8px 16px; 
+                        border-radius: 10px; font-weight: 700; font-size: 1.1rem;
+                        box-shadow: 0 4px 15px {style["glow"]};
+                        border: 1px solid rgba(255,255,255,0.3);'>
                 {actual_rarity} • {total_stats} ⭐ Total
             </span>
         </div>
-        <div style='background: rgba(255,255,255,0.1); padding: 15px; border-radius: 12px;'>
+        <div style='background: rgba(255,255,255,0.1); padding: 15px; border-radius: 12px;
+                    border: 1px solid rgba(255,255,255,0.2);'>
             {stats_html}
         </div>
     </div>
