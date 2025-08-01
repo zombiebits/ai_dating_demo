@@ -1734,11 +1734,9 @@ if "user" not in st.session_state:
 
 if "user" not in st.session_state:
     if Path(LOGO).is_file():
-    col1, col2, col3 = st.columns([0.5, 3, 0.5])
-    with col2:
         st.image(LOGO, width=380)
         st.markdown(
-            f"<p style='text-align:center;margin-top:5px;font-size:1.05rem;"
+            f"<p style='text-align:center;margin-top:-2px;font-size:1.05rem;"
             f"color:#FFC8D8'>{TAGLINE}</p>",
             unsafe_allow_html=True,
         )
@@ -2001,13 +1999,18 @@ user   = st.session_state.user
 colset = collection_set(user["id"])
 
 # ─────────────────── APP HEADER & NAVIGATION ────────────────────
-if Path(LOGO).is_file():
-    st.image(LOGO, width=380)
-    st.markdown(
-        f"<p style='text-align:center;margin-top:-2px;font-size:1.05rem;"
-        f"color:#FFC8D8'>{TAGLINE}</p>",
-        unsafe_allow_html=True,
-    )
+st.markdown("""<style>
+  /* Try to hide manage/GitHub buttons */
+  .stActionButton, [data-testid="stActionButton"], .stDeployButton {
+    visibility: hidden !important;
+  }
+  
+  @media (max-width: 768px) {
+    .stActionButton, [data-testid="stActionButton"], .stDeployButton {
+      display: none !important;
+    }
+  }
+</style>""", unsafe_allow_html=True)
 # Get Bond XP info
 bond_xp = user.get('bond_xp', 0)
 bond_title = user.get('bond_title', 'Bond Newbie')
