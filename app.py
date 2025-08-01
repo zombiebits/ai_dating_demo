@@ -51,6 +51,15 @@ st.markdown("""<style>
   }
 </style>""", unsafe_allow_html=True)
 
+st.markdown("""
+<style>
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+</style>
+""", unsafe_allow_html=True)
+
 
 
 # ─────────────────── CONSTANTS & DATA ─────────────────────────────
@@ -349,7 +358,7 @@ def format_stats_display_badges(stats):
         <div style='position: absolute; top: -2px; left: -2px; right: -2px; bottom: -2px;
                     background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
                     border-radius: inherit; z-index: -1;
-                    animation: shimmer 3s infinite;'></div>
+                 
 """
 
 # ADD THIS CSS ANIMATION TO THE TOP OF YOUR STREAMLIT APP (after st.set_page_config):
@@ -770,7 +779,7 @@ def display_mystery_tier_info():
 
 
 def show_stats_reveal_animation(companion, reveal_info):
-    """SIMPLE TEST VERSION to debug the issue"""
+    """Enhanced reveal animation that matches companion card styling"""
     if reveal_info["surprise_factor"] == "upgrade":
         st.balloons()
         st.success(f"🎉 SURPRISE UPGRADE! You got a {reveal_info['actual_tier']} companion!")
@@ -779,14 +788,41 @@ def show_stats_reveal_animation(companion, reveal_info):
     else:
         st.info(f"You got a {reveal_info['actual_tier']} companion!")
     
-    # Simple reveal without complex HTML
-    st.markdown(f"### 🎊 {companion['name']} Revealed! 🎊")
-    st.markdown(f"**Rarity:** {reveal_info['actual_rarity']} • **Total Stats:** {reveal_info['stat_total']} ⭐")
+    total_stats = reveal_info["stat_total"]
+    actual_rarity = reveal_info["actual_rarity"]
     
-    # Display stats using a simple method
-    if "stats" in companion:
-        for stat, value in companion["stats"].items():
-            st.markdown(f"• **{stat.title()}:** {value}")
+    # Use the same rarity styles as your companion cards
+    rarity_styles = {
+        "Common": {"color": "#9CA3AF", "glow": "rgba(156, 163, 175, 0.4)"},
+        "Rare": {"color": "#3B82F6", "glow": "rgba(59, 130, 246, 0.5)"},
+        "Legendary": {"color": "#F59E0B", "glow": "rgba(245, 158, 11, 0.6)"}
+    }
+    
+    style = rarity_styles.get(actual_rarity, rarity_styles["Common"])
+    
+    st.markdown(f"""
+    <div style='background: linear-gradient(135deg, #1F2937 0%, #374151 100%); 
+                border-left: 8px solid {style["color"]};
+                padding: 20px; border-radius: 16px; margin: 15px 0;
+                box-shadow: 0 0 25px {style["glow"]};'>
+        <h3 style='color: white; text-align: center; margin: 0 0 15px 0; font-size: 1.4rem;'>
+            🎊 {companion['name']} Revealed! 🎊
+        </h3>
+        <div style='text-align: center; margin-bottom: 15px;'>
+            <span style='background: {style["color"]}; color: white; padding: 8px 16px; 
+                        border-radius: 10px; font-weight: 700; font-size: 1.1rem;'>
+                {actual_rarity} • {total_stats} ⭐ Total
+            </span>
+        </div>
+        <div style='background: rgba(255,255,255,0.1); padding: 15px; border-radius: 12px;'>
+            <div style='text-align: center; color: white;'>
+    """, unsafe_allow_html=True)
+    
+    # Display stats
+    for stat, value in companion["stats"].items():
+        st.markdown(f"**{stat.title()}:** {value}")
+    
+    st.markdown("</div></div></div>", unsafe_allow_html=True)
 
 def display_mystery_companion_card(companion, user_id, owned=False, in_collection=False):
     """Display companion card with mystery box or revealed stats"""
