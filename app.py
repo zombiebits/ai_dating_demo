@@ -778,10 +778,12 @@ def display_mystery_tier_info():
 
 
 
+# EMERGENCY FIX - Replace the broken reveal function with this SIMPLE version
+
 def show_stats_reveal_animation(companion, reveal_info):
-    """Fixed reveal animation that matches your existing beautiful collection cards"""
+    """Simple, working reveal animation - no fancy HTML"""
     
-    # Show the upgrade/surprise message
+    # Show the upgrade message
     if reveal_info["surprise_factor"] == "upgrade":
         st.balloons()
         st.success(f"🎉 SURPRISE UPGRADE! You got a {reveal_info['actual_tier']} companion!")
@@ -790,35 +792,21 @@ def show_stats_reveal_animation(companion, reveal_info):
     else:
         st.info(f"You got a {reveal_info['actual_tier']} companion!")
     
+    # Simple reveal info
     total_stats = reveal_info["stat_total"]
     actual_rarity = reveal_info["actual_rarity"]
     
-    # Use the same blue color scheme as your collection cards
-    st.markdown(f"""
-    <div style='background: linear-gradient(135deg, #1E293B 0%, #334155 100%); 
-                border-left: 6px solid #3B82F6;
-                padding: 20px; border-radius: 12px; margin: 15px 0;
-                box-shadow: 0 4px 20px rgba(59, 130, 246, 0.3);'>
-        <h3 style='color: white; text-align: center; margin: 0 0 15px 0; font-size: 1.4rem;'>
-            🎊 {companion['name']} Revealed! 🎊
-        </h3>
-        <div style='text-align: center; margin-bottom: 20px;'>
-            <span style='background: #3B82F6; color: white; padding: 8px 16px; 
-                        border-radius: 8px; font-weight: 600; font-size: 1.1rem;'>
-                💎 {actual_rarity} • {total_stats} ⭐ Total
-            </span>
-        </div>
-        <div style='display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;'>
-    """, unsafe_allow_html=True)
+    # Use Streamlit's built-in styling instead of custom HTML
+    st.markdown(f"### 🎊 {companion['name']} Revealed! 🎊")
     
-    # Display stats using the same badge style as your collection cards
-    stat_colors = {
-        "wit": "#A78BFA",      # Purple
-        "empathy": "#FB7185",  # Pink
-        "creativity": "#FBBF24", # Yellow
-        "knowledge": "#60A5FA", # Blue
-        "boldness": "#34D399"   # Green
-    }
+    # Show rarity and total in a simple way
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.metric("Rarity & Total Stats", f"{actual_rarity} • {total_stats} ⭐")
+    
+    # Show stats using Streamlit metrics (safe and clean)
+    st.markdown("**📊 Individual Stats:**")
+    stat_cols = st.columns(len(companion["stats"]))
     
     stat_emojis = {
         "wit": "🧠",
@@ -828,23 +816,29 @@ def show_stats_reveal_animation(companion, reveal_info):
         "boldness": "⚡"
     }
     
-    for stat, value in companion["stats"].items():
-        color = stat_colors.get(stat, "#60A5FA")
+    for i, (stat, value) in enumerate(companion["stats"].items()):
         emoji = stat_emojis.get(stat, "⭐")
-        
-        st.markdown(f"""
-            <span style='background: {color}; color: white; padding: 6px 12px; 
-                        border-radius: 20px; font-weight: 600; margin: 4px;
-                        display: inline-block; font-size: 0.9rem;'>
-                {emoji} {value}
-            </span>
-        """, unsafe_allow_html=True)
+        with stat_cols[i]:
+            st.metric(f"{emoji} {stat.title()}", value)
     
-    # Close the container
-    st.markdown("</div></div>", unsafe_allow_html=True)
+    st.markdown("---")
+
+# ALSO - Check for broken HTML in your companion card functions
+# Look for any unclosed HTML tags or malformed CSS that might be causing the raw HTML to show
+
+# IMMEDIATE DEBUGGING - Add this to find the source of broken HTML:
+def debug_html_issues():
+    """Debug function to find HTML issues"""
+    st.write("🔧 Debug mode - checking for HTML issues...")
     
-    # Add some spacing
-    st.markdown("<br>", unsafe_allow_html=True)
+    # Check if there are any unclosed HTML tags in session state
+    for key, value in st.session_state.items():
+        if isinstance(value, str) and ('<div' in value or '<span' in value):
+            st.write(f"Found HTML in session state key: {key}")
+            st.code(value[:200] + "..." if len(value) > 200 else value)
+
+# CALL THIS TEMPORARILY to debug:
+# debug_html_issues()
 
 def display_mystery_companion_card(companion, user_id, owned=False, in_collection=False):
     """Display companion card with mystery box or revealed stats"""
