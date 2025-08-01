@@ -1472,7 +1472,7 @@ def create_user_row(auth_uid: str, username: str, email: str = None) -> dict:
             "auth_uid": auth_uid,
             "username": username,
             "email": email,
-            "tokens": 1000,
+            "tokens": 500,
             "last_airdrop": None,
             "bond_xp": 0,                    # Bond XP field
             "bond_level": 1,                 # Bond XP field  
