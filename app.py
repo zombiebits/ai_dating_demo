@@ -38,6 +38,7 @@ if "user_jwt" in st.session_state:
 
 
 # ─────────────────── STREAMLIT CONFIG ──────────────────────────────
+
 st.set_page_config(
     page_title="BONDIGO",
     page_icon="🩷",
@@ -49,51 +50,6 @@ st.markdown("""<style>
     visibility: hidden; height: 0;
   }
 </style>""", unsafe_allow_html=True)
-
-st.markdown("""
-<style>
-@keyframes shimmer {
-    0% { transform: translateX(-100%); }
-    100% { transform: translateX(100%); }
-}
-
-@keyframes shimmer-advanced {
-    0% { 
-        transform: translateX(-100%); 
-        opacity: 0;
-    }
-    50% { 
-        opacity: 1;
-    }
-    100% { 
-        transform: translateX(100%); 
-        opacity: 0;
-    }
-}
-
-.shimmer-container {
-    position: relative;
-    overflow: hidden;
-}
-
-.shimmer-container::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(
-        90deg,
-        transparent,
-        rgba(255, 255, 255, 0.2),
-        transparent
-    );
-    animation: shimmer-advanced 3s infinite;
-    z-index: 1;
-}
-</style>
-""", unsafe_allow_html=True)
 
 
 
