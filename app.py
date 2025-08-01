@@ -253,21 +253,7 @@ def apply_daily_airdrop(user: dict) -> dict:
         }).eq("auth_uid", user["auth_uid"]).execute().data[0]
     return user
 
-def create_user_row(auth_uid: str, username: str, email: str = None) -> dict:
-    try:
-        result = SRS.table("users").insert({
-            "id": auth_uid,
-            "auth_uid": auth_uid,
-            "username": username,
-            "email": email,  # Add this line
-            "tokens": 1000,
-            "last_airdrop": None
-        }).execute()
-        logger.info(f"Created user row for: {auth_uid} with username: {username}, email: {email}")
-        return result.data[0]
-    except Exception as e:
-        logger.error(f"Failed to create user row: {str(e)}")
-        raise
+
 
 # ─────────────────── MYSTERY BOX SYSTEM (ADD AFTER YOUR EXISTING HELPERS) ─────────────────────
 import random
