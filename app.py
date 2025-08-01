@@ -335,34 +335,119 @@ def format_stats_display_badges(stats):
     
     return "<div style='margin:8px 0;'>" + " ".join(formatted_stats) + "</div>"
 
+# STEP 1: REPLACE format_companion_card_enhanced FUNCTION
+# Find this function around line 420 and replace it entirely with:
+
 def format_companion_card_enhanced(companion, show_stats=True):
-    """Enhanced companion card for collection/chat - ROBUST VERSION"""
+    """OPTION D3: Premium Metallic - Luxury holographic finish"""
     rarity = get_actual_rarity(companion)
-    rarity_colors = {
-        "Common": {"bg": "#F3F4F6", "border": "#9CA3AF", "text": "#374151"},
-        "Rare": {"bg": "#EFF6FF", "border": "#3B82F6", "text": "#1E40AF"}, 
-        "Legendary": {"bg": "#FFFBEB", "border": "#F59E0B", "text": "#92400E"}
-    }
-    style = rarity_colors.get(rarity, rarity_colors["Common"])
     
+    # Premium metallic styling for each rarity
+    rarity_styles = {
+        "Common": {
+            "bg_gradient": "linear-gradient(135deg, rgba(156, 163, 175, 0.1), rgba(156, 163, 175, 0.05))",
+            "border_gradient": "linear-gradient(45deg, #9CA3AF, #D1D5DB, #F3F4F6, #9CA3AF)",
+            "badge_gradient": "linear-gradient(45deg, #6B7280, #9CA3AF, #D1D5DB)",
+            "glow": "rgba(156, 163, 175, 0.2)",
+            "badge_icon": "⚪"
+        },
+        "Rare": {
+            "bg_gradient": "linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(59, 130, 246, 0.05))",
+            "border_gradient": "linear-gradient(45deg, #3B82F6, #60A5FA, #93C5FD, #3B82F6)",
+            "badge_gradient": "linear-gradient(45deg, #1E40AF, #3B82F6, #60A5FA)",
+            "glow": "rgba(59, 130, 246, 0.2)",
+            "badge_icon": "💎"
+        },
+        "Legendary": {
+            "bg_gradient": "linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(245, 158, 11, 0.05))",
+            "border_gradient": "linear-gradient(45deg, #F59E0B, #FBBF24, #FCD34D, #F59E0B)",
+            "badge_gradient": "linear-gradient(45deg, #92400E, #F59E0B, #FBBF24)",
+            "glow": "rgba(245, 158, 11, 0.3)",
+            "badge_icon": "🏆"
+        }
+    }
+    
+    style = rarity_styles.get(rarity, rarity_styles["Common"])
     total_stats = companion.get("total_stats", sum(companion.get("stats", {}).values()))
     companion_name = companion["name"]
     companion_bio = companion["bio"]
     
-    # Generate stats HTML separately and safely
+    # Premium trait styling with holographic effects
     stats_section = ""
     if show_stats:
-        stats_section = format_stats_display_badges(companion["stats"])
+        trait_configs = {
+            "wit": {
+                "emoji": "🧠", 
+                "text_color": "#E0E7FF",
+                "bg_gradient": "linear-gradient(45deg, rgba(139, 92, 246, 0.3), rgba(167, 139, 250, 0.2))",
+                "border_color": "rgba(167, 139, 250, 0.5)",
+                "glow": "rgba(139, 92, 246, 0.25)"
+            },
+            "empathy": {
+                "emoji": "❤️", 
+                "text_color": "#FEE2E2",
+                "bg_gradient": "linear-gradient(45deg, rgba(239, 68, 68, 0.3), rgba(248, 113, 113, 0.2))",
+                "border_color": "rgba(248, 113, 113, 0.5)",
+                "glow": "rgba(239, 68, 68, 0.25)"
+            },
+            "creativity": {
+                "emoji": "🎨", 
+                "text_color": "#FED7AA",
+                "bg_gradient": "linear-gradient(45deg, rgba(249, 115, 22, 0.3), rgba(251, 146, 60, 0.2))",
+                "border_color": "rgba(251, 146, 60, 0.5)",
+                "glow": "rgba(249, 115, 22, 0.25)"
+            },
+            "knowledge": {
+                "emoji": "📚", 
+                "text_color": "#DBEAFE",
+                "bg_gradient": "linear-gradient(45deg, rgba(59, 130, 246, 0.3), rgba(96, 165, 250, 0.2))",
+                "border_color": "rgba(96, 165, 250, 0.5)",
+                "glow": "rgba(59, 130, 246, 0.25)"
+            },
+            "boldness": {
+                "emoji": "⚡", 
+                "text_color": "#D1FAE5",
+                "bg_gradient": "linear-gradient(45deg, rgba(16, 185, 129, 0.3), rgba(52, 211, 153, 0.2))",
+                "border_color": "rgba(52, 211, 153, 0.5)",
+                "glow": "rgba(16, 185, 129, 0.25)"
+            }
+        }
+        
+        trait_html = []
+        for stat_name, value in companion["stats"].items():
+            if stat_name in trait_configs:
+                config = trait_configs[stat_name]
+                trait_html.append(
+                    f"<span style='color: {config['text_color']}; font-weight: 700; "
+                    f"background: {config['bg_gradient']}; "
+                    f"border: 1px solid {config['border_color']}; "
+                    f"padding: 6px 10px; border-radius: 10px; margin: 2px; "
+                    f"box-shadow: 0 2px 8px {config['glow']}; display: inline-block;'>"
+                    f"{config['emoji']} {value}</span>"
+                )
+        
+        stats_section = f"<div style='margin: 12px 0; font-size: 0.85rem;'>{''.join(trait_html)}</div>"
     
-    # Use triple quotes to avoid escaping issues
-    card_html = f"""<div style='background:{style["bg"]};border:2px solid {style["border"]};border-radius:12px;padding:16px;margin:8px 0;box-shadow:0 2px 8px rgba(0,0,0,0.1);'>
-    <div style='display:flex;align-items:center;margin-bottom:12px;'>
-        <span style='background:{style["border"]};color:white;padding:4px 12px;border-radius:20px;font-weight:700;font-size:0.8rem;margin-right:12px;'>{rarity}</span>
-        <h4 style='margin:0;color:{style["text"]};font-size:1.1rem;'>{companion_name} • {total_stats} ⭐</h4>
+    # Build the complete card HTML
+    card_html = f"""
+    <div style='background: {style["bg_gradient"]}; 
+                border: 2px solid; border-image: {style["border_gradient"]} 1;
+                padding: 16px; margin: 8px 0; border-radius: 12px;
+                box-shadow: 0 8px 32px {style["glow"]}, inset 0 1px 0 rgba(255,255,255,0.1);'>
+        <div style='margin-bottom: 12px;'>
+            <span style='background: {style["badge_gradient"]};
+                       color: white; padding: 6px 14px; border-radius: 20px;
+                       font-size: 0.8rem; font-weight: 700;
+                       box-shadow: 0 4px 15px {style["glow"]};
+                       text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+                       border: 1px solid rgba(255,255,255,0.2);'>{style["badge_icon"]} {rarity} {style["badge_icon"]}</span>
+            <span style='color: white; font-weight: 600; font-size: 1.1rem; margin-left: 12px; 
+                       text-shadow: 0 1px 3px rgba(0,0,0,0.5);'>{companion_name} • {total_stats} ⭐</span>
+        </div>
+        {stats_section}
+        <div style='color: #F1F5F9; font-style: italic; font-size: 0.9rem; margin-top: 12px; opacity: 0.9;'>{companion_bio}</div>
     </div>
-    {stats_section}
-    <p style='margin:8px 0 0 0;color:#6B7280;font-style:italic;font-size:0.9rem;'>{companion_bio}</p>
-</div>"""
+    """
     
     return card_html
 
@@ -525,7 +610,7 @@ def should_show_companion_identity(companion):
 
 def roll_mystery_companion(mystery_tier, available_companions):
     """
-    Roll a random companion based on the mystery tier odds
+    Roll a random companion based on the mystery tier odds - FIXED VERSION
     """
     import random
     
@@ -534,7 +619,7 @@ def roll_mystery_companion(mystery_tier, available_companions):
     # Create weighted list based on odds
     weighted_companions = []
     for companion in available_companions:
-        rarity = get_actual_rarity(companion)
+        rarity = get_actual_rarity(companion)  # ✅ FIXED: Use stats-based rarity
         weight = odds.get(rarity, 0)
         
         # Add this companion multiple times based on its weight
