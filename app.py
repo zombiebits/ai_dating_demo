@@ -336,7 +336,7 @@ def format_stats_display_badges(stats):
     return "<div style='margin:8px 0;'>" + " ".join(formatted_stats) + "</div>"
 
 def format_companion_card_enhanced(companion, show_stats=True):
-    """Enhanced companion card for collection/chat - FIXED VERSION"""
+    """Enhanced companion card for collection/chat - ROBUST VERSION"""
     rarity = get_actual_rarity(companion)
     rarity_colors = {
         "Common": {"bg": "#F3F4F6", "border": "#9CA3AF", "text": "#374151"},
@@ -346,32 +346,24 @@ def format_companion_card_enhanced(companion, show_stats=True):
     style = rarity_colors.get(rarity, rarity_colors["Common"])
     
     total_stats = companion.get("total_stats", sum(companion.get("stats", {}).values()))
+    companion_name = companion["name"]
+    companion_bio = companion["bio"]
     
-    # Generate stats HTML only if show_stats is True
-    stats_html = ""
+    # Generate stats HTML separately and safely
+    stats_section = ""
     if show_stats:
-        stats_html = format_stats_display_badges(companion["stats"])
+        stats_section = format_stats_display_badges(companion["stats"])
     
-    card_html = f"""
-    <div style='background:{style["bg"]};border:2px solid {style["border"]};border-radius:12px;
-                padding:16px;margin:8px 0;box-shadow:0 2px 8px rgba(0,0,0,0.1);'>
-        <div style='display:flex;align-items:center;margin-bottom:12px;'>
-            <span style='background:{style["border"]};color:white;padding:4px 12px;
-                        border-radius:20px;font-weight:700;font-size:0.8rem;margin-right:12px;'>
-                {rarity}
-            </span>
-            <h4 style='margin:0;color:{style["text"]};font-size:1.1rem;'>
-                {companion["name"]} • {total_stats} ⭐
-            </h4>
-        </div>
-        
-        {stats_html}
-        
-        <p style='margin:8px 0 0 0;color:#6B7280;font-style:italic;font-size:0.9rem;'>
-            {companion["bio"]}
-        </p>
+    # Use triple quotes to avoid escaping issues
+    card_html = f"""<div style='background:{style["bg"]};border:2px solid {style["border"]};border-radius:12px;padding:16px;margin:8px 0;box-shadow:0 2px 8px rgba(0,0,0,0.1);'>
+    <div style='display:flex;align-items:center;margin-bottom:12px;'>
+        <span style='background:{style["border"]};color:white;padding:4px 12px;border-radius:20px;font-weight:700;font-size:0.8rem;margin-right:12px;'>{rarity}</span>
+        <h4 style='margin:0;color:{style["text"]};font-size:1.1rem;'>{companion_name} • {total_stats} ⭐</h4>
     </div>
-    """
+    {stats_section}
+    <p style='margin:8px 0 0 0;color:#6B7280;font-style:italic;font-size:0.9rem;'>{companion_bio}</p>
+</div>"""
+    
     return card_html
 
 def is_companion_revealed(user_id: str, companion_id: str) -> bool:
