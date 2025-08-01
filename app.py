@@ -832,11 +832,18 @@ def show_companion_details_popup(companion):
     <div style='background: linear-gradient(135deg, #1F2937, #374151); 
                 border: 3px solid #3B82F6; border-radius: 20px; 
                 padding: 30px; margin: 20px 0;
-                box-shadow: 0 20px 60px rgba(0,0,0,0.5);'>
+                box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+                position: relative; z-index: 1000;'>
     """, unsafe_allow_html=True)
     
-    # Header
-    st.markdown(f"### 📸 {companion['name']} - Full Details")
+    # Header with close button
+    col_header1, col_header2, col_header3 = st.columns([1, 3, 1])
+    with col_header2:
+        st.markdown(f"### 📸 {companion['name']} - Full Details")
+    with col_header3:
+        if st.button("❌ Close", key=f"close_details_header_{companion['id']}", use_container_width=True):
+            st.session_state.show_companion_details = None
+            st.rerun()
     
     # Two-column layout: Image + Stats
     col1, col2 = st.columns([1, 1])
@@ -854,15 +861,24 @@ def show_companion_details_popup(companion):
         st.markdown(f"**Total Stats:** {total_stats} ⭐")
         st.markdown(f"**Bio:** *{companion['bio']}*")
         
-        # Individual stats
+        # Individual stats with emojis
         st.markdown("**Stats:**")
+        stat_emojis = {
+            "wit": "🧠",
+            "empathy": "❤️", 
+            "creativity": "🎨",
+            "knowledge": "📚",
+            "boldness": "⚡"
+        }
+        
         for stat, value in companion["stats"].items():
-            st.markdown(f"• **{stat.title()}:** {value}")
+            emoji = stat_emojis.get(stat, "⭐")
+            st.markdown(f"• {emoji} **{stat.title()}:** {value}")
     
-    # Close button
+    # Bottom close button
     col1, col2, col3 = st.columns([2, 1, 2])
     with col2:
-        if st.button("❌ Close", key=f"close_details_{companion['id']}", use_container_width=True):
+        if st.button("❌ Close", key=f"close_details_bottom_{companion['id']}", use_container_width=True):
             st.session_state.show_companion_details = None
             st.rerun()
     
@@ -2139,7 +2155,19 @@ with col4:
         # Rerun to show login screen
         st.rerun()
 
+# ─────────────────── HANDLE PAGE CHANGES & POPUP DISPLAY ────────────────────
+# Clear companion details popup when navigating between pages
+if "previous_page" not in st.session_state:
+    st.session_state.previous_page = st.session_state.page
 
+if st.session_state.previous_page != st.session_state.page:
+    st.session_state.show_companion_details = None
+    st.session_state.previous_page = st.session_state.page
+
+# CHECK FOR COMPANION DETAILS POPUP - GLOBAL DISPLAY
+if st.session_state.show_companion_details:
+    show_companion_details_popup(st.session_state.show_companion_details)
+    st.markdown("---")  # Separator
 
 
 # ─────────────────── FIND MATCHES (FIXED) ────────────────────────────────
@@ -2147,11 +2175,6 @@ if st.session_state.page == "Find matches":
     if st.session_state.flash:
         st.success(st.session_state.flash)
         st.session_state.flash = None
-
-    # CHECK FOR COMPANION DETAILS POPUP (NEW)
-    if st.session_state.show_companion_details:
-        show_companion_details_popup(st.session_state.show_companion_details)
-        st.markdown("---")  # Separator
 
     # Show updated mystery box pricing info
     display_mystery_tier_info()
@@ -2289,11 +2312,6 @@ if st.session_state.page == "Find matches":
 # ─────────────────── UPDATED CHAT SECTION WITH MYSTERY REVEAL ─────────────────────
 
 elif st.session_state.page == "Chat":
-
-    if st.session_state.show_companion_details:
-        show_companion_details_popup(st.session_state.show_companion_details)
-        st.markdown("---")
-
     if st.session_state.flash:
         st.success(st.session_state.flash)
         st.session_state.flash = None
@@ -2417,11 +2435,6 @@ elif st.session_state.page == "Chat":
 
 # ─────────────────── MY COLLECTION ───────────────────────────────
 elif st.session_state.page == "My Collection":
-
-    if st.session_state.show_companion_details:
-        show_companion_details_popup(st.session_state.show_companion_details)
-        st.markdown("---")
-
     st.header("My BONDIGO Collection")
     
     # Display collection score
