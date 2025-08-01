@@ -776,7 +776,7 @@ def display_mystery_tier_info():
 
 
 def show_stats_reveal_animation(companion, reveal_info):
-    """Show exciting reveal animation with hybrid border styling - FIXED VERSION"""
+    """SIMPLE TEST VERSION to debug the issue"""
     if reveal_info["surprise_factor"] == "upgrade":
         st.balloons()
         st.success(f"🎉 SURPRISE UPGRADE! You got a {reveal_info['actual_tier']} companion!")
@@ -785,59 +785,14 @@ def show_stats_reveal_animation(companion, reveal_info):
     else:
         st.info(f"You got a {reveal_info['actual_tier']} companion!")
     
-    # Enhanced stats display with hybrid styling
-    total_stats = reveal_info["stat_total"]
-    actual_rarity = reveal_info["actual_rarity"]
+    # Simple reveal without complex HTML
+    st.markdown(f"### 🎊 {companion['name']} Revealed! 🎊")
+    st.markdown(f"**Rarity:** {reveal_info['actual_rarity']} • **Total Stats:** {reveal_info['stat_total']} ⭐")
     
-    # Enhanced rarity styling with gradients
-    rarity_styles = {
-        "Common": {
-            "color": "#9CA3AF",
-            "border_gradient": "linear-gradient(45deg, #9CA3AF, #D1D5DB, #F3F4F6, #9CA3AF)",
-            "glow": "rgba(156, 163, 175, 0.4)"
-        },
-        "Rare": {
-            "color": "#3B82F6",
-            "border_gradient": "linear-gradient(45deg, #3B82F6, #60A5FA, #93C5FD, #3B82F6)",
-            "glow": "rgba(59, 130, 246, 0.5)"
-        },
-        "Legendary": {
-            "color": "#F59E0B",
-            "border_gradient": "linear-gradient(45deg, #F59E0B, #FBBF24, #FCD34D, #F59E0B)",
-            "glow": "rgba(245, 158, 11, 0.6)"
-        }
-    }
-    
-    style = rarity_styles.get(actual_rarity, rarity_styles["Common"])
-    
-    # Render the main container
-    st.markdown(f"""
-    <div class='shimmer-container' style='background: linear-gradient(135deg, #1F2937 0%, #374151 100%); 
-                border-left: 8px solid transparent;
-                border-image: {style["border_gradient"]} 1;
-                padding: 20px; border-radius: 16px; margin: 15px 0;
-                box-shadow: 0 0 25px {style["glow"]}, inset 0 1px 0 rgba(255,255,255,0.2);'>
-        <h3 style='color: white; text-align: center; margin: 0 0 15px 0; font-size: 1.4rem; position: relative; z-index: 2;'>
-            🎊 {companion['name']} Revealed! 🎊
-        </h3>
-        <div style='text-align: center; margin-bottom: 15px; position: relative; z-index: 2;'>
-            <span style='background: {style["border_gradient"]}; color: white; padding: 8px 16px; 
-                        border-radius: 10px; font-weight: 700; font-size: 1.1rem;
-                        box-shadow: 0 4px 15px {style["glow"]};
-                        border: 1px solid rgba(255,255,255,0.3);'>
-                {actual_rarity} • {total_stats} ⭐ Total
-            </span>
-        </div>
-        <div style='background: rgba(255,255,255,0.1); padding: 15px; border-radius: 12px;
-                    border: 1px solid rgba(255,255,255,0.2); position: relative; z-index: 2;'>
-    """, unsafe_allow_html=True)
-    
-    # Render stats separately to avoid quote conflicts
-    stats_html = format_stats_display_clean(companion["stats"])
-    st.markdown(stats_html, unsafe_allow_html=True)
-    
-    # Close the container
-    st.markdown("</div></div>", unsafe_allow_html=True)
+    # Display stats using a simple method
+    if "stats" in companion:
+        for stat, value in companion["stats"].items():
+            st.markdown(f"• **{stat.title()}:** {value}")
 
 def display_mystery_companion_card(companion, user_id, owned=False, in_collection=False):
     """Display companion card with mystery box or revealed stats"""
