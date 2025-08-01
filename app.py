@@ -851,14 +851,32 @@ def show_stats_reveal_animation(companion, reveal_info):
     pass
 
 def show_companion_details_popup(companion):
-    """Show full companion details in a prominent popup-style display with auto-scroll"""
+    """Show full companion details in a prominent popup-style display with enhanced auto-scroll"""
     
-    # Force scroll to top when popup opens
-    st.markdown("""
-    <script>
-    window.scrollTo(0, 0);
-    </script>
-    """, unsafe_allow_html=True)
+    # Enhanced scroll solution - multiple attempts for reliability
+    current_page = st.session_state.get('page', 'Find matches')
+    
+    if current_page == "My Collection":
+        # More aggressive scroll for collection page
+        st.markdown("""
+        <script>
+        // Immediate scroll
+        window.scrollTo(0, 0);
+        
+        // Follow-up scrolls with delays
+        setTimeout(() => window.scrollTo({top: 0, behavior: 'instant'}), 10);
+        setTimeout(() => window.scrollTo({top: 0, behavior: 'smooth'}), 100);
+        setTimeout(() => window.scrollTo({top: 0, behavior: 'smooth'}), 200);
+        </script>
+        """, unsafe_allow_html=True)
+    else:
+        # Standard scroll for other pages
+        st.markdown("""
+        <script>
+        window.scrollTo({top: 0, behavior: 'smooth'});
+        setTimeout(() => window.scrollTo({top: 0, behavior: 'smooth'}), 50);
+        </script>
+        """, unsafe_allow_html=True)
     
     # Create a prominent container that takes up most of the screen
     st.markdown("""
