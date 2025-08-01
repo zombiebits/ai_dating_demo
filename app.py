@@ -749,31 +749,53 @@ def display_mystery_tier_info():
 # EMERGENCY FIX - Replace the broken reveal function with this SIMPLE version
 
 def show_stats_reveal_animation(companion, reveal_info):
-    """Updated to show correct surprise messages"""
+    """Reveal animation that matches the companion's actual rarity colors"""
     
-    # Show the CORRECT upgrade message
+    # Show the upgrade message first
     if reveal_info["surprise_factor"] == "upgrade":
         st.balloons()
-        st.success(f"🎉 SURPRISE UPGRADE! You got a {reveal_info['actual_rarity']} companion!")  # ← FIXED
+        st.success(f"🎉 SURPRISE UPGRADE! You got a {reveal_info['actual_rarity']} companion!")
     elif reveal_info["surprise_factor"] == "expected":
-        st.success(f"✨ Perfect match! You got the expected {reveal_info['actual_rarity']} companion!")  # ← FIXED
+        st.success(f"✨ Perfect match! You got the expected {reveal_info['actual_rarity']} companion!")
     else:
-        st.info(f"You got a {reveal_info['actual_rarity']} companion.")  # ← FIXED
+        st.info(f"You got a {reveal_info['actual_rarity']} companion.")
     
-    # Rest of the function stays the same...
+    # Get the info we need
     total_stats = reveal_info["stat_total"]
     actual_rarity = reveal_info["actual_rarity"]
     
+    # FIXED: Use the same rarity-based colors as the collection cards
+    rarity_styles = {
+        "Common": {
+            "border_color": "#9CA3AF",
+            "badge_color": "#9CA3AF", 
+            "glow": "rgba(156, 163, 175, 0.3)"
+        },
+        "Rare": {
+            "border_color": "#3B82F6",
+            "badge_color": "#3B82F6",
+            "glow": "rgba(59, 130, 246, 0.3)"
+        },
+        "Legendary": {
+            "border_color": "#F59E0B",
+            "badge_color": "#F59E0B", 
+            "glow": "rgba(245, 158, 11, 0.4)"
+        }
+    }
+    
+    style = rarity_styles.get(actual_rarity, rarity_styles["Common"])
+    
+    # Create reveal card with MATCHING colors
     st.markdown(f"""
     <div style='background: linear-gradient(135deg, #1F2937 0%, #374151 100%); 
-                border-left: 6px solid #3B82F6;
+                border-left: 6px solid {style["border_color"]};
                 padding: 20px; border-radius: 12px; margin: 15px 0;
-                box-shadow: 0 4px 20px rgba(59, 130, 246, 0.3);'>
+                box-shadow: 0 4px 20px {style["glow"]};'>
         <h3 style='color: white; text-align: center; margin: 0 0 15px 0;'>
             🎊 {companion['name']} Revealed! 🎊
         </h3>
         <div style='text-align: center; margin-bottom: 15px;'>
-            <span style='background: #3B82F6; color: white; padding: 8px 16px; 
+            <span style='background: {style["badge_color"]}; color: white; padding: 8px 16px; 
                         border-radius: 8px; font-weight: 600;'>
                 💎 {actual_rarity} • {total_stats} ⭐ Total
             </span>
@@ -786,8 +808,11 @@ def show_stats_reveal_animation(companion, reveal_info):
     stat_cols = st.columns(len(companion["stats"]))
     
     stat_emojis = {
-        "wit": "🧠", "empathy": "❤️", "creativity": "🎨", 
-        "knowledge": "📚", "boldness": "⚡"
+        "wit": "🧠",
+        "empathy": "❤️", 
+        "creativity": "🎨",
+        "knowledge": "📚",
+        "boldness": "⚡"
     }
     
     for i, (stat, value) in enumerate(companion["stats"].items()):
@@ -795,6 +820,7 @@ def show_stats_reveal_animation(companion, reveal_info):
         with stat_cols[i]:
             st.metric(f"{emoji} {stat.title()}", value)
     
+    # Show the bio
     st.markdown(f"*\"{companion['bio']}\"*")
     st.markdown("---")
 
