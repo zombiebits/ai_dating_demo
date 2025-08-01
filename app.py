@@ -50,6 +50,15 @@ st.markdown("""<style>
   }
 </style>""", unsafe_allow_html=True)
 
+st.markdown("""
+<style>
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+</style>
+""", unsafe_allow_html=True)
+
 # ─────────────────── CONSTANTS & DATA ─────────────────────────────
 MAX_TOKENS    = 10_000
 DAILY_AIRDROP = 150
@@ -2238,7 +2247,7 @@ elif st.session_state.page == "Chat":
         with col1:
             st.image(comp.get("photo", PLACEHOLDER), width=100)
         with col2:
-            st.markdown(format_companion_card_enhanced(comp, show_stats=True), unsafe_allow_html=True)
+            st.markdown(format_companion_card_hybrid(comp, show_stats=True), unsafe_allow_html=True)
         
         st.markdown("---")
 
@@ -2350,7 +2359,7 @@ elif st.session_state.page == "My Collection":
                 col1.image(c.get("photo",PLACEHOLDER), width=80)
             
             with col2:
-                col2.markdown(format_companion_card_enhanced(c, show_stats=True), unsafe_allow_html=True)
+                col2.markdown(format_companion_card_hybrid(c, show_stats=True), unsafe_allow_html=True)
             
             with col3:
                 # Simple chat button
