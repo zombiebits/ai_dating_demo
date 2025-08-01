@@ -1734,12 +1734,11 @@ if "user" not in st.session_state:
 
 if "user" not in st.session_state:
     if Path(LOGO).is_file():
-        st.markdown(
-            f"<div style='text-align:center;margin-bottom:10px;'>"
-            f"<img src='{LOGO}' style='width:380px;max-width:90%;'>"
-            f"</div>",
-            unsafe_allow_html=True,
-        )
+        # Bigger logo for login impact
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.image(LOGO, width=380)
+        
         st.markdown(
             f"<p style='text-align:center;margin-top:5px;font-size:1.05rem;"
             f"color:#FFC8D8'>{TAGLINE}</p>",
@@ -2005,14 +2004,13 @@ colset = collection_set(user["id"])
 
 # ─────────────────── APP HEADER & NAVIGATION ────────────────────
 if Path(LOGO).is_file():
+    # Smaller, more compact for main app
+    col1, col2, col3 = st.columns([1.5, 1, 1.5])
+    with col2:
+        st.image(LOGO, width=280)  # Smaller: 280px vs 380px
+    
     st.markdown(
-        f"<div style='text-align:center;margin-bottom:8px;'>"
-        f"<img src='{LOGO}' style='width:320px;max-width:90%;'>"  # Smaller: 320px vs 380px
-        f"</div>",
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        f"<p style='text-align:center;margin-top:2px;font-size:0.95rem;"  # Slightly smaller text
+        f"<p style='text-align:center;margin-top:2px;font-size:0.9rem;"  # Smaller text
         f"color:#FFC8D8'>{TAGLINE}</p>",
         unsafe_allow_html=True,
     )
