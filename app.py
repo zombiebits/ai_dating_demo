@@ -701,40 +701,40 @@ def buy_mystery_box_hybrid(user: dict, mystery_tier: str, specific_companion=Non
 
 # Update the display function
 def display_mystery_tier_info():
-    """Display the updated mystery box pricing explanation"""
+    """Display the updated mystery box pricing explanation - COMPACT VERSION"""
     st.markdown("""
     <div style='background: linear-gradient(45deg, #FF6B9D, #C44569); 
-                padding: 20px; border-radius: 12px; margin: 20px 0;'>
-        <h3 style='color: white; text-align: center; margin-bottom: 15px;'>
+                padding: 15px; border-radius: 8px; margin: 15px 0;'>
+        <h4 style='color: white; text-align: center; margin-bottom: 10px; font-size: 1.1rem;'>
             🎁 Mystery Box System
-        </h3>
+        </h4>
         <div style='display: flex; justify-content: space-around; flex-wrap: wrap;'>
-            <div style='background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; margin: 5px; min-width: 150px;'>
+            <div style='background: rgba(255,255,255,0.1); padding: 8px; border-radius: 6px; margin: 3px; min-width: 120px;'>
                 <div style='text-align: center; color: white;'>
-                    <div style='font-size: 1.5rem;'>🎁</div>
-                    <div><strong>Basic Bond</strong></div>
-                    <div style='font-size: 1.2rem; color: #FFD700;'>50 💎</div>
-                    <div style='font-size: 0.8rem;'>80% Common, 18% Rare, 2% Legendary</div>
+                    <div style='font-size: 1.2rem;'>🎁</div>
+                    <div style='font-size: 0.9rem;'><strong>Basic Bond</strong></div>
+                    <div style='font-size: 1rem; color: #FFD700;'>50 💎</div>
+                    <div style='font-size: 0.7rem;'>80% Common, 18% Rare, 2% Legendary</div>
                 </div>
             </div>
-            <div style='background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; margin: 5px; min-width: 150px;'>
+            <div style='background: rgba(255,255,255,0.1); padding: 8px; border-radius: 6px; margin: 3px; min-width: 120px;'>
                 <div style='text-align: center; color: white;'>
-                    <div style='font-size: 1.5rem;'>✨</div>
-                    <div><strong>Premium Bond</strong></div>
-                    <div style='font-size: 1.2rem; color: #FFD700;'>150 💎</div>
-                    <div style='font-size: 0.8rem;'>30% Common, 50% Rare, 20% Legendary</div>
+                    <div style='font-size: 1.2rem;'>✨</div>
+                    <div style='font-size: 0.9rem;'><strong>Premium Bond</strong></div>
+                    <div style='font-size: 1rem; color: #FFD700;'>150 💎</div>
+                    <div style='font-size: 0.7rem;'>30% Common, 50% Rare, 20% Legendary</div>
                 </div>
             </div>
-            <div style='background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; margin: 5px; min-width: 150px;'>
+            <div style='background: rgba(255,255,255,0.1); padding: 8px; border-radius: 6px; margin: 3px; min-width: 120px;'>
                 <div style='text-align: center; color: white;'>
-                    <div style='font-size: 1.5rem;'>🏆</div>
-                    <div><strong>Elite Bond</strong></div>
-                    <div style='font-size: 1.2rem; color: #FFD700;'>400 💎</div>
-                    <div style='font-size: 0.8rem;'>10% Common, 30% Rare, 60% Legendary</div>
+                    <div style='font-size: 1.2rem;'>🏆</div>
+                    <div style='font-size: 0.9rem;'><strong>Elite Bond</strong></div>
+                    <div style='font-size: 1rem; color: #FFD700;'>400 💎</div>
+                    <div style='font-size: 0.7rem;'>10% Common, 30% Rare, 60% Legendary</div>
                 </div>
             </div>
         </div>
-        <p style='color: white; text-align: center; margin-top: 15px; font-size: 0.9rem;'>
+        <p style='color: white; text-align: center; margin-top: 10px; font-size: 0.8rem;'>
             💡 <strong>Strategy:</strong> Some companions show their identity - buy them directly or try your luck with mystery boxes!
         </p>
     </div>
@@ -825,7 +825,14 @@ def show_stats_reveal_animation(companion, reveal_info):
     pass
 
 def show_companion_details_popup(companion):
-    """Show full companion details in a prominent popup-style display"""
+    """Show full companion details in a prominent popup-style display with auto-scroll"""
+    
+    # Force scroll to top when popup opens
+    st.markdown("""
+    <script>
+    window.scrollTo(0, 0);
+    </script>
+    """, unsafe_allow_html=True)
     
     # Create a prominent container that takes up most of the screen
     st.markdown("""
@@ -2164,8 +2171,12 @@ if st.session_state.previous_page != st.session_state.page:
     st.session_state.show_companion_details = None
     st.session_state.previous_page = st.session_state.page
 
-# CHECK FOR COMPANION DETAILS POPUP - GLOBAL DISPLAY
+# CHECK FOR COMPANION DETAILS POPUP - GLOBAL DISPLAY WITH SCROLL
 if st.session_state.show_companion_details:
+    # Add a small delay for chat page to ensure proper rendering
+    if st.session_state.page == "Chat":
+        st.empty()  # Force a render cycle
+    
     show_companion_details_popup(st.session_state.show_companion_details)
     st.markdown("---")  # Separator
 
