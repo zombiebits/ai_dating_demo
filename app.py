@@ -50,14 +50,7 @@ st.markdown("""<style>
   }
 </style>""", unsafe_allow_html=True)
 
-st.markdown("""
-<style>
-@keyframes shimmer {
-    0% { transform: translateX(-100%); }
-    100% { transform: translateX(100%); }
-}
-</style>
-""", unsafe_allow_html=True)
+
 
 # ─────────────────── CONSTANTS & DATA ─────────────────────────────
 MAX_TOKENS    = 10_000
