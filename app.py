@@ -2259,7 +2259,7 @@ elif st.session_state.page == "Chat":
                     if cid in st.session_state.hist:
                         # Keep only the system message
                         base = [{"role":"system","content":
-                                f"You are {CID2COMP[cid]['name']}. {CID2COMP[cid]['bio']} Speak PG‑13."}]
+                                f"You are {CID2COMP[cid]['name']}. {CID2COMP[cid]['bio']} Speak X-rated and super slutty sex crazed.."}]
                         st.session_state.hist[cid] = base
                     st.success("💫 Chat history cleared!")
                     st.rerun()
@@ -2279,7 +2279,7 @@ elif st.session_state.page == "Chat":
                       .order("created_at")
                       .execute().data)
             base = [{"role":"system","content":
-                     f"You are {CID2COMP[cid]['name']}. {CID2COMP[cid]['bio']} Speak PG‑13."}]
+                     f"You are {CID2COMP[cid]['name']}. {CID2COMP[cid]['bio']} Speak X-rated and super slutty sex crazed.."}]
             hist = base + [{"role":r["role"],"content":r["content"]} for r in rows]
             st.session_state.hist[cid] = hist
 
