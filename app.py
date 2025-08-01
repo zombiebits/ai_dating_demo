@@ -2341,7 +2341,19 @@ if st.session_state.page == "Find matches":
                     st.warning(result)
         else:
             # Mystery box - don't reveal identity
-            c1.markdown("<div style='font-size: 60px; text-align: center; margin: 10px 0;'>❓</div>", unsafe_allow_html=True)
+            c1.markdown("""
+            <div style='text-align: center; margin: 10px 0;'>
+                <div style='background: linear-gradient(45deg, #FF6B9D, #4ECDC4, #FFAA33); 
+                            width: 80px; height: 80px; border-radius: 12px; margin: 0 auto;
+                            display: flex; align-items: center; justify-content: center;
+                            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+                            border: 3px solid rgba(255,255,255,0.3);'>
+                    <div style='font-size: 24px; font-weight: bold; color: white; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);'>
+                        🎁<br>?
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
             
             c2.markdown(
                 f"**Mystery Companion** 🎁<br>"
