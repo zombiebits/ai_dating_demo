@@ -53,8 +53,39 @@ st.markdown("""<style>
 st.markdown("""
 <style>
 @keyframes shimmer {
-    0% { transform: translateX(-100%); }
-    100% { transform: translateX(100%); }
+    0% { 
+        transform: translateX(-100%); 
+        opacity: 0;
+    }
+    50% { 
+        opacity: 1;
+    }
+    100% { 
+        transform: translateX(100%); 
+        opacity: 0;
+    }
+}
+
+.shimmer-container {
+    position: relative;
+    overflow: hidden;
+}
+
+.shimmer-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.2),
+        transparent
+    );
+    animation: shimmer 3s infinite;
+    z-index: 1;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -790,7 +821,7 @@ def display_mystery_tier_info():
 
 
 def show_stats_reveal_animation(companion, reveal_info):
-    """Show exciting reveal animation with hybrid border styling - ENHANCED VERSION"""
+    """Show exciting reveal animation with hybrid border styling - FIXED VERSION"""
     if reveal_info["surprise_factor"] == "upgrade":
         st.balloons()
         st.success(f"🎉 SURPRISE UPGRADE! You got a {reveal_info['actual_tier']} companion!")
@@ -826,20 +857,15 @@ def show_stats_reveal_animation(companion, reveal_info):
     style = rarity_styles.get(actual_rarity, rarity_styles["Common"])
     
     st.markdown(f"""
-    <div style='background: linear-gradient(135deg, #1F2937 0%, #374151 100%); 
+    <div class='shimmer-container' style='background: linear-gradient(135deg, #1F2937 0%, #374151 100%); 
                 border-left: 8px solid transparent;
                 border-image: {style["border_gradient"]} 1;
                 padding: 20px; border-radius: 16px; margin: 15px 0;
-                box-shadow: 0 0 25px {style["glow"]}, inset 0 1px 0 rgba(255,255,255,0.2);
-                position: relative; overflow: hidden;'>
-        <div style='position: absolute; top: -2px; left: -2px; right: -2px; bottom: -2px;
-                    background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
-                    border-radius: inherit; z-index: -1;
-                    animation: shimmer 3s infinite;'></div>
-        <h3 style='color: white; text-align: center; margin: 0 0 15px 0; font-size: 1.4rem;'>
+                box-shadow: 0 0 25px {style["glow"]}, inset 0 1px 0 rgba(255,255,255,0.2);'>
+        <h3 style='color: white; text-align: center; margin: 0 0 15px 0; font-size: 1.4rem; position: relative; z-index: 2;'>
             🎊 {companion['name']} Revealed! 🎊
         </h3>
-        <div style='text-align: center; margin-bottom: 15px;'>
+        <div style='text-align: center; margin-bottom: 15px; position: relative; z-index: 2;'>
             <span style='background: {style["border_gradient"]}; color: white; padding: 8px 16px; 
                         border-radius: 10px; font-weight: 700; font-size: 1.1rem;
                         box-shadow: 0 4px 15px {style["glow"]};
@@ -848,7 +874,7 @@ def show_stats_reveal_animation(companion, reveal_info):
             </span>
         </div>
         <div style='background: rgba(255,255,255,0.1); padding: 15px; border-radius: 12px;
-                    border: 1px solid rgba(255,255,255,0.2);'>
+                    border: 1px solid rgba(255,255,255,0.2); position: relative; z-index: 2;'>
             {stats_html}
         </div>
     </div>
