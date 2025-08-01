@@ -2197,15 +2197,26 @@ if st.session_state.previous_page != st.session_state.page:
     st.session_state.show_companion_details = None
     st.session_state.previous_page = st.session_state.page
 
-# CHECK FOR COMPANION DETAILS POPUP - GLOBAL DISPLAY WITH SCROLL
+# CHECK FOR COMPANION DETAILS POPUP - GLOBAL DISPLAY WITH ENHANCED SCROLL
 if st.session_state.show_companion_details:
-    # Add a small delay for chat page to ensure proper rendering
+    # Enhanced handling for different pages
     if st.session_state.page == "Chat":
         st.empty()  # Force a render cycle
+    elif st.session_state.page == "My Collection":
+        # Extra aggressive scroll for collection page
+        st.markdown("""
+        <script>
+        setTimeout(function() {
+            window.scrollTo({top: 0, behavior: 'instant'});
+            setTimeout(function() {
+                window.scrollTo({top: 0, behavior: 'smooth'});
+            }, 50);
+        }, 10);
+        </script>
+        """, unsafe_allow_html=True)
     
     show_companion_details_popup(st.session_state.show_companion_details)
     st.markdown("---")  # Separator
-
 
 # ─────────────────── FIND MATCHES (FIXED) ────────────────────────────────
 if st.session_state.page == "Find matches":
