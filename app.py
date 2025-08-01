@@ -2057,6 +2057,26 @@ with col4:
 
 
 # ─────────────────── FIND MATCHES ────────────────────────────────
+# SOLUTION: Fix the button click bug in Find Matches
+
+# PROBLEM: When you come back from Chat to Find matches, the first button click 
+# refreshes matches instead of processing the purchase.
+
+# CURRENT BROKEN CODE (in your Find Matches section):
+"""
+if st.button("Show matches"):
+    st.session_state.matches = (
+       [c for c in COMPANIONS if all(t in c["tags"] for t in (hobby,trait,vibe,scene))]
+       or random.sample(COMPANIONS, 5)
+    )
+
+# Display matches with HYBRID system
+for c in st.session_state.matches:  # ← BUG: matches might be empty here
+"""
+
+# FIXED VERSION - Replace your Find Matches section with this:
+
+# ─────────────────── FIND MATCHES (FIXED) ────────────────────────────────
 if st.session_state.page == "Find matches":
     if st.session_state.flash:
         st.success(st.session_state.flash)
@@ -2065,7 +2085,7 @@ if st.session_state.page == "Find matches":
     # Show updated mystery box pricing info
     display_mystery_tier_info()
     
-    # Existing match finding logic (keep this the same)
+    # Existing match finding logic
     hobby = st.selectbox("Pick a hobby", ["space","foodie","gaming","music","art",
                        "sports","reading","travel","gardening","coding"])
     trait = st.selectbox("Pick a trait", ["curious","adventurous","night‑owl","chill",
@@ -2082,7 +2102,11 @@ if st.session_state.page == "Find matches":
            or random.sample(COMPANIONS, 5)
         )
 
-    # Display matches with HYBRID system
+    # FIX: Initialize matches if they don't exist (this is the key fix!)
+    if "matches" not in st.session_state or not st.session_state.matches:
+        st.session_state.matches = random.sample(COMPANIONS, 5)
+
+    # Display matches with HYBRID system (now guaranteed to have matches)
     for c in st.session_state.matches:
         owned = c["id"] in colset
         show_identity = should_show_companion_identity(c)
