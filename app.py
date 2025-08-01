@@ -742,11 +742,7 @@ def display_mystery_tier_info():
     
 
 # ─────────────────── UI DISPLAY FUNCTIONS FOR MYSTERY BOX ─────────────────────
-# Add these right after your reveal_companion_stats function
 
-
-
-# EMERGENCY FIX - Replace the broken reveal function with this SIMPLE version
 
 def show_stats_reveal_animation(companion, reveal_info):
     """Reveal animation that matches the companion's actual rarity colors"""
@@ -823,6 +819,54 @@ def show_stats_reveal_animation(companion, reveal_info):
     # Show the bio
     st.markdown(f"*\"{companion['bio']}\"*")
     st.markdown("---")
+
+def show_stats_reveal_animation(companion, reveal_info):
+    # ... your existing reveal function ...
+    pass
+
+def show_companion_details_popup(companion):
+    """Show full companion details in a prominent popup-style display"""
+    
+    # Create a prominent container that takes up most of the screen
+    st.markdown("""
+    <div style='background: linear-gradient(135deg, #1F2937, #374151); 
+                border: 3px solid #3B82F6; border-radius: 20px; 
+                padding: 30px; margin: 20px 0;
+                box-shadow: 0 20px 60px rgba(0,0,0,0.5);'>
+    """, unsafe_allow_html=True)
+    
+    # Header
+    st.markdown(f"### 📸 {companion['name']} - Full Details")
+    
+    # Two-column layout: Image + Stats
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        # Large portrait
+        st.image(companion.get("photo", PLACEHOLDER), width=400)
+        
+    with col2:
+        # Companion details using your existing card styling
+        rarity = get_actual_rarity(companion)
+        total_stats = companion.get("total_stats", sum(companion.get("stats", {}).values()))
+        
+        st.markdown(f"**Rarity:** {rarity}")
+        st.markdown(f"**Total Stats:** {total_stats} ⭐")
+        st.markdown(f"**Bio:** *{companion['bio']}*")
+        
+        # Individual stats
+        st.markdown("**Stats:**")
+        for stat, value in companion["stats"].items():
+            st.markdown(f"• **{stat.title()}:** {value}")
+    
+    # Close button
+    col1, col2, col3 = st.columns([2, 1, 2])
+    with col2:
+        if st.button("❌ Close", key=f"close_details_{companion['id']}", use_container_width=True):
+            st.session_state.show_companion_details = None
+            st.rerun()
+    
+    st.markdown("</div>", unsafe_allow_html=True)
 
 def display_mystery_companion_card(companion, user_id, owned=False, in_collection=False):
     """Display companion card with mystery box or revealed stats"""
@@ -1999,6 +2043,9 @@ for k,v in {
 }.items():
     st.session_state.setdefault(k, v)
 
+if "show_companion_details" not in st.session_state:
+    st.session_state.show_companion_details = None
+
 user   = st.session_state.user
 colset = collection_set(user["id"])
 
@@ -2101,6 +2148,14 @@ if st.session_state.page == "Find matches":
         st.success(st.session_state.flash)
         st.session_state.flash = None
 
+    # CHECK FOR COMPANION DETAILS POPUP (NEW)
+    if st.session_state.show_companion_details:
+        show_companion_details_popup(st.session_state.show_companion_details)
+        st.markdown("---")  # Separator
+
+    # Show updated mystery box pricing info
+    display_mystery_tier_info()
+
     # Show updated mystery box pricing info
     display_mystery_tier_info()
     
@@ -2135,7 +2190,12 @@ if st.session_state.page == "Find matches":
         
         if owned:
             # If owned, always show full identity
-            c1.image(c.get("photo", PLACEHOLDER), width=90)
+            with c1:
+                # Add view details button
+                if st.button("👁️", key=f"view_{c['id']}", help="View full details", use_container_width=True):
+                    st.session_state.show_companion_details = c
+                    st.rerun()
+                st.image(c.get("photo", PLACEHOLDER), width=90)
             rarity, clr = get_actual_rarity(c), CLR[get_actual_rarity(c)]
             c2.markdown(
                 f"<span style='background:{clr};color:black;padding:2px 6px;"
@@ -2149,7 +2209,12 @@ if st.session_state.page == "Find matches":
                 
         elif show_identity:
             # Show this companion's true identity - can buy specifically
-            c1.image(c.get("photo", PLACEHOLDER), width=90)
+            with c1:
+                # Add view details button
+                if st.button("👁️", key=f"view_{c['id']}", help="View full details", use_container_width=True):
+                    st.session_state.show_companion_details = c
+                    st.rerun()
+                st.image(c.get("photo", PLACEHOLDER), width=90)
             rarity, clr = get_actual_rarity(c), CLR[get_actual_rarity(c)]
             mystery_tier = get_mystery_tier_from_companion(c)
             price = MYSTERY_COST[mystery_tier]
@@ -2250,6 +2315,10 @@ elif st.session_state.page == "Chat":
         # DISPLAY COMPANION HEADER WITH STATS (now always revealed)
         col1, col2 = st.columns([1, 4])
         with col1:
+            # Add view details button in chat too
+            if st.button("👁️ View Details", key=f"chat_view_{cid}", use_container_width=True):
+                st.session_state.show_companion_details = comp
+                st.rerun()
             st.image(comp.get("photo", PLACEHOLDER), width=100)
         with col2:
             st.markdown(format_companion_card_enhanced_hybrid(comp, show_stats=True), unsafe_allow_html=True)
@@ -2361,6 +2430,10 @@ elif st.session_state.page == "My Collection":
             col1, col2, col3 = st.columns([1, 4, 1])
             
             with col1:
+                # Add view details button
+                if st.button("👁️", key=f"collection_view_{cid}", help="View full details", use_container_width=True):
+                    st.session_state.show_companion_details = c
+                    st.rerun()
                 col1.image(c.get("photo",PLACEHOLDER), width=80)
             
             with col2:
