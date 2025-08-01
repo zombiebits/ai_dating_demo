@@ -2156,8 +2156,7 @@ if st.session_state.page == "Find matches":
     # Show updated mystery box pricing info
     display_mystery_tier_info()
 
-    # Show updated mystery box pricing info
-    display_mystery_tier_info()
+    
     
     # Existing match finding logic
     hobby = st.selectbox("Pick a hobby", ["space","foodie","gaming","music","art",
