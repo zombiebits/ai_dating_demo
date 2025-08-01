@@ -903,23 +903,28 @@ def show_companion_details_popup(companion):
         # Large portrait with rarity glow
         rarity = get_actual_rarity(companion)
         rarity_glows = {
-            "Common": "rgba(156, 163, 175, 0.4)",
-            "Rare": "rgba(59, 130, 246, 0.6)", 
-            "Legendary": "rgba(245, 158, 11, 0.7)"
+            "Common": "rgba(156, 163, 175, 0.6)",
+            "Rare": "rgba(59, 130, 246, 0.8)", 
+            "Legendary": "rgba(245, 158, 11, 0.9)"
         }
         glow_color = rarity_glows.get(rarity, rarity_glows["Common"])
         
-        # Create container with glow effect
+        # Create HTML image with glow effect
+        image_url = companion.get("photo", PLACEHOLDER)
         st.markdown(f"""
         <div style='display: flex; justify-content: center; margin-bottom: 20px;'>
-            <div style='border-radius: 12px; 
-                        box-shadow: 0 0 30px {glow_color}, 0 0 60px {glow_color}; 
-                        padding: 4px; background: rgba(255,255,255,0.1);'>
+            <img src="{image_url}" 
+                style='width: 400px; 
+                        border-radius: 12px; 
+                        box-shadow: 0 0 25px {glow_color}, 
+                                    0 0 50px {glow_color}, 
+                                    0 0 75px {glow_color};
+                        border: 3px solid rgba(255,255,255,0.2);
+                        transition: all 0.3s ease;'
+                onmouseover='this.style.boxShadow="0 0 35px {glow_color}, 0 0 70px {glow_color}, 0 0 105px {glow_color}"'
+                onmouseout='this.style.boxShadow="0 0 25px {glow_color}, 0 0 50px {glow_color}, 0 0 75px {glow_color}"' />
+        </div>
         """, unsafe_allow_html=True)
-        
-        st.image(companion.get("photo", PLACEHOLDER), width=400)
-        
-        st.markdown("</div></div>", unsafe_allow_html=True)
         
     with col2:
         # Companion details using your existing card styling
