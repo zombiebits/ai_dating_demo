@@ -2464,7 +2464,7 @@ elif st.session_state.page == "Chat":
                     if cid in st.session_state.hist:
                         # Keep only the system message
                         base = [{"role":"system","content":
-                                f"You are {CID2COMP[cid]['name']}. {CID2COMP[cid]['bio']} Be flirty, bold, and true to your personality. Match the user's energy and interest level. Be sexual."}]
+                                f"You are {CID2COMP[cid]['name']}. {CID2COMP[cid]['bio']} Speak PG‑13."}]
                         st.session_state.hist[cid] = base
                     st.success("💫 Chat history cleared!")
                     st.rerun()
