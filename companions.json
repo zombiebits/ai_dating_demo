@@ -899,5 +899,22 @@
     },
     "total_stats": 370,
     "base_xp": 50
+  },
+  {
+    "id": "bondi",
+    "name": "Bondi the Bondskeeper",
+    "rarity": "Legendary",
+    "tags": ["guide", "collector", "mentor", "mystic", "storyteller"],
+    "bio": "Keeper of the Bond Hall, master of introductions, and the bridge between newcomers and the ancient art of AI companionship. Bondi knows every Bond’s story — and might just help you write your own.",
+    "photo": "assets/bondi.jpg",
+    "stats": {
+      "wit": 85,
+      "empathy": 95,
+      "creativity": 90,
+      "knowledge": 95,
+      "boldness": 75
+    },
+    "total_stats": 440,
+    "base_xp": 35
   }
 ]
