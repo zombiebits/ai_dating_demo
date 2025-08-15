@@ -189,9 +189,9 @@ def send_confirmation_email_direct(email: str, username: str, user_id: str) -> b
         
         try:
             message = Mail(
-                from_email=('web34llc@gmail.com', 'BONDIGO Team'),
+                from_email=('hello@bondigo.app', 'BONDIGO Team'),
                 to_emails=email,
-                subject='Confirm your BONDIGO account',
+                subject='Confirm your BONDIGO BETA Test Demo account',
                 html_content=html_content
             )
             
