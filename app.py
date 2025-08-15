@@ -2484,7 +2484,7 @@ elif st.session_state.page == "Chat":
                       .order("created_at")
                       .execute().data)
             base = [{"role":"system","content":
-                     f"You are {CID2COMP[cid]['name']}. {CID2COMP[cid]['bio']} Be flirty, bold, and true to your personality. Match the user's energy and interest level. Be sexual."}]
+                     f"You are {CID2COMP[cid]['name']}. {CID2COMP[cid]['bio']} Speak PG‑13."}]
             hist = base + [{"role":r["role"],"content":r["content"]} for r in rows]
             st.session_state.hist[cid] = hist
 
