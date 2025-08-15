@@ -10,12 +10,58 @@ from supabase import create_client
 from postgrest.exceptions import APIError
 import sendgrid
 from sendgrid.helpers.mail import Mail
+import base64
 
 # ─────────────────── DEVELOPMENT MODE TOGGLE ─────────────────────
 # Set to False for production, True for development
 DEV_MODE = os.environ.get('DEV_MODE', 'False').lower() == 'true'
 
+# ─────────────────── ENCRYPTION ─────────────────────
 
+from cryptography.fernet import Fernet
+import base64
+
+def get_cipher():
+    """Get encryption cipher"""
+    try:
+        key = st.secrets["CHAT_ENCRYPTION_KEY"]
+        return Fernet(key.encode())
+    except Exception as e:
+        logger.error(f"Encryption key error: {str(e)}")
+        return None
+
+def encrypt_message(text: str) -> str:
+    """Encrypt a chat message"""
+    if not text:
+        return text
+    
+    cipher = get_cipher()
+    if not cipher:
+        logger.warning("Encryption failed, storing message in plain text")
+        return text
+    
+    try:
+        encrypted_bytes = cipher.encrypt(text.encode('utf-8'))
+        return base64.urlsafe_b64encode(encrypted_bytes).decode('utf-8')
+    except Exception as e:
+        logger.error(f"Encryption error: {str(e)}")
+        return text
+
+def decrypt_message(encrypted_text: str) -> str:
+    """Decrypt a chat message"""
+    if not encrypted_text:
+        return encrypted_text
+    
+    cipher = get_cipher()
+    if not cipher:
+        return encrypted_text
+    
+    try:
+        encrypted_bytes = base64.urlsafe_b64decode(encrypted_text.encode('utf-8'))
+        decrypted_bytes = cipher.decrypt(encrypted_bytes)
+        return decrypted_bytes.decode('utf-8')
+    except Exception:
+        return encrypted_text
 
 # ─────────────────── LOGGING SETUP ─────────────────────────────────
 logging.basicConfig(
@@ -2485,12 +2531,13 @@ elif st.session_state.page == "Chat":
                       .execute().data)
             base = [{"role":"system","content":
                      f"You are {CID2COMP[cid]['name']}. {CID2COMP[cid]['bio']} Speak PG‑13."}]
-            hist = base + [{"role":r["role"],"content":r["content"]} for r in rows]
+            hist = base + [{"role":r["role"],"content":decrypt_message(r["content"])} for r in rows]
             st.session_state.hist[cid] = hist
 
         for msg in hist[1:]:
+            decrypted_content = decrypt_message(msg["content"])
             st.chat_message("assistant" if msg["role"]=="assistant" else "user")\
-              .write(msg["content"])
+                .write(decrypted_content)
         if st.session_state.spent >= MAX_TOKENS:
             st.warning("Daily token budget hit.")
         else:
@@ -2512,18 +2559,21 @@ elif st.session_state.page == "Chat":
                     # Award XP for the interaction
                     xp_earned = award_chat_xp(user["auth_uid"], cid, len(user_input))
 
-                    # Original database insertions
+                    # Encrypt messages before storing
+                    encrypted_user_input = encrypt_message(user_input)
+                    encrypted_reply = encrypt_message(reply)
+
                     SRS.table("messages").insert({
                         "user_id":      user["id"],
                         "companion_id": cid,
                         "role":         "user",
-                        "content":      user_input
+                        "content":      encrypted_user_input
                     }).execute()
                     SRS.table("messages").insert({
                         "user_id":      user["id"],
                         "companion_id": cid,
                         "role":         "assistant",
-                        "content":      reply
+                        "content":      encrypted_reply
                     }).execute()
 
                     # Show XP notification
